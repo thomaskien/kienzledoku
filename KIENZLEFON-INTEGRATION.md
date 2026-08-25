@@ -95,10 +95,13 @@ bereit, verändert aber weder einen vorhandenen Kienzlefon-AI-Installer noch
 dessen Server-Snapshots. Alternativ können weiterhin vorhandene Dienste auf
 demselben Mac oder im Praxisnetz verwendet werden.
 
-Für Ubuntu-x86_64-Server mit NVIDIA/CUDA liegt zusätzlich der getrennte
-Installer [`server-linux`](server-linux/README.md) bei. Er richtet LLM,
+Die **empfohlene Betriebsarchitektur** verwendet einen dedizierten
+Ubuntu-x86_64-Server mit NVIDIA/CUDA. Der getrennte Installer
+[`server-linux`](server-linux/README.md) richtet dort LLM,
 WhisperLiveKit/Faster-Whisper und pyannote als systemd-Dienste ein und ergänzt
-den für Kienzledoku erforderlichen Final-Block-Endpunkt auf Port 8179.
+den für Kienzledoku erforderlichen Final-Block-Endpunkt auf Port 8179. Der
+T2med-Mac bleibt dabei der Client; der vollständig lokale Apple-Silicon-Betrieb
+ist eine optionale Alternative.
 
 ## Konfigurierbare Dienstziele
 

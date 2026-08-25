@@ -3,6 +3,14 @@
 Dieser Ordner enthält die Linux-Serverinstallation für einen Kienzledoku-Client
 auf einem anderen Rechner. Die Dienste laufen resident unter systemd:
 
+> [!TIP]
+> **Diese dedizierte Serverinstallation ist die empfohlene
+> Kienzledoku-Betriebsvariante.** Der T2med-Mac bleibt dabei der schlanke
+> Client, während Modellbetrieb, GPU-Last und Wartung der KI-Dienste auf dem
+> Ubuntu-/NVIDIA-Server gebündelt werden. Die Dienste gehören ausschließlich
+> ins geschützte Praxisnetz und müssen per Firewall auf die vorgesehenen
+> Clients begrenzt werden.
+
 | Dienst | Implementierung | Port für Kienzledoku |
 | --- | --- | --- |
 | LLM | Qwen3.5-9B Q6_K über llama.cpp/CUDA | `8080` |

@@ -18,6 +18,14 @@ Projektdateien gespeichert.
 > in [Sicherheitsgrenzen](#sicherheitsgrenzen) beschriebenen Einschränkungen
 > schließen einen ungeprüften produktiven Einsatz aus.
 
+> [!TIP]
+> **Empfohlene Betriebsvariante:** Kienzledoku läuft als schlanker Client auf
+> dem T2med-Mac; LLM, Final-Block-ASR und Diarisierung laufen resident auf
+> einem dedizierten Ubuntu-/NVIDIA-Server im Praxisnetz. Dadurch bleiben
+> Modellbetrieb und GPU-Last vom Arbeitsplatz getrennt und die KI-Dienste
+> lassen sich zentral warten. Der rein lokale Betrieb auf einem
+> Apple-Silicon-Mac ist eine optionale Alternative.
+
 ## Funktionsumfang
 
 - automatische Mikrofonaufnahme nach dem Aufruf aus T2med;
@@ -90,7 +98,11 @@ lädt festgeschriebene Versionen und prüft die vorgesehenen Dateien.
 
 ## Installation
 
-### Vollständig lokal auf Apple Silicon
+Für den regelmäßigen Einsatz wird die
+[dedizierte Linux-Servervariante](#empfohlen-dedizierter-linuxnvidia-server-im-praxisnetz)
+empfohlen.
+
+### Alternative: vollständig lokal auf Apple Silicon
 
 Auf einem geeigneten Apple-Silicon-Mac installiert dieser Doppelklick-Installer
 zuerst die ausgewählten lokalen KI-Dienste und anschließend die
@@ -140,9 +152,10 @@ akzeptierte Modellbedingungen. Einzelheiten, Komponentenwahl und
 nichtinteraktive Optionen stehen in
 [`local-ai-macos/README.md`](local-ai-macos/README.md).
 
-### Linux/NVIDIA-Server im Praxisnetz
+### Empfohlen: dedizierter Linux/NVIDIA-Server im Praxisnetz
 
-Für einen separaten Ubuntu-Server enthält
+Dies ist die **empfohlene Betriebsvariante**. Für einen separaten
+Ubuntu-/NVIDIA-Server enthält
 [`server-linux`](server-linux/README.md) die vollständige Installation von:
 
 - Qwen3.5-9B/llama.cpp auf Port `8080`;
