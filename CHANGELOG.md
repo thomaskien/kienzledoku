@@ -42,6 +42,9 @@ festgehalten. Das Format orientiert sich an
 - Dokumentationsübernahme erfolgt als atomare FHIR-Transaktion.
 - Temporäre Audio-, Transkript- und LLM-Dateien werden geschützt verarbeitet
   und nach Abschluss entfernt.
+- Die Grenze des öffentlichen T2med-Demo-Keys von 100 einzelnen FHIR-Requests
+  pro APS-Serverprozess sowie der danach erforderliche Neustart des
+  T2med-/APS-Serverprozesses werden prominent ausgewiesen.
 
 ### Sicherheit
 

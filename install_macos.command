@@ -361,7 +361,10 @@ fi
 echo "URL-Schemes: T2demo://, whisperdoku:// und kienzledoku://"
 echo "Dienstkonfiguration: $CONFIG_PATH"
 echo "Diagnose-Log: $LOG_PATH"
-echo "API-Key: zunächst öffentlicher T2med-Demo-Key; eigener Key kann später per set_api_key_macos.command in den Schlüsselbund gelegt werden."
+echo "API-Key: zunächst öffentlicher T2med-Demo-Key."
+echo "WICHTIG: Der Demo-Key ist auf 100 einzelne FHIR-Requests pro APS-Serverprozess begrenzt."
+echo "Nach Ausschöpfen muss der T2med-/APS-Serverprozess neu gestartet werden."
+echo "Für den regelmäßigen Betrieb einen eigenen Key mit set_api_key_macos.command im Schlüsselbund speichern."
 echo
 echo "Nächster Test: TESTPATIENTEN öffnen und den in T2med separat zugewiesenen Drittanbieter-Button betätigen."
 echo "Das eigene Kienzledoku-Fenster sollte sich öffnen und die Aufnahme sofort starten."

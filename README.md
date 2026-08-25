@@ -26,6 +26,14 @@ Projektdateien gespeichert.
 > lassen sich zentral warten. Der rein lokale Betrieb auf einem
 > Apple-Silicon-Mac ist eine optionale Alternative.
 
+> [!WARNING]
+> **Demo-Key: höchstens 100 FHIR-Requests pro APS-Serverprozess.** Jeder
+> Patienten-Read, Encounter-Read und Write zählt einzeln; damit sind nicht 100
+> vollständige Dokumentationsvorgänge gemeint. Ist das Kontingent
+> ausgeschöpft, muss der T2med-/APS-Serverprozess neu gestartet werden, bevor
+> der öffentliche Demo-Key wieder verwendet werden kann. Für den regelmäßigen
+> Betrieb sollte ein eigener T2med-API-Schlüssel eingerichtet werden.
+
 ## Funktionsumfang
 
 - automatische Mikrofonaufnahme nach dem Aufruf aus T2med;
@@ -305,8 +313,15 @@ export KIENZLEDOKU_T2MED_KUERZEL=KI
 ## API-Schlüssel und Datenschutz
 
 Für die T2med-Demo ist der öffentliche Schlüssel aus der T2med-Dokumentation
-vorbelegt. Ein eigener Schlüssel wird mit diesem Hilfsskript im
-macOS-Schlüsselbund gespeichert:
+vorbelegt. Er ist auf **100 FHIR-Requests pro APS-Serverprozess** begrenzt.
+Jeder Patienten-Read, Encounter-Read und Write verbraucht einen eigenen
+Request; 100 Requests entsprechen daher nicht 100 vollständigen
+Dokumentationsvorgängen. Nach Ausschöpfen des Kontingents muss der
+T2med-/APS-Serverprozess neu gestartet werden, damit der Demo-Key wieder
+verwendet werden kann.
+
+Für den regelmäßigen Betrieb wird ein eigener Schlüssel empfohlen. Er wird mit
+diesem Hilfsskript im macOS-Schlüsselbund gespeichert:
 
 ```bash
 ./set_api_key_macos.command
@@ -403,6 +418,7 @@ Zugangsdaten enthalten.
 | ASR, Diarisierung oder LLM ist rot | Dienstadresse in `config.json`, Erreichbarkeit des Hosts und Ports sowie den jeweiligen `/health`- beziehungsweise `/v1/models`-Endpunkt prüfen. |
 | Kein Sprachsignal | Mikrofon in den macOS-Systemeinstellungen erlauben und das richtige Eingabegerät in Kienzledoku wählen. |
 | T2med öffnet die falsche Anwendung | `T2demo://` kann nur einem aktiven Handler zugeordnet sein. Kienzledoku erneut installieren und konkurrierende Test-Apps nicht gleichzeitig registrieren. |
+| Demo-Key wird abgelehnt | Der öffentliche Demo-Key erlaubt höchstens 100 einzelne FHIR-Requests pro APS-Serverprozess. Nach Ausschöpfen muss der T2med-/APS-Serverprozess neu gestartet oder ein eigener T2med-API-Schlüssel eingerichtet werden. |
 | Start schlägt fehl | `~/Library/Logs/Kienzledoku.log` prüfen; keine Deep Links oder Zugangsdaten in öffentliche Issues kopieren. |
 | FHIR-Ziel wird abgelehnt | Dieser Stand erlaubt nur die unter [Sicherheitsgrenzen](#sicherheitsgrenzen) genannten Hosts und den erwarteten API-Pfad. |
 

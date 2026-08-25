@@ -170,7 +170,7 @@ def get_api_key():
             except Exception:
                 pass
 
-    return DEMO_API_KEY, "öffentlicher T2med-Demo-Key"
+    return DEMO_API_KEY, "öffentlicher T2med-Demo-Key (max. 100 FHIR-Requests pro APS-Serverprozess)"
 
 
 def parse_deep_link(url):
