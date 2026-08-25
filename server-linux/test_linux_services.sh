@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
+exec "$SCRIPT_DIR/install_kienzlefon_ai_server.sh" --action test "$@"

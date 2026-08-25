@@ -1,0 +1,36 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+*.log
+
+# Medizinische Roh- und Arbeitsdaten gehören nicht in das Repository.
+*.wav
+*.m4a
+*.mp3
+*.flac
+recordings/
+transcripts/
+
+# Zugangsdaten und lokale Schlüsseldateien.
+*token*.txt
+*secret*
+*.pem
+*.key
+
+# Lokale Laufzeitkonfiguration und macOS-Metadaten.
+config.json
+.DS_Store
+letzte_kienzledoku_*.json
+letzte_whisperdoku_*.json
+*.p12
+*.pfx
+
+# Modelle und abgebrochene Downloads werden niemals committed.
+*.gguf
+*.npz
+*.part
+models/
