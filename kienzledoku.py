@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Kienzledoku 1.2 <-> T2med FHIR client.
+"""Kienzledoku 1.2.1 <-> T2med FHIR client.
 
 Target: Python 3.9+ (macOS 10.14 Mojave through current macOS).
 No third-party Python packages required.
@@ -55,7 +55,7 @@ from kienzledoku_speech import (
 )
 
 APP_NAME = "Kienzledoku"
-VERSION = "1.2"
+VERSION = "1.2.1"
 
 # Public test/demo key from T2med's reference application (not a secret).
 # Demo/test/integration only; never use for production.
@@ -221,12 +221,12 @@ def configured_fhir_hosts(config_path=None):
 def validate_local_fhir_url(url, config_path=None):
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme.lower() != "https":
-        raise ValueError("Kienzledoku 1.2 akzeptiert ausschließlich HTTPS-FHIR-URLs")
+        raise ValueError("Kienzledoku 1.2.1 akzeptiert ausschließlich HTTPS-FHIR-URLs")
     host = (parsed.hostname or "").lower()
     allowed_hosts = configured_fhir_hosts(config_path=config_path)
     if host not in allowed_hosts:
         raise ValueError(
-            "Kienzledoku 1.2 akzeptiert nur explizit freigegebene T2med-FHIR-Hosts. "
+            "Kienzledoku 1.2.1 akzeptiert nur explizit freigegebene T2med-FHIR-Hosts. "
             "Erlaubt sind %s; erhalten: %s. Bitte install_macos.command erneut ausführen."
             % (", ".join(sorted(allowed_hosts)), host or "(kein Host)")
         )
@@ -1043,7 +1043,7 @@ def page_html(state):
 def close_page_html():
     return """<!doctype html><html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kienzledoku 1.2</title><style>{css}</style></head>
+<title>Kienzledoku 1.2.1</title><style>{css}</style></head>
 <body><main><div class="card"><h1>Dokumentation übernommen</h1>
 <p class="ok">Die Dokumentation wurde in T2med gespeichert. Dieses Fenster wird geschlossen.</p>
 <button type="button" onclick="window.close()">Fenster schließen</button>
@@ -1446,7 +1446,7 @@ def self_test():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Kienzledoku 1.2 mit T2med FHIR")
+    parser = argparse.ArgumentParser(description="Kienzledoku 1.2.1 mit T2med FHIR")
     parser.add_argument("--deep-link", help="T2demo://, whisperdoku:// oder kienzledoku:// aus T2med")
     parser.add_argument("--no-browser", action="store_true", help="print local UI URL instead of opening browser")
     parser.add_argument("--self-test", action="store_true")

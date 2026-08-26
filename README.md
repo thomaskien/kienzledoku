@@ -1,4 +1,4 @@
-# Kienzledoku 1.2
+# Kienzledoku 1.2.1
 
 [![Video: Lokaler KI-Dokumentationsassistent für die Arztpraxis mit T2med](https://img.youtube.com/vi/6l1U047NSwg/maxresdefault.jpg)](https://www.youtube.com/watch?v=6l1U047NSwg)
 
@@ -12,7 +12,7 @@ oder innerhalb des Praxisnetzes. T2med-Zugangsdaten werden nicht in
 Projektdateien gespeichert.
 
 > [!IMPORTANT]
-> Kienzledoku 1.2 ist ein Entwicklungs- und Integrationsstand, kein
+> Kienzledoku 1.2.1 ist ein Entwicklungs- und Integrationsstand, kein
 > zertifiziertes Medizinprodukt. Die erzeugte Dokumentation ist immer ein
 > Entwurf und muss vor der Übernahme vollständig ärztlich geprüft werden. Die
 > in [Sicherheitsgrenzen](#sicherheitsgrenzen) beschriebenen Einschränkungen

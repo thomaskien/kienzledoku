@@ -6,12 +6,22 @@ festgehalten. Das Format orientiert sich an
 
 ## [Unveröffentlicht]
 
+- Noch keine Änderungen.
+
+## [1.2.1] – 2026-08-26
+
+### Behoben
+
+- Der Mac-Installer fragt den T2med-FHIR-Host ab und speichert ihn als lokale
+  Freigabe. Die in 1.2 irrtümlich fest codierte Test-IP `10.0.83.120` ist nur
+  noch der änderbare Vorschlagswert.
+
+### Dokumentation
+
 - T2med-Einrichtung um den abschließenden Menüleistenknopf ergänzt.
 - Host-Firewall auf dem KI-Server als optionale zusätzliche Absicherung im
   geschützten Praxisnetz klargestellt.
 - Nicht umgesetzten Zertifikats-Hinweis entfernt.
-- T2med-FHIR-Host wird nun vom Mac-Installer abgefragt und statt einer festen
-  Test-IP als lokale Freigabe gespeichert.
 - Datenschutz-Selbsteinschätzung des Betreibers für den ausschließlich
   praxisinternen Betrieb ergänzt.
 

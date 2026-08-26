@@ -17,7 +17,7 @@ werden.
   Zertifikats-, Konfigurations- oder Logdateien erfasst werden.
 - [ ] Screenshots nochmals auf Patienten-, Praxis- und Zugangsdaten prüfen.
 - [ ] Prüfen, dass alle Versionsangaben in Python, Installer, nativem Fenster
-  und Dokumentation auf `1.2` stehen.
+  und Dokumentation auf `1.2.1` stehen.
 - [ ] Netzwerkfreie Tests ausführen.
 - [ ] Modellfreien Selbsttest des Local-AI-Installers ausführen.
 - [ ] Statischen Selbsttest des Ubuntu/NVIDIA-Installers ausführen.
@@ -85,8 +85,8 @@ reale Tokens dürfen nicht enthalten sein.
 
 ## Empfohlene Release-Angaben
 
-- Tag: `v1.2.0`
-- Titel: `Kienzledoku 1.2`
+- Tag: `v1.2.1`
+- Titel: `Kienzledoku 1.2.1`
 - Plattform: Kienzledoku-App für Intel und Apple Silicon; Local AI für Apple
   Silicon mit mindestens 32 GB Unified Memory; Serverdienste für Ubuntu 24.04
   x86_64 mit NVIDIA/CUDA

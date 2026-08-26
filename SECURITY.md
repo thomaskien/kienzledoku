@@ -4,10 +4,10 @@
 
 | Version | Sicherheitsupdates |
 | --- | --- |
-| 1.2 | Ja |
-| älter als 1.2 | Nein |
+| 1.2.1 | Ja |
+| 1.2 und älter | Nein |
 
-Kienzledoku 1.2 ist ein Entwicklungs- und Integrationsstand. Die bekannten
+Kienzledoku 1.2.1 ist ein Entwicklungs- und Integrationsstand. Die bekannten
 Einsatzgrenzen sind im Abschnitt
 [Sicherheitsgrenzen](README.md#sicherheitsgrenzen) der README beschrieben.
 

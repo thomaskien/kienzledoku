@@ -1,4 +1,4 @@
-# Kienzlefon AI → Kienzledoku 1.2
+# Kienzlefon AI → Kienzledoku 1.2.1
 
 Dieses Dokument definiert die vorbereitete Nahtstelle zwischen den bereits
 vorhandenen Kienzlefon-AI-Diensten und der T2med-Übergabe in Kienzledoku.
@@ -121,7 +121,7 @@ stattdessen vorhandene Einzelwerte beibehalten. Die lokale Datei
 `~/Library/Application Support/Kienzledoku/config.json` enthält ausschließlich
 den erlaubten T2med-FHIR-Host und diese Dienstadressen, keine Patienten-,
 OAuth- oder API-Daten. Die Oberfläche prüft und zeigt die Erreichbarkeit aller
-drei Dienste separat an. Seit
-Kienzledoku 1.2 wird dieser Installer-Pfad beim Anwendungsstart ausdrücklich
-übergeben; eine vorhandene Datei hat Vorrang vor geerbten Dienstvariablen. Die
+drei Dienste separat an. Dieser Installer-Pfad wird beim Anwendungsstart
+ausdrücklich übergeben; eine vorhandene Datei hat Vorrang vor geerbten
+Dienstvariablen. Die
 tatsächlich geladene Quelle ist in den technischen Informationen sichtbar.

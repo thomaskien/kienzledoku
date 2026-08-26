@@ -397,7 +397,7 @@ class SpeechIntegrationTests(unittest.TestCase):
         state.speech = SpeechRecognitionManager(os.path.dirname(os.path.dirname(__file__)))
         rendered = page_html(state)
         self.assertIn(">kienzledoku</a>", rendered)
-        self.assertIn("v1.2 · von Dr. Thomas Kienzle", rendered)
+        self.assertIn("v1.2.1 · von Dr. Thomas Kienzle", rendered)
         self.assertIn('href="https://kienzledoku.de"', rendered)
         self.assertIn("Kienzle, Thomas", rendered)
         self.assertIn("31.12.1970", rendered)

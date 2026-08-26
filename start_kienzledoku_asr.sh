@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "=== Kienzledoku 1.2: Natural Pause -> Final-Block-ASR -> pyannote -> LLM ==="
+echo "=== Kienzledoku 1.2.1: Natural Pause -> Final-Block-ASR -> pyannote -> LLM ==="
 echo "Verzeichnis: $SCRIPT_DIR"
 
 # v6.2: Der Python-venv liegt absichtlich NICHT im (ggf. per iCloud

@@ -323,7 +323,7 @@ property scriptPath : "$SCRIPT_AS"
 property logPath : "$LOG_AS"
 
 on run
-    display dialog "Kienzledoku 1.2 ist installiert. Die Anwendung wird aus T2med über T2demo:// bzw. kienzledoku:// gestartet." buttons {"OK"} default button "OK"
+    display dialog "Kienzledoku 1.2.1 ist installiert. Die Anwendung wird aus T2med über T2demo:// bzw. kienzledoku:// gestartet." buttons {"OK"} default button "OK"
 end run
 
 on open location theURL
@@ -344,9 +344,9 @@ PLIST="$APP_DIR/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleIdentifier" "$PLIST" >/dev/null 2>&1 || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string de.kienzledoku.app" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleShortVersionString" "$PLIST" >/dev/null 2>&1 || true
-/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.2" "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 1.2.1" "$PLIST"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleVersion" "$PLIST" >/dev/null 2>&1 || true
-/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 1.2" "$PLIST"
+/usr/libexec/PlistBuddy -c "Add :CFBundleVersion string 1.2.1" "$PLIST"
 # T2demo and whisperdoku remain registered for compatibility; kienzledoku is canonical.
 /usr/libexec/PlistBuddy -c "Delete :CFBundleURLTypes" "$PLIST" >/dev/null 2>&1 || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$PLIST"

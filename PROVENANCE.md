@@ -1,6 +1,6 @@
 # Herkunft und Referenzstände
 
-Kienzledoku 1.2 wurde aus den lokal übergebenen, überprüften Referenzständen
+Kienzledoku 1.2.1 wurde aus den lokal übergebenen, überprüften Referenzständen
 zusammengeführt. Die Archive und ihre entpackten Referenzen außerhalb dieses
 Verzeichnisses bleiben unverändert.
 
