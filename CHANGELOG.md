@@ -6,7 +6,8 @@ festgehalten. Das Format orientiert sich an
 
 ## [Unveröffentlicht]
 
-- Noch keine Änderungen.
+- Installationsanleitung klar in Clientwahl (macOS oder Ubuntu) und davon
+  unabhängige KI-Serverwahl (Apple Silicon oder Ubuntu/NVIDIA) gegliedert.
 
 ## [1.3.0] – 2026-08-26
 

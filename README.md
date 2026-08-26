@@ -19,13 +19,11 @@ Projektdateien gespeichert.
 > schließen einen ungeprüften produktiven Einsatz aus.
 
 > [!TIP]
-> **Empfohlene Betriebsvariante:** Kienzledoku läuft als schlanker Client auf
-> dem T2med-Arbeitsplatz unter Ubuntu 24.04 LTS oder macOS; LLM,
-> Final-Block-ASR und Diarisierung laufen resident auf
-> einem dedizierten Ubuntu-/NVIDIA-Server im Praxisnetz. Dadurch bleiben
-> Modellbetrieb und GPU-Last vom Arbeitsplatz getrennt und die KI-Dienste
-> lassen sich zentral warten. Der rein lokale Betrieb auf einem
-> Apple-Silicon-Mac ist eine optionale Alternative.
+> **Freie Betriebssystemkombination:** Der Client kann auf macOS oder Ubuntu
+> 24.04 laufen. Unabhängig davon können LLM, Final-Block-ASR und Diarisierung
+> auf einem Apple-Silicon-Mac oder einem Ubuntu-/NVIDIA-System laufen – lokal
+> auf demselben Rechner oder über das Praxisnetz. Für den Mehrplatzbetrieb
+> wird ein dedizierter Ubuntu-/NVIDIA-Server empfohlen.
 
 > [!WARNING]
 > **Demo-Key: höchstens 100 FHIR-Requests pro APS-Serverprozess.** Jeder
@@ -50,12 +48,11 @@ Projektdateien gespeichert.
   Freitext-Eintrag;
 - atomare Übertragung als FHIR-Transaktion: entweder werden alle Einträge
   übernommen oder keiner;
-- schlanker Client für Ubuntu 24.04 LTS mit einem eigenen, unter X11 und
-  Wayland laufenden WebKitGTK-Fenster;
-- enthaltener lokaler macOS-Installer für Qwen/llama.cpp, Whisper/MLX und
-  pyannote/MPS auf Apple Silicon;
-- enthaltener Ubuntu/NVIDIA-Installer für LLM, Final-Block-ASR und
-  Diarisierung auf einem separaten Linux-Server.
+- Clientinstaller für macOS auf Intel/Apple Silicon und Ubuntu 24.04 LTS auf
+  x86_64; der Linux-Client besitzt ein eigenes WebKitGTK-Fenster für X11 und
+  Wayland;
+- Serverinstaller für Qwen/llama.cpp, Whisper und pyannote wahlweise auf einem
+  Apple-Silicon-Mac oder einem Ubuntu-/NVIDIA-System.
 
 Die frühere Entwicklungsbezeichnung **WhisperDoku** erscheint nur noch bei
 Herkunft und Rückwärtskompatibilität. Der Projektname und das kanonische
@@ -99,179 +96,56 @@ T2med-Patientenkontext
   - ein OpenAI-kompatibles LLM, standardmäßig Port `8080`;
 - ein vom Betriebssystem bereitgestelltes Mikrofon-Eingabegerät.
 
-Für einen vollständig lokalen Betrieb enthält dieses Repository den optionalen
-Installer [`local-ai-macos`](local-ai-macos/README.md). Er benötigt einen Mac
-mit Apple Silicon, mindestens 32 GB Unified Memory, natives Homebrew und die
-Xcode Command Line Tools. Die Kienzledoku-App selbst kann weiterhin auf Intel-
-oder Apple-Silicon-Macs laufen und vorhandene Dienste im Praxisnetz verwenden.
-Modelle sind wegen ihrer Größe nicht im Repository enthalten; der Installer
-lädt festgeschriebene Versionen und prüft die vorgesehenen Dateien.
+Für die KI-Serverdienste enthält dieses Repository zwei Alternativen:
+[`local-ai-macos`](local-ai-macos/README.md) für Apple Silicon mit mindestens
+32 GB Unified Memory sowie [`server-linux`](server-linux/README.md) für Ubuntu
+24.04 mit geeigneter NVIDIA-GPU. Beide Clientvarianten können mit beiden
+Servervarianten verbunden werden. Modelle sind wegen ihrer Größe nicht im
+Repository enthalten; die Serverinstaller laden festgeschriebene Versionen und
+prüfen die vorgesehenen Dateien.
 
-## Installation
+## Installation: Client und KI-Server getrennt auswählen
 
-Für den regelmäßigen Einsatz wird die
-[dedizierte Linux-Servervariante](#empfohlen-dedizierter-linuxnvidia-server-im-praxisnetz)
-empfohlen.
+Kienzledoku besteht aus zwei voneinander unabhängigen Teilen:
 
-### Ubuntu-24.04-LTS-Client
+1. Der **Client** läuft auf dem T2med-Arbeitsplatz, nimmt das Gespräch auf,
+   zeigt den Entwurf an und überträgt ihn nach T2med.
+2. Die drei **KI-Serverdienste** übernehmen Spracherkennung, optionale
+   Sprechertrennung und Dokumentationserstellung.
 
-Der Linux-Client wird bewusst direkt aus dem einsehbaren Repository mit einem
-Shell-Skript installiert. Er enthält keine KI-Modelle und installiert keine
-Serverkomponente:
+Client und Server müssen nicht dasselbe Betriebssystem verwenden und müssen
+nicht auf demselben Rechner laufen:
 
-Direkt von GitHub:
+| Rolle | macOS | Linux |
+| --- | --- | --- |
+| **Kienzledoku-Client** | Intel oder Apple Silicon: `install_macos.command` | Ubuntu 24.04 LTS x86_64: `install_linux.sh` |
+| **KI-Serverdienste** | Apple Silicon ab 32 GB: `local-ai-macos` | Ubuntu 24.04 mit NVIDIA-GPU: `server-linux` |
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/thomaskien/kienzledoku/main/install_linux.sh | bash
-```
+Damit sind beispielsweise alle folgenden Kombinationen möglich:
 
-Der Einstieg per `curl` lädt anschließend den vollständigen Quellbaum als
-temporäres GitHub-Archiv und führt daraus den Installer aus. Wer den Stand vor
-der Ausführung vollständig prüfen möchte, kann alternativ das Repository
-klonen:
+- macOS-Client mit KI-Diensten auf demselben Mac;
+- macOS-Client mit einem Linux-/NVIDIA-Server im Praxisnetz;
+- Linux-Client mit KI-Diensten auf demselben geeigneten Linux-Rechner;
+- Linux-Client mit einem separaten Linux-Server oder einem Apple-Silicon-Mac
+  im Praxisnetz.
+
+Für den regelmäßigen Mehrplatzbetrieb wird ein dedizierter
+Ubuntu-/NVIDIA-Server empfohlen. Die Clientwahl bleibt davon unabhängig.
+
+### Schritt 1: Kienzledoku-Client installieren
+
+Auf jedem T2med-Arbeitsplatz wird genau eine der beiden Clientvarianten
+installiert.
+
+#### Client auf macOS
+
+Der macOS-Client läuft auf Intel- und Apple-Silicon-Macs. Er setzt keine lokale
+KI-Installation voraus und kann ebenso einen Linux-Server im Praxisnetz
+verwenden:
 
 ```bash
 git clone https://github.com/thomaskien/kienzledoku.git
 cd kienzledoku
-./install_linux.sh
-```
-
-Der Installer unterstützt ausschließlich Ubuntu 24.04 LTS auf x86_64. Er
-installiert die benötigten Ubuntu-Pakete mit `sudo`, baut den kleinen
-GTK-4-/WebKitGTK-6.0-Fenstercontainer aus dem enthaltenen C-Quelltext und legt
-die eigentlichen Clientdateien benutzerbezogen unter den XDG-Verzeichnissen ab.
-GTK wählt automatisch den vorhandenen Display-Backend; damit ist der Client
-weder an GNOME noch an XFCE und weder an Wayland noch an X11 gebunden.
-
-Zu den automatisch installierten Paketen gehören Python mit `venv`, Compiler
-und `pkg-config`, GTK 4/WebKitGTK 6.0, PortAudio, XDG-/Desktop-Werkzeuge,
-Secret Service/gnome-keyring und Desktop-Benachrichtigungen. Falls erforderlich,
-aktiviert das Skript dafür Ubuntu `universe`. Die Python-Abhängigkeit
-`sounddevice` wird anschließend in einem isolierten Benutzer-venv installiert.
-
-Standardmäßig wird nur das kanonische Schema `kienzledoku://` registriert. Wer
-eine bestehende T2med-Konfiguration mit den früheren Schemas weiterverwenden
-muss, kann sie ausdrücklich zusätzlich registrieren:
-
-```bash
-./install_linux.sh --legacy-url-schemes
-# bei direkter GitHub-Installation:
-curl -fsSL https://raw.githubusercontent.com/thomaskien/kienzledoku/main/install_linux.sh | bash -s -- --legacy-url-schemes
-```
-
-Auf bereits vorbereiteten Rechnern kann die Paketinstallation mit
-`--skip-packages` ausgelassen werden. Der netzwerkfreie statische Test ist auch
-auf anderen Entwicklungsrechnern ausführbar:
-
-```bash
-./install_linux.sh --self-test
-```
-
-Der Installer:
-
-- fragt den erlaubten T2med-FHIR-Host sowie ASR-, Diarisierungs- und LLM-Ziel
-  getrennt ab;
-- installiert keine Modelle und keine KI-Serverdienste;
-- speichert Konfiguration und Protokoll mit restriktiven Dateirechten;
-- registriert den URL-Handler desktopunabhängig über die XDG-Werkzeuge;
-- übergibt den OAuth-haltigen Deep Link über eine anonyme Pipe an den
-  langlebigen Python-Prozess und schreibt ihn nicht auf den Datenträger;
-- verwendet Secret Service für einen eigenen T2med-API-Schlüssel;
-- führt Selbsttest und Erreichbarkeitsprüfung der drei KI-Dienste aus.
-
-Erfüllt derselbe Ubuntu-Rechner die NVIDIA-/CUDA-Hardwarevoraussetzungen, kann
-die Serverkomponente aus [`server-linux`](server-linux/README.md) separat auf
-diesem Rechner installiert werden. Die Clientinstallation bleibt davon
-unabhängig und verbindet sich dann über die lokalen Dienstports.
-
-### Alternative: vollständig lokal auf Apple Silicon
-
-Auf einem geeigneten Apple-Silicon-Mac installiert dieser Doppelklick-Installer
-zuerst die ausgewählten lokalen KI-Dienste und anschließend die
-Kienzledoku-App:
-
-```bash
-./install_all_macos.command
-```
-
-Beim Doppelklick werden standardmäßig alle drei lokalen Dienste installiert;
-Listen-Adresse und Startmodus werden weiterhin abgefragt. Für den sicheren
-Einzelplatzbetrieb sollte `127.0.0.1` beibehalten werden. Danach konfiguriert
-der gemeinsame Installer die App automatisch auf die lokale
-Verbindungsadresse und die Ports `8179`, `8183` und `8080`. Eine abweichende
-Komponentenauswahl ist über die in der Local-AI-Dokumentation beschriebenen
-Terminaloptionen möglich.
-
-Die beiden Schritte können auch getrennt ausgeführt werden:
-
-```bash
-./install_local_ai_macos.command
-./install_macos.command
-```
-
-Einzelne Server können ausdrücklich und additiv nachinstalliert werden. Bereits
-ausgewählte lokale Dienste bleiben dabei aktiviert:
-
-```bash
-./install_llm_server_macos.command
-./install_asr_server_macos.command
-./install_diarization_server_macos.command
-```
-
-| Installer | Installierter Dienst | Port | Laufzeit |
-| --- | --- | --- | --- |
-| `install_llm_server_macos.command` | Qwen3.5-9B Q6_K über llama.cpp | `8080` | Metal |
-| `install_asr_server_macos.command` | Whisper large-v3 Final-Block-ASR | `8179` | MLX/Metal |
-| `install_diarization_server_macos.command` | pyannote Community-1 | `8183` | PyTorch MPS |
-
-Der Diarisierungsinstaller fragt den Hugging-Face-Token verdeckt ab und
-speichert ihn nicht. Vorher müssen die Modellbedingungen für pyannote
-Community-1 im gleichen Hugging-Face-Konto akzeptiert worden sein.
-
-Der KI-Installer kann je nach Auswahl rund 7 bis 25 GiB herunterladen und
-installieren. Pyannote benötigt zusätzlich ein Hugging-Face-Lesetoken und zuvor
-akzeptierte Modellbedingungen. Einzelheiten, Komponentenwahl und
-nichtinteraktive Optionen stehen in
-[`local-ai-macos/README.md`](local-ai-macos/README.md).
-
-### Empfohlen: dedizierter Linux/NVIDIA-Server im Praxisnetz
-
-Dies ist die **empfohlene Betriebsvariante**. Für einen separaten
-Ubuntu-/NVIDIA-Server enthält
-[`server-linux`](server-linux/README.md) die vollständige Installation von:
-
-- Qwen3.5-9B/llama.cpp auf Port `8080`;
-- Whisper large-v3 mit dem Kienzledoku-Final-Block-Endpunkt auf Port `8179`;
-- pyannote Community-1 auf Port `8183`.
-
-Auf einem vorbereiteten Ubuntu-24.04-/NVIDIA-Server:
-
-```bash
-cd server-linux
-chmod +x *.sh
-./install_kienzledoku_servers.sh --bind SERVER_LAN_IP
-```
-
-Der Installer wird als normaler Benutzer mit `sudo`-Berechtigung gestartet.
-Er fragt GPU-Zuordnung und Hugging-Face-Token interaktiv ab. Der ASR-Installer
-ergänzt nach der WhisperLiveKit-Installation automatisch den streng
-versionsgeprüften Endpoint `POST /v1/asr/final-block`.
-
-Danach auf dem T2med-Arbeitsplatz `./install_linux.sh` beziehungsweise
-`./install_macos.command` ausführen und für ASR, Diarisierung und LLM jeweils
-`SERVER_LAN_IP` sowie die Ports `8179`, `8183` und `8080` eintragen. Die
-Linux-APIs dürfen nur im geschützten Praxisnetz
-erreichbar sein. Eine Host-Firewall auf dem KI-Server ist nicht zwingend,
-kann aber als zusätzliche Absicherung erwogen werden. Hostvorbereitung,
-Einzelinstaller, Rollback und Tests stehen in
-[`server-linux/README.md`](server-linux/README.md).
-
-### macOS-App mit vorhandenen KI-Diensten
-
-Wenn ASR, Diarisierung und LLM bereits auf diesem Mac oder im Praxisnetz
-laufen, genügt im geklonten oder entpackten Projektverzeichnis:
-
-```bash
 ./install_macos.command
 ```
 
@@ -283,24 +157,122 @@ chmod +x local-ai-macos/*.command local-ai-macos/*.sh
 ./install_macos.command
 ```
 
-Der App-Installer:
+Der Installer legt `Kienzledoku.app` unter `~/Applications` an, registriert das
+URL-Schema und fragt den T2med-FHIR-Host sowie die Adressen der drei
+KI-Serverdienste ab.
 
-- prüft Python 3.9 oder neuer;
-- fragt den erlaubten T2med-FHIR-Host ab; `10.0.83.120` ist dabei nur der
-  vorgeschlagene Standardwert;
-- fragt Host/IP und Port von ASR, Diarisierung und LLM getrennt ab;
-- speichert die Dienstkonfiguration mit Dateirechten `600`;
-- installiert `Kienzledoku.app` unter `~/Applications`;
-- kopiert die Laufzeitdateien nach
-  `~/Library/Application Support/Kienzledoku`;
-- registriert `kienzledoku://` sowie die kompatiblen Schemata `T2demo://` und
-  `whisperdoku://`;
-- führt den netzwerkfreien Selbsttest aus;
-- prüft anschließend die Erreichbarkeit der drei Dienste.
+#### Client auf Ubuntu 24.04 LTS
 
-Nicht erreichbare Dienste erzeugen während der Installation eine Warnung, ohne
-die Installation abzubrechen. Vor einer Aufnahme müssen ASR und LLM erreichbar
-sein; der Status jedes Dienstes wird in der Oberfläche getrennt angezeigt.
+Der Linux-Client läuft auf Ubuntu 24.04 LTS x86_64. Er ist unabhängig von
+GNOME oder XFCE sowie von Wayland oder X11. Die KI-Dienste können auf demselben
+geeigneten Rechner, auf einem anderen Linux-Server oder auf einem
+Apple-Silicon-Mac laufen.
+
+Direkte Installation von GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thomaskien/kienzledoku/main/install_linux.sh | bash
+```
+
+Der Einstieg per `curl` lädt den vollständigen Quellbaum als temporäres
+GitHub-Archiv und führt daraus den Installer aus. Zum Prüfen des gesamten
+Quellstands vor der Ausführung kann stattdessen das Repository geklont werden:
+
+```bash
+git clone https://github.com/thomaskien/kienzledoku.git
+cd kienzledoku
+./install_linux.sh
+```
+
+Der Installer installiert die benötigten Ubuntu-Pakete mit `sudo`, darunter
+Python mit `venv`, Compiler, GTK 4, WebKitGTK 6.0, PortAudio,
+XDG-/Desktop-Werkzeuge, Secret Service/gnome-keyring und Benachrichtigungen.
+Falls erforderlich, aktiviert er Ubuntu `universe`. Danach baut er den
+Fenstercontainer und installiert den Client benutzerbezogen in den
+XDG-Verzeichnissen. Modelle oder KI-Serverdienste werden nicht installiert.
+
+Standardmäßig wird nur `kienzledoku://` registriert. Frühere URL-Schemata
+können ausdrücklich zusätzlich aktiviert werden:
+
+```bash
+./install_linux.sh --legacy-url-schemes
+# bei direkter GitHub-Installation:
+curl -fsSL https://raw.githubusercontent.com/thomaskien/kienzledoku/main/install_linux.sh | bash -s -- --legacy-url-schemes
+```
+
+Auf bereits vorbereiteten Rechnern lässt `--skip-packages` die
+Paketinstallation aus. `./install_linux.sh --self-test` führt nur den
+netzwerkfreien statischen Selbsttest aus.
+
+Beide Clientinstaller fragen Host/IP und Port von ASR, Diarisierung und LLM
+getrennt ab. Nicht erreichbare Dienste erzeugen bei der Installation eine
+Warnung, ohne die Clientinstallation abzubrechen.
+
+### Schritt 2: KI-Serverdienste bereitstellen
+
+Benötigt werden drei erreichbare Dienste: Final-Block-ASR auf Port `8179`,
+Diarisierung auf Port `8183` und ein OpenAI-kompatibles LLM auf Port `8080`.
+Sie können wahlweise unter macOS oder Linux laufen.
+
+#### KI-Serverdienste auf macOS/Apple Silicon
+
+Für Apple-Silicon-Macs mit mindestens 32 GB Unified Memory enthält
+[`local-ai-macos`](local-ai-macos/README.md) Installer für Qwen/llama.cpp,
+Whisper/MLX und pyannote/MPS:
+
+```bash
+./install_local_ai_macos.command
+```
+
+Die Listen-Adresse wird abgefragt. `127.0.0.1` ist richtig, wenn auch der
+Client auf diesem Mac läuft. Für einen Client auf einem anderen Mac oder einem
+Linux-Arbeitsplatz muss eine im Praxisnetz erreichbare Adresse bewusst
+freigegeben und abgesichert werden.
+
+Einzelne Dienste können additiv installiert werden:
+
+```bash
+./install_llm_server_macos.command
+./install_asr_server_macos.command
+./install_diarization_server_macos.command
+```
+
+| Dienst | Port | Laufzeit |
+| --- | --- | --- |
+| Qwen3.5-9B Q6_K über llama.cpp | `8080` | Metal |
+| Whisper large-v3 Final-Block-ASR | `8179` | MLX/Metal |
+| pyannote Community-1 | `8183` | PyTorch MPS |
+
+Für die vollständige Einzelplatzinstallation von Client und allen drei
+KI-Diensten auf demselben Apple-Silicon-Mac gibt es zusätzlich:
+
+```bash
+./install_all_macos.command
+```
+
+Der KI-Installer lädt je nach Auswahl rund 7 bis 25 GiB. Pyannote benötigt
+einen Hugging-Face-Lesetoken und zuvor akzeptierte Modellbedingungen. Details
+stehen in [`local-ai-macos/README.md`](local-ai-macos/README.md).
+
+#### KI-Serverdienste auf Ubuntu 24.04/NVIDIA
+
+Für Ubuntu 24.04 mit geeigneter NVIDIA-GPU enthält
+[`server-linux`](server-linux/README.md) die vollständige Installation aller
+drei Dienste. Sie kann auf demselben Rechner wie der Linux-Client oder auf
+einem separaten Server erfolgen:
+
+```bash
+cd server-linux
+chmod +x *.sh
+./install_kienzledoku_servers.sh --bind SERVER_LAN_IP
+```
+
+Der Installer wird als normaler Benutzer mit `sudo`-Berechtigung gestartet und
+fragt GPU-Zuordnung sowie Hugging-Face-Token ab. Danach werden beim Client auf
+macOS oder Linux `SERVER_LAN_IP` und die Ports `8179`, `8183` und `8080`
+eingetragen. Die APIs dürfen nur im geschützten Praxisnetz erreichbar sein.
+Hostvorbereitung, Einzelinstaller, Rollback und Tests beschreibt
+[`server-linux/README.md`](server-linux/README.md).
 
 ### T2med-Drittanbieterzugriff einrichten
 
@@ -560,10 +532,15 @@ Die lokalen KI-Dienste, Modelle, LaunchAgents und technischen Logs werden
 separat entfernt:
 
 ```bash
+# KI-Dienste auf macOS:
 ./uninstall_local_ai_macos.command
+
+# KI-Dienste auf dem Ubuntu-/NVIDIA-Server:
+cd server-linux
+./install_kienzlefon_ai_server.sh --action uninstall
 ```
 
-Homebrew und Homebrew-Pakete bleiben dabei erhalten.
+Systempakete wie Homebrew, APT-Pakete oder GPU-Treiber bleiben dabei erhalten.
 
 ## Weiterführende Dokumentation
 
