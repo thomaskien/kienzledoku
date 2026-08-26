@@ -95,6 +95,24 @@ print(value)
 PY
 }
 
+stored_t2med_host() {
+  "$PYTHON3" - "$CONFIG_PATH" "$1" <<'PY'
+import json
+import sys
+
+path, fallback = sys.argv[1:]
+value = fallback
+try:
+    with open(path, "r", encoding="utf-8") as handle:
+        configured = json.load(handle).get("t2med", {}).get("fhir_host", "")
+    if isinstance(configured, str) and configured.strip():
+        value = configured.strip()
+except (OSError, ValueError, TypeError, AttributeError):
+    pass
+print(value)
+PY
+}
+
 validate_host_and_port() {
   "$PYTHON3" - "$1" "$2" <<'PY'
 import ipaddress
@@ -174,6 +192,38 @@ prompt_service() {
   done
 }
 
+prompt_t2med_host() {
+  default_host="$1"
+  override_host="$2"
+
+  while true; do
+    if [ -n "$override_host" ]; then
+      chosen_host="$override_host"
+    elif [ "${KIENZLEDOKU_INSTALL_NONINTERACTIVE:-0}" = "1" ]; then
+      chosen_host="$default_host"
+    else
+      printf 'T2med-FHIR-Server (Host/IP) [%s]: ' "$default_host"
+      IFS= read -r chosen_host
+      chosen_host="${chosen_host:-$default_host}"
+    fi
+
+    if validation_error="$(validate_host_and_port "$chosen_host" 443 2>&1)"; then
+      T2MED_HOST="$chosen_host"
+      return 0
+    fi
+    echo "FEHLER: $validation_error" >&2
+    if [ "${KIENZLEDOKU_INSTALL_NONINTERACTIVE:-0}" = "1" ] || [ -n "$override_host" ]; then
+      return 1
+    fi
+  done
+}
+
+echo
+echo "T2med-FHIR-Ziel für diesen Mac"
+echo "Der eingetragene Host muss dem Host der von T2med übergebenen fhirBasisUrl entsprechen."
+T2MED_DEFAULT_HOST="$(stored_t2med_host 10.0.83.120)"
+prompt_t2med_host "$T2MED_DEFAULT_HOST" "${KIENZLEDOKU_INSTALL_T2MED_HOST:-}"
+
 echo
 echo "Kienzlefon-Dienste für diesen Mac"
 echo "Nur Hostname/IP und Port eingeben; ASR, Diarisierung und LLM dürfen auf unterschiedlichen Rechnern laufen."
@@ -204,6 +254,7 @@ LLM_PORT="$SERVICE_PORT"
 LLM_URL="$(compose_service_url "$LLM_HOST" "$LLM_PORT")"
 
 "$PYTHON3" - "$CONFIG_PATH" \
+  "$T2MED_HOST" \
   "$ASR_URL" \
   "$DIARIZATION_URL" \
   "$LLM_URL" <<'PY'
@@ -212,9 +263,12 @@ import os
 import sys
 import tempfile
 
-path, asr_url, diarization_url, llm_url = sys.argv[1:]
+path, t2med_host, asr_url, diarization_url, llm_url = sys.argv[1:]
 payload = {
     "version": 1,
+    "t2med": {
+        "fhir_host": t2med_host,
+    },
     "services": {
         "asr": asr_url,
         "diarization": diarization_url,
@@ -360,6 +414,7 @@ if [ -d "$LEGACY_APP_DIR" ]; then
 fi
 echo "URL-Schemes: T2demo://, whisperdoku:// und kienzledoku://"
 echo "Dienstkonfiguration: $CONFIG_PATH"
+echo "Erlaubter T2med-FHIR-Host: $T2MED_HOST"
 echo "Diagnose-Log: $LOG_PATH"
 echo "API-Key: zunächst öffentlicher T2med-Demo-Key."
 echo "WICHTIG: Der Demo-Key ist auf 100 einzelne FHIR-Requests pro APS-Serverprozess begrenzt."

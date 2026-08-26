@@ -13,6 +13,8 @@ from kienzledoku import (
     T2medFhirClient,
     close_page_html,
     page_html,
+    parse_deep_link,
+    validate_local_fhir_url,
     validate_transaction_response,
 )
 from kienzledoku_document import (
@@ -144,6 +146,34 @@ class T2medTransactionTests(unittest.TestCase):
         }
         with self.assertRaisesRegex(FhirError, "zurückgerollt"):
             validate_transaction_response(response, ["Anamnese"])
+
+
+class T2medHostConfigurationTests(unittest.TestCase):
+    def test_installer_selected_fhir_host_replaces_fixed_test_ip(self):
+        with tempfile.TemporaryDirectory() as config_dir:
+            config_path = os.path.join(config_dir, "config.json")
+            with open(config_path, "w", encoding="utf-8") as handle:
+                json.dump({"t2med": {"fhir_host": "t2med-praxis.local"}}, handle)
+
+            validate_local_fhir_url(
+                "https://t2med-praxis.local:16567/aps/fhir/api/r4",
+                config_path=config_path,
+            )
+            link = parse_deep_link(
+                "kienzledoku://?kontextId=test&"
+                "fhirBasisUrl=https%3A%2F%2Ft2med-praxis.local%3A16567%2Faps%2Ffhir%2Fapi%2Fr4",
+                config_path=config_path,
+            )
+            self.assertEqual(
+                "https://t2med-praxis.local:16567/aps/fhir/api/r4",
+                link["fhir_base_url"],
+            )
+
+            with self.assertRaisesRegex(ValueError, "erneut ausführen"):
+                validate_local_fhir_url(
+                    "https://10.0.83.120:16567/aps/fhir/api/r4",
+                    config_path=config_path,
+                )
 
 
 class SpeechIntegrationTests(unittest.TestCase):

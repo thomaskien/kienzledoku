@@ -105,11 +105,12 @@ ist eine optionale Alternative.
 
 ## Konfigurierbare Dienstziele
 
-Der Kienzledoku-Installer fragt ASR, Diarisierung und LLM getrennt ab. Die drei
-Dienste dürfen auf demselben Mac, auf verschiedenen Macs oder gemischt lokal
-und im Praxisnetz laufen. Bei einer Erstinstallation werden folgende Ziele
-vorgeschlagen:
+Der Kienzledoku-Installer fragt zuerst den erlaubten T2med-FHIR-Host und danach
+ASR, Diarisierung und LLM getrennt ab. Die drei KI-Dienste dürfen auf demselben
+Mac, auf verschiedenen Macs oder gemischt lokal und im Praxisnetz laufen. Bei
+einer Erstinstallation werden folgende Ziele vorgeschlagen:
 
+- T2med-FHIR-Host: `10.0.83.120` (änderbarer Vorschlag, keine feste Codegrenze)
 - ASR: `http://127.0.0.1:8179`
 - Diarisierung: `http://127.0.0.1:8183`
 - LLM: `http://127.0.0.1:8080`
@@ -118,8 +119,9 @@ Nach der ASR-Eingabe wird ihr Host als Vorschlag für die Diarisierung verwendet
 deren Host wird entsprechend für das LLM vorgeschlagen. Bei Upgrades werden
 stattdessen vorhandene Einzelwerte beibehalten. Die lokale Datei
 `~/Library/Application Support/Kienzledoku/config.json` enthält ausschließlich
-diese Dienstadressen, keine Patienten-, OAuth- oder API-Daten. Die Oberfläche
-prüft und zeigt die Erreichbarkeit aller drei Dienste separat an. Seit
+den erlaubten T2med-FHIR-Host und diese Dienstadressen, keine Patienten-,
+OAuth- oder API-Daten. Die Oberfläche prüft und zeigt die Erreichbarkeit aller
+drei Dienste separat an. Seit
 Kienzledoku 1.2 wird dieser Installer-Pfad beim Anwendungsstart ausdrücklich
 übergeben; eine vorhandene Datei hat Vorrang vor geerbten Dienstvariablen. Die
 tatsächlich geladene Quelle ist in den technischen Informationen sichtbar.

@@ -8,8 +8,8 @@ auf einem anderen Rechner. Die Dienste laufen resident unter systemd:
 > Kienzledoku-Betriebsvariante.** Der T2med-Mac bleibt dabei der schlanke
 > Client, während Modellbetrieb, GPU-Last und Wartung der KI-Dienste auf dem
 > Ubuntu-/NVIDIA-Server gebündelt werden. Die Dienste gehören ausschließlich
-> ins geschützte Praxisnetz und müssen per Firewall auf die vorgesehenen
-> Clients begrenzt werden.
+> ins geschützte Praxisnetz. Eine Host-Firewall auf dem KI-Server ist nicht
+> zwingend, kann aber als zusätzliche Absicherung erwogen werden.
 
 | Dienst | Implementierung | Port für Kienzledoku |
 | --- | --- | --- |
@@ -65,9 +65,10 @@ Diarisierung, aktiviert den Final-Block-Endpunkt und lässt die Modelle resident
 laufen.
 
 Der interne WhisperLiveKit-Port `8179` wird für den entfernten Kienzledoku-Mac
-an `0.0.0.0` gebunden. Deshalb muss die Firewall diesen Port sowie `8080` und
-`8183` ausschließlich für die IP des Kienzledoku-Macs freigeben. Beispiel mit
-aktivem UFW:
+an `0.0.0.0` gebunden. Im geschützten Praxisnetz ist dafür keine Host-Firewall
+auf dem KI-Server zwingend erforderlich. Optional können die Ports `8080`,
+`8179` und `8183` zusätzlich auf die IP des Kienzledoku-Macs begrenzt werden.
+Beispiel mit bereits aktivem UFW:
 
 ```bash
 sudo ufw allow from KIENZLEDOKU_MAC_IP to any port 8080 proto tcp
@@ -76,8 +77,9 @@ sudo ufw allow from KIENZLEDOKU_MAC_IP to any port 8183 proto tcp
 ```
 
 Keine dieser APIs direkt aus dem Internet erreichbar machen. LLM und
-Diarisierung besitzen keine eigene Authentifizierung. Auch ein ASR-Token
-ersetzt keine Netzwerksegmentierung.
+Diarisierung besitzen keine eigene Authentifizierung. Die Absicherung erfolgt
+primär durch das geschützte Praxisnetz; eine Host-Firewall kann das lokale
+Netzkonzept optional ergänzen.
 
 ## Einzelne Server installieren
 

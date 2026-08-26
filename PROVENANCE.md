@@ -39,7 +39,7 @@ Final-Block-ASR-Backends für einen entfernten Kienzledoku-Client ergänzt.
 
 | Bestandteil | SHA-256 / Referenz |
 | --- | --- |
-| `server-linux/install_kienzlefon_ai_server.sh` | `9477800790f8058db889766f188b109de54d8258b2fb3ca25c219645b2a16907` |
+| `server-linux/install_kienzlefon_ai_server.sh` | `e0acae2d013f57b827fad172eef6349d63a5d98540f7fb27161b2a6045a83f63` |
 | `server-linux/install_final_block_endpoint.sh` | `c38e5c8a865c230b6f7966d5ff66a895bd07eea7bd0e9c28e0fea26ae64e995d` |
 | WhisperLiveKit | Version `0.2.24` |
 | erwartete unveränderte `basic_server.py` | `ae89062f8f7146a130e48b973187cd81f6451a672d93bc04e9ec1fcbb28fe78f` |

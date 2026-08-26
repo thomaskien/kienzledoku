@@ -6,10 +6,10 @@ Target: Python 3.9+ (macOS 10.14 Mojave through current macOS).
 No third-party Python packages required.
 
 Security model inherited from the confirmed T2med v0.1.2 round-trip:
-- accepts only localhost/127.0.0.1 and the explicitly approved T2med test server 10.0.83.120
+- accepts only loopback and the T2med FHIR host selected during installation
 - OAuth token is kept in memory only and never logged/displayed
 - T2med's public demo API key is used only if no Keychain/env override exists
-- installation-specific APS certificates are accepted only for explicitly approved test endpoints
+- installation-specific APS certificates are accepted only for the configured endpoint
 """
 
 from __future__ import print_function
@@ -22,6 +22,7 @@ import secrets
 import ssl
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.error
@@ -76,7 +77,7 @@ PROFILE_THERAPIE = "https://fhir.t2med.de/StructureDefinition/FhirApiProcedureTh
 PROFILE_PROZEDERE = "https://fhir.t2med.de/StructureDefinition/FhirApiProcedureProcedere|1.0.0"
 EXTENSION_FREITEXT_KUERZEL = "https://fhir.t2med.de/StructureDefinition/FhirApiFreitextKuerzel"
 
-ALLOWED_FHIR_HOSTS = {"127.0.0.1", "localhost", "::1", "10.0.83.120"}
+LOOPBACK_FHIR_HOSTS = frozenset(("127.0.0.1", "localhost", "::1"))
 
 DEFAULT_OUTPUT_MODE = os.environ.get(
     "KIENZLEDOKU_T2MED_OUTPUT_MODE", OUTPUT_MODE_STRUCTURED
@@ -173,7 +174,7 @@ def get_api_key():
     return DEMO_API_KEY, "öffentlicher T2med-Demo-Key (max. 100 FHIR-Requests pro APS-Serverprozess)"
 
 
-def parse_deep_link(url):
+def parse_deep_link(url, config_path=None):
     parsed = urllib.parse.urlparse(url)
     if not parsed.scheme:
         raise ValueError("Deep Link hat kein URL-Schema")
@@ -193,7 +194,7 @@ def parse_deep_link(url):
     if not fhir_base_url:
         raise ValueError("Deep Link enthält keine fhirBasisUrl")
 
-    validate_local_fhir_url(fhir_base_url)
+    validate_local_fhir_url(fhir_base_url, config_path=config_path)
 
     return {
         "scheme": parsed.scheme,
@@ -203,15 +204,31 @@ def parse_deep_link(url):
     }
 
 
-def validate_local_fhir_url(url):
+def configured_fhir_hosts(config_path=None):
+    """Return loopback plus the exact T2med FHIR host selected by the installer."""
+    path = config_path or SERVICE_CONFIG_PATH
+    hosts = set(LOOPBACK_FHIR_HOSTS)
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            configured = json.load(handle).get("t2med", {}).get("fhir_host", "")
+        if isinstance(configured, str) and configured.strip():
+            hosts.add(configured.strip().lower())
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    return hosts
+
+
+def validate_local_fhir_url(url, config_path=None):
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme.lower() != "https":
         raise ValueError("Kienzledoku 1.2 akzeptiert ausschließlich HTTPS-FHIR-URLs")
     host = (parsed.hostname or "").lower()
-    if host not in ALLOWED_FHIR_HOSTS:
+    allowed_hosts = configured_fhir_hosts(config_path=config_path)
+    if host not in allowed_hosts:
         raise ValueError(
             "Kienzledoku 1.2 akzeptiert nur explizit freigegebene T2med-FHIR-Hosts. "
-            "Erlaubt sind 127.0.0.1/localhost/::1 und 10.0.83.120; erhalten: %s" % (host or "(kein Host)")
+            "Erlaubt sind %s; erhalten: %s. Bitte install_macos.command erneut ausführen."
+            % (", ".join(sorted(allowed_hosts)), host or "(kein Host)")
         )
     if "/aps/fhir/api/r4" not in parsed.path:
         raise ValueError("FHIR-Basis-URL enthält nicht den erwarteten Pfad /aps/fhir/api/r4")
@@ -219,7 +236,6 @@ def validate_local_fhir_url(url):
 
 def local_ssl_context():
     # Test/integration only: T2med explicitly uses installation-specific local certs.
-    # Production should use a controlled trust store or certificate pinning.
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -916,7 +932,7 @@ def page_html(state):
           <form method="post" action="/action"><input type="hidden" name="csrf" value="{csrf}">
           <button class="subtle" type="submit" name="do" value="encounter">Behandlungsfall laden</button></form></section>
       </div>
-      <p class="small">OAuth-Token wird nur im Arbeitsspeicher gehalten. Für die ausdrücklich freigegebenen APS-Testziele wird das lokale Zertifikat akzeptiert.</p>
+      <p class="small">OAuth-Token wird nur im Arbeitsspeicher gehalten. Für das im Installer freigegebene APS-Ziel wird das lokale Zertifikat akzeptiert.</p>
     </details>
     """.format(
         base=fhir_base,
@@ -1338,8 +1354,12 @@ def self_test():
         "fhirBasisUrl=https%3A%2F%2F10.0.83.120%3A16567%2Faps%2Ffhir%2Fapi%2Fr4&"
         "oAuthToken=test-token"
     )
-    lan_link = parse_deep_link(lan_url)
-    assert lan_link["fhir_base_url"] == "https://10.0.83.120:16567/aps/fhir/api/r4"
+    with tempfile.TemporaryDirectory() as config_dir:
+        config_path = os.path.join(config_dir, "config.json")
+        with open(config_path, "w", encoding="utf-8") as handle:
+            json.dump({"t2med": {"fhir_host": "10.0.83.120"}}, handle)
+        lan_link = parse_deep_link(lan_url, config_path=config_path)
+        assert lan_link["fhir_base_url"] == "https://10.0.83.120:16567/aps/fhir/api/r4"
 
     patient = {
         "resourceType": "Patient",

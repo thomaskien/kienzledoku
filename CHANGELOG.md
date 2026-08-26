@@ -6,7 +6,14 @@ festgehalten. Das Format orientiert sich an
 
 ## [Unveröffentlicht]
 
-- Noch keine Änderungen.
+- T2med-Einrichtung um den abschließenden Menüleistenknopf ergänzt.
+- Host-Firewall auf dem KI-Server als optionale zusätzliche Absicherung im
+  geschützten Praxisnetz klargestellt.
+- Nicht umgesetzten Zertifikats-Hinweis entfernt.
+- T2med-FHIR-Host wird nun vom Mac-Installer abgefragt und statt einer festen
+  Test-IP als lokale Freigabe gespeichert.
+- Datenschutz-Selbsteinschätzung des Betreibers für den ausschließlich
+  praxisinternen Betrieb ergänzt.
 
 ## [1.2] – 2026-08-25
 

@@ -185,9 +185,11 @@ versionsgeprüften Endpoint `POST /v1/asr/final-block`.
 
 Danach auf dem Mac `./install_macos.command` ausführen und für ASR,
 Diarisierung und LLM jeweils `SERVER_LAN_IP` sowie die Ports `8179`, `8183` und
-`8080` eintragen. Die Linux-APIs müssen per Firewall ausschließlich für den
-Kienzledoku-Mac freigegeben werden. Hostvorbereitung, Einzelinstaller,
-Rollback und Tests stehen in [`server-linux/README.md`](server-linux/README.md).
+`8080` eintragen. Die Linux-APIs dürfen nur im geschützten Praxisnetz
+erreichbar sein. Eine Host-Firewall auf dem KI-Server ist nicht zwingend,
+kann aber als zusätzliche Absicherung erwogen werden. Hostvorbereitung,
+Einzelinstaller, Rollback und Tests stehen in
+[`server-linux/README.md`](server-linux/README.md).
 
 ### App mit vorhandenen KI-Diensten
 
@@ -209,6 +211,8 @@ chmod +x local-ai-macos/*.command local-ai-macos/*.sh
 Der App-Installer:
 
 - prüft Python 3.9 oder neuer;
+- fragt den erlaubten T2med-FHIR-Host ab; `10.0.83.120` ist dabei nur der
+  vorgeschlagene Standardwert;
 - fragt Host/IP und Port von ASR, Diarisierung und LLM getrennt ab;
 - speichert die Dienstkonfiguration mit Dateirechten `600`;
 - installiert `Kienzledoku.app` unter `~/Applications`;
@@ -250,6 +254,11 @@ abweichen.
 
    ![T2med-Drittanbieter-URL für Kienzledoku eintragen](docs/images/t2med-drittanbieter-url.png)
 
+6. Zum Abschluss in T2med einen **Knopf in der Menüleiste einrichten** und ihm
+   den soeben angelegten Drittanbieter-Eintrag `Kienzledoku` zuweisen. Über
+   diesen Knopf wird Kienzledoku anschließend für den aktuell geöffneten
+   Patienten gestartet.
+
 Die Platzhalter werden erst beim Aufruf durch T2med ersetzt. Der vollständige
 Deep Link kann ein OAuth-Token enthalten und darf deshalb weder protokolliert
 noch in Issues oder Screenshots veröffentlicht werden.
@@ -262,9 +271,11 @@ Die vom Installer erzeugte Datei ist die verbindliche Konfigurationsquelle:
 ~/Library/Application Support/Kienzledoku/config.json
 ```
 
-Sie enthält ausschließlich die drei Dienstadressen, keine Patienten-, OAuth-
-oder T2med-API-Daten. Bei einer erneuten Installation werden die vorhandenen
-Werte als Vorgabe angeboten.
+Sie enthält den erlaubten T2med-FHIR-Host und die drei KI-Dienstadressen, aber
+keine Patienten-, OAuth- oder T2med-API-Daten. Bei einer erneuten Installation
+werden die vorhandenen Werte als Vorgabe angeboten. Für eine nichtinteraktive
+Installation kann der T2med-Host mit
+`KIENZLEDOKU_INSTALL_T2MED_HOST` vorgegeben werden.
 
 Nur im Entwicklerbetrieb ohne Installer-Konfiguration gelten die lokalen
 Standardadressen. Sie können dann über Umgebungsvariablen überschrieben werden:
@@ -346,26 +357,40 @@ personen- oder praxisbezogene Angaben geprüft werden.
 
 ## Sicherheitsgrenzen
 
-Dieser Stand akzeptiert als FHIR-Ziel ausschließlich Loopback-Adressen und den
-explizit bestätigten T2med-Testserver `10.0.83.120` mit dem Pfad
-`/aps/fhir/api/r4`. Wegen installationsspezifischer APS-Zertifikate ist die
-öffentliche CA-Prüfung für diese freigegebenen Ziele deaktiviert.
+Als FHIR-Ziel akzeptiert Kienzledoku ausschließlich Loopback-Adressen und den
+bei der Installation ausdrücklich eingetragenen T2med-FHIR-Host mit dem Pfad
+`/aps/fhir/api/r4`. `10.0.83.120` ist nur noch der vorgeschlagene
+Installer-Standardwert und nicht mehr fest im Programmcode erzwungen. Wegen
+installationsspezifischer APS-Zertifikate ist die öffentliche CA-Prüfung für
+das konfigurierte Ziel deaktiviert.
 
 Die mitgelieferten lokalen KI-Dienste binden standardmäßig ausschließlich an
 `127.0.0.1`. Bei Auswahl von `0.0.0.0` oder einer LAN-Adresse sind ihre APIs im
 erreichbaren Netzwerk sichtbar und besitzen keine eigene Authentifizierung.
-Diese Einstellung darf nur in einem kontrollierten Praxisnetz mit geeigneter
-Firewall und Zugriffsbeschränkung verwendet werden.
+Diese Einstellung ist für das kontrollierte Praxisnetz vorgesehen. Eine
+Host-Firewall auf dem KI-System ist optional und kann entsprechend dem lokalen
+Netz- und Sicherheitskonzept als zusätzliche Zugriffsbeschränkung verwendet
+werden.
 
 Dasselbe gilt für den Linux-Server: Für einen entfernten Kienzledoku-Client
 müssen die Ports `8080`, `8179` und `8183` im Praxisnetz erreichbar sein. Port
-`8179` bindet dabei technisch an alle Server-Schnittstellen und muss zwingend
-per Host-Firewall auf die Client-IP begrenzt werden.
+`8179` bindet dabei technisch an alle Server-Schnittstellen. Eine Begrenzung
+per Host-Firewall auf die Client-IP kann zusätzlich erwogen werden, ist im
+geschützten Praxisnetz aber keine technische Voraussetzung für den Betrieb.
 
-Vor einem produktiven Rollout sind mindestens erforderlich:
+### Datenschutz-Einschätzung durch den Betreiber
 
-- Freigabe des tatsächlichen T2med-Hosts;
-- kontrollierter Truststore oder Zertifikat-Pinning;
+Selbsteinschätzung des Betreibers: Der Betrieb ist datenschutzrechtlich
+unproblematisch, da Verarbeitung und Speicherung der medizinischen Daten
+ausschließlich innerhalb der Praxis erfolgen. Voraussetzung ist
+selbstverständlich, dass Mac, T2med-, Netzwerk- und KI-System sauber
+eingerichtet, geschützt und administriert werden. Der jeweilige
+Praxisbetreiber prüft und verantwortet die konkrete Installation und Nutzung
+in seiner Umgebung.
+
+Vor einem regelmäßigen Einsatz sind mindestens erforderlich:
+
+- korrekte Auswahl des T2med-FHIR-Hosts im Installer;
 - realer Integrationstest mit T2med, Mikrofon und allen KI-Diensten;
 - Festlegung von Zugriffs-, Aufbewahrungs- und Löschregeln im Praxisnetz;
 - medizinische, datenschutzrechtliche und regulatorische Bewertung durch den
@@ -420,7 +445,7 @@ Zugangsdaten enthalten.
 | T2med öffnet die falsche Anwendung | `T2demo://` kann nur einem aktiven Handler zugeordnet sein. Kienzledoku erneut installieren und konkurrierende Test-Apps nicht gleichzeitig registrieren. |
 | Demo-Key wird abgelehnt | Der öffentliche Demo-Key erlaubt höchstens 100 einzelne FHIR-Requests pro APS-Serverprozess. Nach Ausschöpfen muss der T2med-/APS-Serverprozess neu gestartet oder ein eigener T2med-API-Schlüssel eingerichtet werden. |
 | Start schlägt fehl | `~/Library/Logs/Kienzledoku.log` prüfen; keine Deep Links oder Zugangsdaten in öffentliche Issues kopieren. |
-| FHIR-Ziel wird abgelehnt | Dieser Stand erlaubt nur die unter [Sicherheitsgrenzen](#sicherheitsgrenzen) genannten Hosts und den erwarteten API-Pfad. |
+| FHIR-Ziel wird abgelehnt | `install_macos.command` erneut ausführen und den Host der von T2med übergebenen `fhirBasisUrl` als T2med-FHIR-Host eintragen; zusätzlich muss der erwartete API-Pfad stimmen. |
 
 ## Deinstallation
 

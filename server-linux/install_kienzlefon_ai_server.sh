@@ -119,7 +119,8 @@ Weitere Optionen:
   --asr-port PORT             Standard: 8178
   --asr-backend-port PORT     Standard: 8179
   --asr-backend-bind ADRESSE  127.0.0.1 oder 0.0.0.0; für einen entfernten
-                              Kienzledoku-Client ist 0.0.0.0 plus Firewall nötig
+                              Kienzledoku-Client ist 0.0.0.0 im geschützten
+                              Praxisnetz nötig; Host-Firewall optional
   --tts-port PORT             Standard: 8182
   --pyannote-port PORT        Standard: 8183
   --non-interactive           Keine Rückfragen
@@ -220,7 +221,7 @@ parse_args() {
     || die "--with-pyannote ist nur zusammen mit --role all sinnvoll; sonst --role pyannote verwenden."
   validate_network_values
   if [[ "$ASR_BACKEND_BIND_ADDRESS" == "0.0.0.0" ]]; then
-    warn "Port $ASR_BACKEND_PORT wird auf allen Server-Schnittstellen geöffnet; Zugriff per Firewall auf den Kienzledoku-Client begrenzen."
+    warn "Port $ASR_BACKEND_PORT wird auf allen Server-Schnittstellen geöffnet; nur im geschützten Praxisnetz betreiben. Eine Host-Firewall ist optional."
   fi
 }
 
@@ -1208,12 +1209,12 @@ if [[ -n "$BIND_OVERRIDE" && "$BIND_OVERRIDE" != "127.0.0.1" && "$BIND_OVERRIDE"
 fi
 if [[ "$BIND_OVERRIDE" == "0.0.0.0" || "$BIND_OVERRIDE" == "::" ]]; then
     (( CONFIRM_NONLOOPBACK == 1 )) || die "Öffentliche Wildcard-Bindung wurde nicht bestätigt."
-    warn "Wildcard-Bindung aktiviert. Firewall und Netzsegmentierung eigenständig prüfen."
+    warn "Wildcard-Bindung aktiviert. Nur im geschützten Praxisnetz verwenden; eine Host-Firewall kann optional ergänzen."
 fi
 if [[ "$ASR_BACKEND_BIND_OVERRIDE" == "0.0.0.0" ]]; then
     (( CONFIRM_ASR_BACKEND_NETWORK_EXPOSURE == 1 )) || \
         die "Direkter WhisperLiveKit-Netzzugriff erfordert --confirm-asr-backend-network-exposure."
-    warn "WhisperLiveKit wird direkt im Netz verfügbar. Nur für die Entwicklung verwenden und den Port per Firewall auf vertrauenswürdige Quelladressen begrenzen."
+    warn "WhisperLiveKit wird direkt im Netz verfügbar. Nur im geschützten Praxisnetz verwenden; eine Host-Firewall ist optional."
 fi
 
 need_sudo() {

@@ -107,7 +107,8 @@ Für Kienzledoku wird das residente Backend zusätzlich über den streng
 versionsgeprüften Patch `install_final_block_endpoint.sh` um
 `POST /v1/asr/final-block` erweitert. Bei einem entfernten Kienzledoku-Client
 wird das Backend mit `--asr-backend-bind 0.0.0.0` freigegeben; Port 8179 muss
-anschließend per Firewall auf die Client-IP begrenzt werden.
+im geschützten Praxisnetz erreichbar sein. Eine zusätzliche Begrenzung per
+Host-Firewall auf die Client-IP ist optional.
 
 ## 7. Qwen3-TTS-Sollstand
 
