@@ -35,7 +35,7 @@
         styleMask:style
         backing:NSBackingStoreBuffered
         defer:NO];
-    self.window.title = @"Kienzledoku 1.2.1";
+    self.window.title = @"Kienzledoku 1.3.0";
     self.window.minSize = NSMakeSize(
         MIN(980.0, visible.size.width),
         MIN(700.0, visible.size.height));
@@ -51,7 +51,7 @@
     self.webView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     self.webView.navigationDelegate = self;
     self.webView.UIDelegate = self;
-    self.webView.customUserAgent = @"Kienzledoku-NativeWindow/1.2.1";
+    self.webView.customUserAgent = @"Kienzledoku-NativeWindow/1.3.0";
     [self.window.contentView addSubview:self.webView];
 
     if (self.iconPath.length > 0) {

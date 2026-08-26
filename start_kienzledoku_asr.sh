@@ -4,11 +4,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "=== Kienzledoku 1.2.1: Natural Pause -> Final-Block-ASR -> pyannote -> LLM ==="
+echo "=== Kienzledoku 1.3.0: Natural Pause -> Final-Block-ASR -> pyannote -> LLM ==="
 echo "Verzeichnis: $SCRIPT_DIR"
 
-# v6.2: Der Python-venv liegt absichtlich NICHT im (ggf. per iCloud
-# synchronisierten) Projektverzeichnis. Python-venvs sind zwischen Macs,
+# v6.2: Der Python-venv liegt absichtlich NICHT im (ggf. synchronisierten)
+# Projektverzeichnis. Python-venvs sind zwischen Betriebssystemen,
 # Python-Versionen und Architekturen nicht portabel.
 find_python3() {
     python_is_supported() {
@@ -36,7 +36,8 @@ find_python3() {
         "$(command -v python3 2>/dev/null || true)" \
         /Library/Frameworks/Python.framework/Versions/3.9/bin/python3 \
         /opt/homebrew/bin/python3 \
-        /usr/local/bin/python3
+        /usr/local/bin/python3 \
+        /usr/bin/python3
     do
         if [ -n "$candidate" ] && [ -x "$candidate" ] && python_is_supported "$candidate"; then
             printf '%s\n' "$candidate"
@@ -60,7 +61,12 @@ fi
 PY_MM="$("$BASE_PYTHON" -c 'import sys; print("%d.%d" % (sys.version_info[0], sys.version_info[1]))')"
 PY_TAG="$(printf '%s' "$PY_MM" | tr -d '.')"
 ARCH="$(uname -m)"
-VENV_ROOT="${KIENZLEDOKU_ASR_VENV_ROOT:-${WHISPERDOKU_VENV_ROOT:-$HOME/.kienzlefon-whisperdoku/venvs}}"
+if [ "$(uname -s)" = "Linux" ]; then
+    DEFAULT_VENV_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/kienzledoku/venvs"
+else
+    DEFAULT_VENV_ROOT="$HOME/.kienzlefon-whisperdoku/venvs"
+fi
+VENV_ROOT="${KIENZLEDOKU_ASR_VENV_ROOT:-${WHISPERDOKU_VENV_ROOT:-$DEFAULT_VENV_ROOT}}"
 VENV_DIR="$VENV_ROOT/client-v6-${ARCH}-py${PY_TAG}"
 VENV_PYTHON="$VENV_DIR/bin/python3"
 
@@ -94,9 +100,9 @@ echo "Basis-Python: $($BASE_PYTHON --version 2>&1) | $BASE_PYTHON"
 echo "Laufzeit:     $($VENV_PYTHON --version 2>&1) | $VENV_PYTHON"
 echo "Architektur:  $ARCH"
 
-# Ein ggf. aus einer älteren iCloud-Kopie vorhandenes ./venv wird absichtlich
-# ignoriert. Es kann auf einem anderen Mac auf einen nicht vorhandenen
-# Interpreter zeigen und ist nicht portabel.
+# Ein ggf. aus einer älteren synchronisierten Kopie vorhandenes ./venv wird
+# absichtlich ignoriert. Es kann auf einem anderen Rechner auf einen nicht
+# vorhandenen Interpreter zeigen und ist nicht portabel.
 if [ -d "$SCRIPT_DIR/venv" ]; then
     echo "Hinweis: vorhandenes ./venv wird absichtlich ignoriert (nicht portabel zwischen Macs)."
 fi

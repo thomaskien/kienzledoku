@@ -4,10 +4,10 @@
 
 | Version | Sicherheitsupdates |
 | --- | --- |
-| 1.2.1 | Ja |
-| 1.2 und älter | Nein |
+| 1.3.0 | Ja |
+| 1.2.1 und älter | Nein |
 
-Kienzledoku 1.2.1 ist ein Entwicklungs- und Integrationsstand. Die bekannten
+Kienzledoku 1.3.0 ist ein Entwicklungs- und Integrationsstand. Die bekannten
 Einsatzgrenzen sind im Abschnitt
 [Sicherheitsgrenzen](README.md#sicherheitsgrenzen) der README beschrieben.
 
@@ -21,7 +21,7 @@ technische Details in einem öffentlichen Kanal.
 
 Eine hilfreiche Meldung enthält:
 
-- betroffene Version und macOS-Version;
+- betroffene Kienzledoku-, Betriebssystem- und Desktop-Version;
 - nachvollziehbare Schritte oder einen minimalen Testfall;
 - erwartetes und tatsächliches Verhalten;
 - mögliche Auswirkungen;
@@ -38,11 +38,12 @@ Bei Änderungen an folgenden Komponenten ist eine zusätzliche Prüfung nötig:
 
 - Deep-Link-Verarbeitung und OAuth-Token;
 - FHIR-Zielvalidierung, TLS-Konfiguration und HTTP-Header;
-- macOS-Schlüsselbund und API-Schlüssel;
+- macOS-Schlüsselbund, Linux Secret Service und API-Schlüssel;
 - lokaler HTTP-Server und nativer WebKit-Container;
 - temporäre Audio-, Transkript- und LLM-Dateien;
 - Local-AI-Listen-Adresse, LaunchAgents und nicht authentifizierte Dienst-APIs;
 - festgeschriebene Modellrevisionen, Größen und Prüfsummen;
+- Linux-URL-Handler, Einzelsitzung und anonyme Deep-Link-Pipe;
 - Linux-systemd-Dienste, ASR-Backend-Freigabe und Firewallregeln;
 - LLM-JSON-Validierung und atomare FHIR-Transaktion;
 - Protokollierung und Fehlermeldungen.

@@ -1,4 +1,4 @@
-# Kienzlefon AI → Kienzledoku 1.2.1
+# Kienzlefon AI → Kienzledoku 1.3.0
 
 Dieses Dokument definiert die vorbereitete Nahtstelle zwischen den bereits
 vorhandenen Kienzlefon-AI-Diensten und der T2med-Übergabe in Kienzledoku.
@@ -6,7 +6,7 @@ vorhandenen Kienzlefon-AI-Diensten und der T2med-Übergabe in Kienzledoku.
 ## Zielkette
 
 ```text
-CoreAudio-Mikrofon → lokale WAV-Blöcke
+Systemmikrofon → lokale WAV-Blöcke
   → Kienzlefon ASR Final-Block (Port 8179)
   → optionale Diarisierung (Port 8183)
   → Kienzlefon LLM (Port 8080)
@@ -70,7 +70,7 @@ Kienzledoku verbindet die Komponenten über folgende getrennte Adapter:
    residenten Dienst auf Port 8080 und validiert die Antwort strikt mit
    `parse_documentation_json`.
 4. `kienzledoku_speech.py` kapselt Aufnahme und Hintergrundprozess, meldet das
-   verwendete CoreAudio-Eingabegerät, verwirft temporäre WAV-/JSON-Dateien und
+   verwendete Betriebssystem-Eingabegerät, verwirft temporäre WAV-/JSON-Dateien und
    übergibt nur das validierte Ergebnis an die Oberfläche.
 5. Das diarisiert dargestellte Sprechertranskript bleibt editierbar. Ein
    erneuter LLM-Lauf verwendet genau diesen bearbeiteten Text und wiederholt
@@ -84,9 +84,12 @@ Kienzledoku verbindet die Komponenten über folgende getrennte Adapter:
    und das native Kienzledoku-Fenster wird geschlossen.
 
 Das sichtbare Fenster ist ein kleiner lokaler WebKit-Container ohne URL- oder
-Browserleiste. WebKit zeigt nur den Zustand und die Eingabefelder an. Die
-Audiodaten werden nicht über WebKit transportiert; der ASR-Prozess liest sie
-direkt per `sounddevice` aus CoreAudio.
+Browserleiste: WKWebView unter macOS, GTK 4/WebKitGTK 6.0 unter Ubuntu. GTK
+wählt den X11- oder Wayland-Backend selbst, sodass der Linux-Client unter XFCE
+und GNOME dieselbe Architektur verwendet. WebKit zeigt nur den Zustand und die
+Eingabefelder an. Die Audiodaten werden nicht über WebKit transportiert; der
+ASR-Prozess liest sie direkt per `sounddevice` aus CoreAudio beziehungsweise
+PortAudio/PipeWire/PulseAudio.
 
 Für Apple-Silicon-Macs mit mindestens 32 GB enthält das Repository nun den
 eigenständigen Installer [`local-ai-macos`](local-ai-macos/README.md). Er stellt
@@ -100,14 +103,17 @@ Ubuntu-x86_64-Server mit NVIDIA/CUDA. Der getrennte Installer
 [`server-linux`](server-linux/README.md) richtet dort LLM,
 WhisperLiveKit/Faster-Whisper und pyannote als systemd-Dienste ein und ergänzt
 den für Kienzledoku erforderlichen Final-Block-Endpunkt auf Port 8179. Der
-T2med-Mac bleibt dabei der Client; der vollständig lokale Apple-Silicon-Betrieb
-ist eine optionale Alternative.
+T2med-Arbeitsplatz unter Ubuntu 24.04 oder macOS bleibt dabei der schlanke
+Client; der vollständig lokale Apple-Silicon-Betrieb ist eine optionale
+Alternative. Unter geeigneter Linux-Hardware kann die Serverkomponente separat
+auch auf demselben Rechner installiert werden; sie bleibt vom Client-Installer
+getrennt.
 
 ## Konfigurierbare Dienstziele
 
 Der Kienzledoku-Installer fragt zuerst den erlaubten T2med-FHIR-Host und danach
 ASR, Diarisierung und LLM getrennt ab. Die drei KI-Dienste dürfen auf demselben
-Mac, auf verschiedenen Macs oder gemischt lokal und im Praxisnetz laufen. Bei
+Rechner, auf verschiedenen Rechnern oder gemischt lokal und im Praxisnetz laufen. Bei
 einer Erstinstallation werden folgende Ziele vorgeschlagen:
 
 - T2med-FHIR-Host: `10.0.83.120` (änderbarer Vorschlag, keine feste Codegrenze)
@@ -117,8 +123,10 @@ einer Erstinstallation werden folgende Ziele vorgeschlagen:
 
 Nach der ASR-Eingabe wird ihr Host als Vorschlag für die Diarisierung verwendet;
 deren Host wird entsprechend für das LLM vorgeschlagen. Bei Upgrades werden
-stattdessen vorhandene Einzelwerte beibehalten. Die lokale Datei
-`~/Library/Application Support/Kienzledoku/config.json` enthält ausschließlich
+stattdessen vorhandene Einzelwerte beibehalten. Die lokale Datei liegt unter
+Linux in `$XDG_CONFIG_HOME/kienzledoku/config.json` (standardmäßig
+`~/.config/kienzledoku/config.json`) und unter macOS in
+`~/Library/Application Support/Kienzledoku/config.json`. Sie enthält ausschließlich
 den erlaubten T2med-FHIR-Host und diese Dienstadressen, keine Patienten-,
 OAuth- oder API-Daten. Die Oberfläche prüft und zeigt die Erreichbarkeit aller
 drei Dienste separat an. Dieser Installer-Pfad wird beim Anwendungsstart

@@ -5,7 +5,7 @@ auf einem anderen Rechner. Die Dienste laufen resident unter systemd:
 
 > [!TIP]
 > **Diese dedizierte Serverinstallation ist die empfohlene
-> Kienzledoku-Betriebsvariante.** Der T2med-Mac bleibt dabei der schlanke
+> Kienzledoku-Betriebsvariante.** Der T2med-Arbeitsplatz bleibt dabei der schlanke
 > Client, während Modellbetrieb, GPU-Last und Wartung der KI-Dienste auf dem
 > Ubuntu-/NVIDIA-Server gebündelt werden. Die Dienste gehören ausschließlich
 > ins geschützte Praxisnetz. Eine Host-Firewall auf dem KI-Server ist nicht
@@ -64,16 +64,16 @@ GPU-Zuordnung und dem Hugging-Face-Token. Er installiert LLM, ASR und
 Diarisierung, aktiviert den Final-Block-Endpunkt und lässt die Modelle resident
 laufen.
 
-Der interne WhisperLiveKit-Port `8179` wird für den entfernten Kienzledoku-Mac
+Der interne WhisperLiveKit-Port `8179` wird für den entfernten Kienzledoku-Client
 an `0.0.0.0` gebunden. Im geschützten Praxisnetz ist dafür keine Host-Firewall
 auf dem KI-Server zwingend erforderlich. Optional können die Ports `8080`,
-`8179` und `8183` zusätzlich auf die IP des Kienzledoku-Macs begrenzt werden.
+`8179` und `8183` zusätzlich auf die IP des Kienzledoku-Arbeitsplatzes begrenzt werden.
 Beispiel mit bereits aktivem UFW:
 
 ```bash
-sudo ufw allow from KIENZLEDOKU_MAC_IP to any port 8080 proto tcp
-sudo ufw allow from KIENZLEDOKU_MAC_IP to any port 8179 proto tcp
-sudo ufw allow from KIENZLEDOKU_MAC_IP to any port 8183 proto tcp
+sudo ufw allow from KIENZLEDOKU_CLIENT_IP to any port 8080 proto tcp
+sudo ufw allow from KIENZLEDOKU_CLIENT_IP to any port 8179 proto tcp
+sudo ufw allow from KIENZLEDOKU_CLIENT_IP to any port 8183 proto tcp
 ```
 
 Keine dieser APIs direkt aus dem Internet erreichbar machen. LLM und
@@ -111,10 +111,10 @@ chmod 600 /geschuetzter/pfad/hf-token.txt
   --non-interactive
 ```
 
-## Kienzledoku auf dem Mac konfigurieren
+## Kienzledoku auf dem Arbeitsplatz konfigurieren
 
-Im macOS-App-Installer für alle drei Dienste die IP des Linux-Servers
-eintragen:
+Im Ubuntu- oder macOS-Client-Installer für alle drei Dienste die IP des
+Linux-Servers eintragen:
 
 | Abfrage | Host | Port |
 | --- | --- | --- |

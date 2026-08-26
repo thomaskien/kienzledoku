@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Gemeinsamer Dokumentationsvertrag für Kienzledoku 1.2.1.
+"""Gemeinsamer Dokumentationsvertrag für Kienzledoku 1.3.0.
 
 Dieses Modul enthält bewusst weder FHIR- noch ASR-/LLM-Transportlogik. Es ist
 die stabile Grenze zwischen der Kienzlefon-Pipeline und dem T2med-Adapter.

@@ -1,3 +1,4 @@
+import io
 import json
 import os
 import tempfile
@@ -8,12 +9,16 @@ from unittest import mock
 from kienzledoku import (
     EXTENSION_FREITEXT_KUERZEL,
     PROFILE_FREITEXT,
+    VERSION,
     FhirError,
     SessionState,
     T2medFhirClient,
     close_page_html,
+    get_api_key,
+    open_ui_window,
     page_html,
     parse_deep_link,
+    read_deep_link_stdin,
     validate_local_fhir_url,
     validate_transaction_response,
 )
@@ -172,6 +177,13 @@ class T2medHostConfigurationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "erneut ausführen"):
                 validate_local_fhir_url(
                     "https://10.0.83.120:16567/aps/fhir/api/r4",
+                    config_path=config_path,
+                )
+
+            with self.assertRaisesRegex(ValueError, "URL-Schema"):
+                parse_deep_link(
+                    "https://example.invalid/?kontextId=test&"
+                    "fhirBasisUrl=https%3A%2F%2Ft2med-praxis.local%3A16567%2Faps%2Ffhir%2Fapi%2Fr4",
                     config_path=config_path,
                 )
 
@@ -336,7 +348,7 @@ class SpeechIntegrationTests(unittest.TestCase):
             self.assertEqual("2", manager.snapshot()["selected_device"])
             self.assertEqual("Testmikrofon", manager.snapshot()["selected_device_name"])
             manager.set_audio_device("")
-            self.assertEqual("macOS-Standardgerät", manager.snapshot()["selected_device_name"])
+            self.assertEqual("System-Standardgerät", manager.snapshot()["selected_device_name"])
             with self.assertRaisesRegex(ValueError, "nicht mehr verfügbar"):
                 manager.set_audio_device("99")
             self.assertIsNone(manager.work_dir)
@@ -397,7 +409,7 @@ class SpeechIntegrationTests(unittest.TestCase):
         state.speech = SpeechRecognitionManager(os.path.dirname(os.path.dirname(__file__)))
         rendered = page_html(state)
         self.assertIn(">kienzledoku</a>", rendered)
-        self.assertIn("v1.2.1 · von Dr. Thomas Kienzle", rendered)
+        self.assertIn("v%s · von Dr. Thomas Kienzle" % VERSION, rendered)
         self.assertIn('href="https://kienzledoku.de"', rendered)
         self.assertIn("Kienzle, Thomas", rendered)
         self.assertIn("31.12.1970", rendered)
@@ -423,6 +435,57 @@ class SpeechIntegrationTests(unittest.TestCase):
         self.assertIn("Aufnahme läuft", active)
         self.assertIn("Live erkannter Text", active)
         self.assertIn("Aufnahme stoppen", active)
+
+
+class LinuxDesktopIntegrationTests(unittest.TestCase):
+    def test_deep_link_is_read_from_one_shot_pipe(self):
+        self.assertEqual(
+            "kienzledoku://?kontextId=test",
+            read_deep_link_stdin(io.StringIO("kienzledoku://?kontextId=test")),
+        )
+
+    def test_empty_or_oversized_deep_link_pipe_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "leer"):
+            read_deep_link_stdin(io.StringIO(""))
+        with self.assertRaisesRegex(ValueError, "groß"):
+            read_deep_link_stdin(io.StringIO("x" * 65537))
+
+    def test_linux_secret_service_key_has_priority_over_demo_key(self):
+        completed = mock.Mock(returncode=0, stdout="praxis-key\n")
+        with mock.patch.dict(os.environ, {}, clear=True), \
+             mock.patch("kienzledoku.sys.platform", "linux"), \
+             mock.patch("kienzledoku.shutil.which", return_value="/usr/bin/secret-tool"), \
+             mock.patch("kienzledoku.subprocess.run", return_value=completed) as run:
+            key, source = get_api_key()
+        self.assertEqual("praxis-key", key)
+        self.assertIn("Secret Service", source)
+        self.assertEqual(
+            [
+                "secret-tool", "lookup",
+                "application", "kienzledoku",
+                "service", "t2med-api-key",
+            ],
+            run.call_args.args[0],
+        )
+
+    def test_linux_uses_native_webkitgtk_helper(self):
+        with tempfile.TemporaryDirectory() as directory:
+            helper = os.path.join(directory, "kienzledoku_window_linux")
+            with open(helper, "w", encoding="utf-8") as handle:
+                handle.write("#!/bin/sh\n")
+            os.chmod(helper, 0o700)
+            process = mock.Mock()
+            with mock.patch("kienzledoku.sys.platform", "linux"), \
+                 mock.patch("kienzledoku.subprocess.Popen", return_value=process) as popen:
+                actual_process, kind = open_ui_window(
+                    "http://127.0.0.1:43210/", directory
+                )
+        self.assertIs(process, actual_process)
+        self.assertEqual("native-webkitgtk", kind)
+        self.assertEqual(
+            [helper, "http://127.0.0.1:43210/"],
+            popen.call_args.args[0],
+        )
 
 
 if __name__ == "__main__":

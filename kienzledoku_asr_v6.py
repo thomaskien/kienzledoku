@@ -22,7 +22,7 @@ Prinzip:
 - ENTER beendet die Aufnahme; der letzte Block wird mit Stille gepolstert,
   anschließend Gesamt-WAV -> pyannote -> Sprechertranskript -> LLM.
 
-macOS Mojave / Python 3.9 sowie aktuelle macOS-Versionen mit Python >= 3.9 kompatibel.
+Ubuntu 24.04 sowie macOS Mojave und aktuelle macOS-Versionen mit Python >= 3.9 kompatibel.
 """
 
 import argparse
@@ -322,7 +322,7 @@ def transcribe_final_block_http(url, wav_bytes, language, api_key=None, timeout=
     headers = {
         'Accept': 'application/json',
         'Content-Type': content_type,
-        'User-Agent': 'Kienzledoku-ASR/1.2.1',
+        'User-Agent': 'Kienzledoku-ASR/1.3.0',
     }
     if api_key:
         headers['Authorization'] = 'Bearer ' + api_key
@@ -912,7 +912,7 @@ async def run_recording(args):
             selected=selected_device,
         )
 
-    print('\n=== Kienzledoku 1.2.1 Final-Block-ASR ===')
+    print('\n=== Kienzledoku 1.3.0 Final-Block-ASR ===')
     print('Final-ASR:         %s' % normalize_final_asr_url(args.asr))
     print('Pausenschnitt:     %.2f s bestätigt' % args.pause_seconds)
     print('Kurze Äußerung:    Schnitt spätestens nach %.2f s Stille' % args.short_block_pause_seconds)
@@ -1026,7 +1026,7 @@ async def run_recording(args):
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description='Kienzledoku 1.2.1: natürliche Pausen + residenter Final-Block-ASR + pyannote + LLM'
+        description='Kienzledoku 1.3.0: natürliche Pausen + residenter Final-Block-ASR + pyannote + LLM'
     )
     p.add_argument('--asr', '--final-asr', dest='asr', default='http://127.0.0.1:8179')
     p.add_argument(

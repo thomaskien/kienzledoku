@@ -8,7 +8,8 @@ eingereicht werden.
 
 - Prüfen, ob das Verhalten bereits in der README oder in einem bestehenden
   Issue beschrieben ist.
-- Version, macOS-Version, Python-Version und die betroffene Komponente nennen.
+- Version, Betriebssystem-/Desktop-Version, Python-Version und die betroffene
+  Komponente nennen.
 - Nur synthetische Patientendaten und bereinigte Protokollauszüge verwenden.
 - Sicherheitsprobleme gemäß [`SECURITY.md`](SECURITY.md) vertraulich melden.
 
@@ -21,6 +22,7 @@ keine installierten Kienzlefon- oder T2med-Dienste erforderlich:
 python3 -m unittest discover -s tests -v
 python3 kienzledoku.py --self-test
 ./local-ai-macos/manager_macos.sh --action self-test
+./install_linux.sh --self-test
 ./server-linux/install_kienzlefon_ai_server.sh --self-test
 ```
 
@@ -33,6 +35,13 @@ Tools neu gebaut werden:
 
 Der Build erzeugt das Universal-Binary `kienzledoku_window` für Intel- und
 Apple-Silicon-Macs und signiert es lokal ad hoc.
+
+Unter Ubuntu 24.04 wird der GTK-4-/WebKitGTK-6.0-Container aus dem enthaltenen
+C-Quelltext gebaut:
+
+```bash
+./build_native_window_linux.sh
+```
 
 ## Anforderungen an Änderungen
 

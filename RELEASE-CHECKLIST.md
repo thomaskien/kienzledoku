@@ -17,12 +17,15 @@ werden.
   Zertifikats-, Konfigurations- oder Logdateien erfasst werden.
 - [ ] Screenshots nochmals auf Patienten-, Praxis- und Zugangsdaten prüfen.
 - [ ] Prüfen, dass alle Versionsangaben in Python, Installer, nativem Fenster
-  und Dokumentation auf `1.2.1` stehen.
+  und Dokumentation auf `1.3.0` stehen.
 - [ ] Netzwerkfreie Tests ausführen.
 - [ ] Modellfreien Selbsttest des Local-AI-Installers ausführen.
 - [ ] Statischen Selbsttest des Ubuntu/NVIDIA-Installers ausführen.
 - [ ] Prüfen, dass Local-AI-Modellrevisionen und Prüfsummen unverändert sind.
 - [ ] Native Intel- und Apple-Silicon-Binärdatei prüfen.
+- [ ] Linux-Installer auf Ubuntu 24.04 x86_64 unter X11 und Wayland prüfen.
+- [ ] WebKitGTK-Fenster, kanonischen URL-Handler und Secret Service unter XFCE
+  und GNOME prüfen.
 - [ ] Realen Integrationstest mit synthetischem T2med-Testpatienten,
   Mikrofon, ASR, Diarisierung und LLM dokumentieren.
 - [ ] Bekannte TLS- und Host-Beschränkungen in Release Notes und README
@@ -50,8 +53,14 @@ bash -n \
   uninstall_macos.command \
   set_api_key_macos.command \
   use_demo_key_macos.command \
+  install_linux.sh \
+  uninstall_linux.sh \
+  set_api_key_linux.sh \
+  use_demo_key_linux.sh \
   start_kienzledoku_asr.sh \
   build_native_window_macos.sh \
+  build_native_window_linux.sh \
+  linux/kienzledoku-launcher.sh \
   local-ai-macos/manager_macos.sh \
   local-ai-macos/start_once_macos.command \
   local-ai-macos/stop_macos.command \
@@ -68,6 +77,10 @@ bash -n \
   server-linux/status_linux_services.sh \
   server-linux/test_linux_services.sh
 ./local-ai-macos/manager_macos.sh --action self-test
+./install_linux.sh --self-test
+# Nach dem Push muss auch der GitHub-Bootstrap erfolgreich sein:
+curl -fsSL https://raw.githubusercontent.com/thomaskien/kienzledoku/main/install_linux.sh | bash -s -- --self-test
+./build_native_window_linux.sh
 ./server-linux/install_kienzlefon_ai_server.sh --self-test
 ```
 
@@ -85,11 +98,11 @@ reale Tokens dürfen nicht enthalten sein.
 
 ## Empfohlene Release-Angaben
 
-- Tag: `v1.2.1`
-- Titel: `Kienzledoku 1.2.1`
-- Plattform: Kienzledoku-App für Intel und Apple Silicon; Local AI für Apple
-  Silicon mit mindestens 32 GB Unified Memory; Serverdienste für Ubuntu 24.04
-  x86_64 mit NVIDIA/CUDA
+- Tag: `v1.3.0`
+- Titel: `Kienzledoku 1.3.0`
+- Plattform: Kienzledoku-Client für Ubuntu 24.04 x86_64 sowie macOS auf Intel
+  und Apple Silicon; Local AI für Apple Silicon mit mindestens 32 GB Unified
+  Memory; Serverdienste für Ubuntu 24.04 x86_64 mit NVIDIA/CUDA
 - Status: Entwicklungs- und Integrationsstand
 - Verweis auf `CHANGELOG.md`, `SECURITY.md` und die Sicherheitsgrenzen der
   README

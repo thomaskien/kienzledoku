@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Kienzledoku
+Comment=Lokaler Dokumentationsassistent für T2med
+Exec="@LAUNCHER_EXEC@" %u
+Icon=audio-input-microphone
+Terminal=false
+NoDisplay=true
+StartupNotify=true
+MimeType=@MIME_TYPES@
+Categories=Office;

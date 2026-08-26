@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Kienzledoku 1.2.1 <-> T2med FHIR client.
+"""Kienzledoku 1.3.0 <-> T2med FHIR client.
 
-Target: Python 3.9+ (macOS 10.14 Mojave through current macOS).
+Target: Python 3.9+ (macOS 10.14+ and Ubuntu 24.04 LTS).
 No third-party Python packages required.
 
 Security model inherited from the confirmed T2med v0.1.2 round-trip:
@@ -15,10 +15,12 @@ Security model inherited from the confirmed T2med v0.1.2 round-trip:
 from __future__ import print_function
 
 import argparse
+import errno
 import html
 import json
 import os
 import secrets
+import shutil
 import ssl
 import subprocess
 import sys
@@ -55,18 +57,37 @@ from kienzledoku_speech import (
 )
 
 APP_NAME = "Kienzledoku"
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 
 # Public test/demo key from T2med's reference application (not a secret).
 # Demo/test/integration only; never use for production.
 DEMO_API_KEY = "7QwA7931lJSQfMKuTH4MQXLn4YEiNhE5tggnYKlY4HE"
 KEYCHAIN_SERVICE = "Kienzledoku-T2med-API-Key"
 LEGACY_KEYCHAIN_SERVICE = "WhisperDoku-T2med-API-Key"
-LOG_PATH = os.path.expanduser("~/Library/Logs/Kienzledoku.log")
-SERVICE_CONFIG_PATH = os.path.expanduser(
-    "~/Library/Application Support/Kienzledoku/config.json"
-)
+if sys.platform == "darwin":
+    LOG_PATH = os.path.expanduser("~/Library/Logs/Kienzledoku.log")
+    SERVICE_CONFIG_PATH = os.path.expanduser(
+        "~/Library/Application Support/Kienzledoku/config.json"
+    )
+    INSTALLER_NAME = "install_macos.command"
+elif sys.platform.startswith("linux"):
+    def _xdg_home(name, fallback):
+        value = os.path.expanduser(os.environ.get(name, "").strip())
+        return value if value and os.path.isabs(value) else os.path.expanduser(fallback)
+
+    _XDG_CONFIG_HOME = _xdg_home("XDG_CONFIG_HOME", "~/.config")
+    _XDG_STATE_HOME = _xdg_home("XDG_STATE_HOME", "~/.local/state")
+    LOG_PATH = os.path.join(_XDG_STATE_HOME, "kienzledoku", "kienzledoku.log")
+    SERVICE_CONFIG_PATH = os.path.join(
+        _XDG_CONFIG_HOME, "kienzledoku", "config.json"
+    )
+    INSTALLER_NAME = "install_linux.sh"
+else:
+    LOG_PATH = os.path.expanduser("~/.kienzledoku/kienzledoku.log")
+    SERVICE_CONFIG_PATH = os.path.expanduser("~/.kienzledoku/config.json")
+    INSTALLER_NAME = "den Plattform-Installer"
 _LOG_LOCK = threading.Lock()
+_SESSION_LOCK_HANDLE = None
 
 IDENTIFIER_SYSTEM_KONTEXT = "https://fhir.t2med.de/identifier/kontext"
 PROFILE_PATIENT = "https://fhir.t2med.de/StructureDefinition/FhirApiPatient|1.0.0"
@@ -99,7 +120,7 @@ def safe_log(event, **fields):
     try:
         parent = os.path.dirname(LOG_PATH)
         if parent:
-            os.makedirs(parent, exist_ok=True)
+            os.makedirs(parent, mode=0o700, exist_ok=True)
         parts = [datetime.now().astimezone().isoformat(timespec="seconds"), str(event)]
         for key in sorted(fields):
             value = fields[key]
@@ -109,10 +130,79 @@ def safe_log(event, **fields):
             parts.append("%s=%s" % (key, text))
         line = " | ".join(parts) + "\n"
         with _LOG_LOCK:
-            with open(LOG_PATH, "a", encoding="utf-8") as fh:
+            descriptor = os.open(
+                LOG_PATH,
+                os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+                0o600,
+            )
+            with os.fdopen(descriptor, "a", encoding="utf-8") as fh:
                 fh.write(line)
     except Exception:
         pass
+
+
+def read_deep_link_stdin(stream=None):
+    """Read a one-shot deep link from a pipe without persisting it."""
+    source = stream or sys.stdin
+    value = source.read(65537)
+    if len(value) > 65536:
+        raise ValueError("Deep Link ist unerwartet groß")
+    value = value.strip()
+    if not value:
+        raise ValueError("Deep-Link-Pipe ist leer")
+    return value
+
+
+def notify_start_failure():
+    """Show a generic Linux desktop notification without sensitive details."""
+    if not sys.platform.startswith("linux") or not shutil.which("notify-send"):
+        return
+    try:
+        subprocess.run(
+            [
+                "notify-send",
+                "--app-name=Kienzledoku",
+                "Kienzledoku konnte nicht gestartet werden",
+                "Details stehen im geschützten Diagnoseprotokoll.",
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=3,
+            check=False,
+        )
+    except Exception:
+        pass
+
+
+def acquire_session_lock():
+    """Allow only one active Linux documentation session per desktop user."""
+    global _SESSION_LOCK_HANDLE
+    if not sys.platform.startswith("linux") or _SESSION_LOCK_HANDLE is not None:
+        return
+
+    import fcntl
+
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR", "").strip()
+    if not runtime_dir or not os.path.isabs(runtime_dir):
+        runtime_dir = os.path.dirname(LOG_PATH)
+    os.makedirs(runtime_dir, mode=0o700, exist_ok=True)
+    lock_path = os.path.join(runtime_dir, "kienzledoku-session.lock")
+    descriptor = os.open(lock_path, os.O_RDWR | os.O_CREAT, 0o600)
+    handle = os.fdopen(descriptor, "w")
+    try:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exc:
+        handle.close()
+        if exc.errno not in (errno.EACCES, errno.EAGAIN):
+            raise
+        raise RuntimeError(
+            "Es ist bereits eine Kienzledoku-Sitzung aktiv. "
+            "Bitte zuerst das vorhandene Fenster abschließen oder schließen."
+        )
+    handle.write(str(os.getpid()))
+    handle.flush()
+    _SESSION_LOCK_HANDLE = handle
 
 
 def deep_link_metadata(url):
@@ -145,7 +235,7 @@ def mask(value, keep=5):
 
 
 def get_api_key():
-    """Priority: current/legacy environment -> current/legacy Keychain -> demo."""
+    """Priority: environment -> OS credential store -> public demo key."""
     for env_name in ("KIENZLEDOKU_T2MED_API_KEY", "WHISPERDOKU_T2MED_API_KEY"):
         env_key = os.environ.get(env_name, "").strip()
         if env_key:
@@ -171,6 +261,26 @@ def get_api_key():
             except Exception:
                 pass
 
+    if sys.platform.startswith("linux") and shutil.which("secret-tool"):
+        try:
+            proc = subprocess.run(
+                [
+                    "secret-tool", "lookup",
+                    "application", "kienzledoku",
+                    "service", "t2med-api-key",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+            key = proc.stdout.strip()
+            if proc.returncode == 0 and key:
+                return key, "Linux-Schlüsselbund (Secret Service)"
+        except Exception:
+            pass
+
     return DEMO_API_KEY, "öffentlicher T2med-Demo-Key (max. 100 FHIR-Requests pro APS-Serverprozess)"
 
 
@@ -178,6 +288,8 @@ def parse_deep_link(url, config_path=None):
     parsed = urllib.parse.urlparse(url)
     if not parsed.scheme:
         raise ValueError("Deep Link hat kein URL-Schema")
+    if parsed.scheme.lower() not in ("kienzledoku", "t2demo", "whisperdoku"):
+        raise ValueError("Deep Link verwendet kein erlaubtes Kienzledoku-URL-Schema")
 
     query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
 
@@ -221,14 +333,19 @@ def configured_fhir_hosts(config_path=None):
 def validate_local_fhir_url(url, config_path=None):
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme.lower() != "https":
-        raise ValueError("Kienzledoku 1.2.1 akzeptiert ausschließlich HTTPS-FHIR-URLs")
+        raise ValueError("Kienzledoku %s akzeptiert ausschließlich HTTPS-FHIR-URLs" % VERSION)
     host = (parsed.hostname or "").lower()
     allowed_hosts = configured_fhir_hosts(config_path=config_path)
     if host not in allowed_hosts:
         raise ValueError(
-            "Kienzledoku 1.2.1 akzeptiert nur explizit freigegebene T2med-FHIR-Hosts. "
-            "Erlaubt sind %s; erhalten: %s. Bitte install_macos.command erneut ausführen."
-            % (", ".join(sorted(allowed_hosts)), host or "(kein Host)")
+            "Kienzledoku %s akzeptiert nur explizit freigegebene T2med-FHIR-Hosts. "
+            "Erlaubt sind %s; erhalten: %s. Bitte %s erneut ausführen."
+            % (
+                VERSION,
+                ", ".join(sorted(allowed_hosts)),
+                host or "(kein Host)",
+                INSTALLER_NAME,
+            )
         )
     if "/aps/fhir/api/r4" not in parsed.path:
         raise ValueError("FHIR-Basis-URL enthält nicht den erwarteten Pfad /aps/fhir/api/r4")
@@ -721,7 +838,7 @@ def page_html(state):
         "can_regenerate": False,
         "audio_devices": [],
         "selected_device": "",
-        "selected_device_name": "macOS-Standardgerät",
+        "selected_device_name": "System-Standardgerät",
         "service_status": "error",
         "service_message": "Kienzlefon-Dienste nicht initialisiert.",
         "service_host": "unbekannt",
@@ -810,7 +927,7 @@ def page_html(state):
             elapsed_text=elapsed_text,
             speech_message=html.escape(speech.get("message") or ""),
             action=action,
-            device=html.escape(speech.get("selected_device_name") or "macOS-Standardgerät"),
+            device=html.escape(speech.get("selected_device_name") or "System-Standardgerät"),
             live_transcript=html.escape(speech.get("live_transcript") or ""),
         )
     else:
@@ -1013,7 +1130,7 @@ def page_html(state):
       const live = document.getElementById('live-transcript');
       if (live) live.value = data.live_transcript || '';
       const device = document.getElementById('speech-device');
-      if (device) device.textContent = data.selected_device_name || 'macOS-Standardgerät';
+      if (device) device.textContent = data.selected_device_name || 'System-Standardgerät';
       const services = data.services || {{}};
       setServer('asr-server', (services.asr || {{}}).status || 'checking', (services.asr || {{}}).host || '');
       setServer('diarization-server', (services.diarization || {{}}).status || 'checking', (services.diarization || {{}}).host || '');
@@ -1043,22 +1160,31 @@ def page_html(state):
 def close_page_html():
     return """<!doctype html><html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kienzledoku 1.2.1</title><style>{css}</style></head>
+<title>Kienzledoku {version}</title><style>{css}</style></head>
 <body><main><div class="card"><h1>Dokumentation übernommen</h1>
 <p class="ok">Die Dokumentation wurde in T2med gespeichert. Dieses Fenster wird geschlossen.</p>
 <button type="button" onclick="window.close()">Fenster schließen</button>
-</div></main><script>window.setTimeout(function(){{ window.close(); }}, 150);</script></body></html>""".format(css=CSS)
+</div></main><script>window.setTimeout(function(){{ window.close(); }}, 150);</script></body></html>""".format(
+        css=CSS,
+        version=VERSION,
+    )
 
 
 def open_ui_window(url, script_dir):
     """Open the local UI in Kienzledoku's native WebKit window."""
-    helper = os.path.join(script_dir, "kienzledoku_window")
-    if sys.platform == "darwin" and os.path.isfile(helper) and os.access(helper, os.X_OK):
+    if sys.platform == "darwin":
+        helper = os.path.join(script_dir, "kienzledoku_window")
+    elif sys.platform.startswith("linux"):
+        helper = os.path.join(script_dir, "kienzledoku_window_linux")
+    else:
+        helper = ""
+
+    if helper and os.path.isfile(helper) and os.access(helper, os.X_OK):
         command = [helper, url]
         icon_path = os.path.expanduser(
             "~/Applications/Kienzledoku.app/Contents/Resources/applet.icns"
         )
-        if os.path.isfile(icon_path):
+        if sys.platform == "darwin" and os.path.isfile(icon_path):
             command.append(icon_path)
         process = subprocess.Popen(
             command,
@@ -1067,7 +1193,9 @@ def open_ui_window(url, script_dir):
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
-        return process, "native-webkit"
+        return process, (
+            "native-webkit" if sys.platform == "darwin" else "native-webkitgtk"
+        )
     opened = webbrowser.open(url, new=1, autoraise=True)
     return None, "browser" if opened else "none"
 
@@ -1080,14 +1208,14 @@ def close_ui_window(state):
         time.sleep(0.2)
         process.terminate()
         process.wait(timeout=3)
-        safe_log("UI close requested", window="native-webkit", closed="yes")
+        safe_log("UI close requested", window="native-webkit-container", closed="yes")
         return True
     except Exception:
         try:
             process.kill()
         except Exception:
             pass
-        safe_log("UI close requested", window="native-webkit", closed="forced")
+        safe_log("UI close requested", window="native-webkit-container", closed="forced")
         return True
 
 
@@ -1233,6 +1361,7 @@ def make_handler(state):
 
 
 def run_session(deep_link, no_browser=False):
+    acquire_session_lock()
     safe_log("Python session start", **deep_link_metadata(deep_link))
     link = parse_deep_link(deep_link)
     safe_log(
@@ -1446,13 +1575,27 @@ def self_test():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Kienzledoku 1.2.1 mit T2med FHIR")
-    parser.add_argument("--deep-link", help="T2demo://, whisperdoku:// oder kienzledoku:// aus T2med")
+    parser = argparse.ArgumentParser(description="Kienzledoku %s mit T2med FHIR" % VERSION)
+    deep_link_group = parser.add_mutually_exclusive_group()
+    deep_link_group.add_argument(
+        "--deep-link",
+        help="T2demo://, whisperdoku:// oder kienzledoku:// aus T2med",
+    )
+    deep_link_group.add_argument(
+        "--deep-link-stdin",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument("--no-browser", action="store_true", help="print local UI URL instead of opening browser")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
 
-    safe_log("Process invoked", version=VERSION, python=sys.version.split()[0], deep_link_arg="yes" if args.deep_link else "no")
+    safe_log(
+        "Process invoked",
+        version=VERSION,
+        python=sys.version.split()[0],
+        deep_link_arg="yes" if (args.deep_link or args.deep_link_stdin) else "no",
+    )
 
     if sys.version_info < (3, 9):
         safe_log("Python version rejected", python=sys.version.split()[0])
@@ -1462,16 +1605,26 @@ def main():
     if args.self_test:
         self_test()
         return 0
-    if not args.deep_link:
+    deep_link = args.deep_link
+    if args.deep_link_stdin:
+        try:
+            deep_link = read_deep_link_stdin()
+        except Exception as exc:
+            safe_log("Deep-link pipe read failed", error=type(exc).__name__)
+            print("Kienzledoku-Startfehler: %s" % exc, file=sys.stderr)
+            notify_start_failure()
+            return 1
+    if not deep_link:
         parser.error("--deep-link fehlt (normalerweise startet T2med die App über T2demo:// bzw. kienzledoku://)")
 
     try:
-        run_session(args.deep_link, no_browser=args.no_browser)
+        run_session(deep_link, no_browser=args.no_browser)
         return 0
     except Exception as exc:
         # Never print/log the deep-link itself: it may contain OAuth material.
         safe_log("Session failed", error=type(exc).__name__, status=getattr(exc, "status", ""))
         print("Kienzledoku-Startfehler: %s" % exc, file=sys.stderr)
+        notify_start_failure()
         return 1
 
 

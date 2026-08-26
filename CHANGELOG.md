@@ -8,6 +8,29 @@ festgehalten. Das Format orientiert sich an
 
 - Noch keine Änderungen.
 
+## [1.3.0] – 2026-08-26
+
+### Hinzugefügt
+
+- Schlanker Client für Ubuntu 24.04 LTS auf x86_64.
+- Desktopunabhängiger GTK-4-/WebKitGTK-6.0-Fenstercontainer für X11 und
+  Wayland.
+- Einsehbarer `install_linux.sh` mit XDG-URL-Handler, Ubuntu-Abhängigkeiten,
+  Client-venv, Selbsttest und Dienstprüfung.
+- Direkte GitHub-Installation per `curl | bash`; der Installer lädt dafür den
+  vollständigen Quellbaum als temporäres Archiv.
+- Speicherung eigener T2med-API-Schlüssel über Linux Secret Service.
+- Linux-Deinstallation und Rückkehr zum öffentlichen Demo-Key.
+
+### Sicherheit
+
+- OAuth-haltige Linux-Deep-Links werden über eine anonyme Pipe an den
+  langlebigen Python-Prozess übergeben und nicht auf den Datenträger geschrieben.
+- Unter Linux ist pro Benutzer nur eine aktive Dokumentationssitzung erlaubt.
+- Das WebKitGTK-Fenster verwendet eine nichtpersistente Netzwerksitzung und
+  erlaubt interne Navigation nur zum zufällig gewählten Loopback-Port der
+  aktuellen Sitzung.
+
 ## [1.2.1] – 2026-08-26
 
 ### Behoben

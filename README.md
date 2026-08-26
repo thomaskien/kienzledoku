@@ -1,4 +1,4 @@
-# Kienzledoku 1.2.1
+# Kienzledoku 1.3.0
 
 [![Video: Lokaler KI-Dokumentationsassistent für die Arztpraxis mit T2med](https://img.youtube.com/vi/6l1U047NSwg/maxresdefault.jpg)](https://www.youtube.com/watch?v=6l1U047NSwg)
 
@@ -7,12 +7,12 @@
 Kienzledoku erstellt aus dem Arzt-Patienten-Gespräch einen strukturierten
 Dokumentationsentwurf und übernimmt ihn nach ärztlicher Prüfung kontrolliert in
 die aktuell in T2med geöffnete Patientenakte. Mikrofonaufnahme,
-Spracherkennung, Sprechertrennung und LLM-Verarbeitung laufen lokal auf dem Mac
-oder innerhalb des Praxisnetzes. T2med-Zugangsdaten werden nicht in
+Spracherkennung, Sprechertrennung und LLM-Verarbeitung laufen lokal auf dem
+Arbeitsplatz oder innerhalb des Praxisnetzes. T2med-Zugangsdaten werden nicht in
 Projektdateien gespeichert.
 
 > [!IMPORTANT]
-> Kienzledoku 1.2.1 ist ein Entwicklungs- und Integrationsstand, kein
+> Kienzledoku 1.3.0 ist ein Entwicklungs- und Integrationsstand, kein
 > zertifiziertes Medizinprodukt. Die erzeugte Dokumentation ist immer ein
 > Entwurf und muss vor der Übernahme vollständig ärztlich geprüft werden. Die
 > in [Sicherheitsgrenzen](#sicherheitsgrenzen) beschriebenen Einschränkungen
@@ -20,7 +20,8 @@ Projektdateien gespeichert.
 
 > [!TIP]
 > **Empfohlene Betriebsvariante:** Kienzledoku läuft als schlanker Client auf
-> dem T2med-Mac; LLM, Final-Block-ASR und Diarisierung laufen resident auf
+> dem T2med-Arbeitsplatz unter Ubuntu 24.04 LTS oder macOS; LLM,
+> Final-Block-ASR und Diarisierung laufen resident auf
 > einem dedizierten Ubuntu-/NVIDIA-Server im Praxisnetz. Dadurch bleiben
 > Modellbetrieb und GPU-Last vom Arbeitsplatz getrennt und die KI-Dienste
 > lassen sich zentral warten. Der rein lokale Betrieb auf einem
@@ -49,6 +50,8 @@ Projektdateien gespeichert.
   Freitext-Eintrag;
 - atomare Übertragung als FHIR-Transaktion: entweder werden alle Einträge
   übernommen oder keiner;
+- schlanker Client für Ubuntu 24.04 LTS mit einem eigenen, unter X11 und
+  Wayland laufenden WebKitGTK-Fenster;
 - enthaltener lokaler macOS-Installer für Qwen/llama.cpp, Whisper/MLX und
   pyannote/MPS auf Apple Silicon;
 - enthaltener Ubuntu/NVIDIA-Installer für LLM, Final-Block-ASR und
@@ -62,7 +65,7 @@ URL-Schema lauten **Kienzledoku** und `kienzledoku://`.
 
 ```text
 T2med-Patientenkontext
-  → CoreAudio-Mikrofon
+  → Systemmikrofon
   → Final-Block-ASR
   → optionale Diarisierung
   → lokales LLM
@@ -87,14 +90,14 @@ T2med-Patientenkontext
 
 ## Voraussetzungen
 
-- macOS auf Intel- oder Apple-Silicon-Hardware;
+- Ubuntu 24.04 LTS auf x86_64 oder macOS auf Intel-/Apple-Silicon-Hardware;
 - Python 3.9 oder neuer;
 - T2med mit eingerichteter Drittanbieter-Anbindung und FHIR-Zugriff;
 - erreichbare, zu Kienzlefon AI kompatible Dienste für
   - ASR/Final Block, standardmäßig Port `8179`,
   - Diarisierung, standardmäßig Port `8183`,
   - ein OpenAI-kompatibles LLM, standardmäßig Port `8080`;
-- Mikrofonberechtigung für `Kienzledoku.app`.
+- ein vom Betriebssystem bereitgestelltes Mikrofon-Eingabegerät.
 
 Für einen vollständig lokalen Betrieb enthält dieses Repository den optionalen
 Installer [`local-ai-macos`](local-ai-macos/README.md). Er benötigt einen Mac
@@ -109,6 +112,77 @@ lädt festgeschriebene Versionen und prüft die vorgesehenen Dateien.
 Für den regelmäßigen Einsatz wird die
 [dedizierte Linux-Servervariante](#empfohlen-dedizierter-linuxnvidia-server-im-praxisnetz)
 empfohlen.
+
+### Ubuntu-24.04-LTS-Client
+
+Der Linux-Client wird bewusst direkt aus dem einsehbaren Repository mit einem
+Shell-Skript installiert. Er enthält keine KI-Modelle und installiert keine
+Serverkomponente:
+
+Direkt von GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/thomaskien/kienzledoku/main/install_linux.sh | bash
+```
+
+Der Einstieg per `curl` lädt anschließend den vollständigen Quellbaum als
+temporäres GitHub-Archiv und führt daraus den Installer aus. Wer den Stand vor
+der Ausführung vollständig prüfen möchte, kann alternativ das Repository
+klonen:
+
+```bash
+git clone https://github.com/thomaskien/kienzledoku.git
+cd kienzledoku
+./install_linux.sh
+```
+
+Der Installer unterstützt ausschließlich Ubuntu 24.04 LTS auf x86_64. Er
+installiert die benötigten Ubuntu-Pakete mit `sudo`, baut den kleinen
+GTK-4-/WebKitGTK-6.0-Fenstercontainer aus dem enthaltenen C-Quelltext und legt
+die eigentlichen Clientdateien benutzerbezogen unter den XDG-Verzeichnissen ab.
+GTK wählt automatisch den vorhandenen Display-Backend; damit ist der Client
+weder an GNOME noch an XFCE und weder an Wayland noch an X11 gebunden.
+
+Zu den automatisch installierten Paketen gehören Python mit `venv`, Compiler
+und `pkg-config`, GTK 4/WebKitGTK 6.0, PortAudio, XDG-/Desktop-Werkzeuge,
+Secret Service/gnome-keyring und Desktop-Benachrichtigungen. Falls erforderlich,
+aktiviert das Skript dafür Ubuntu `universe`. Die Python-Abhängigkeit
+`sounddevice` wird anschließend in einem isolierten Benutzer-venv installiert.
+
+Standardmäßig wird nur das kanonische Schema `kienzledoku://` registriert. Wer
+eine bestehende T2med-Konfiguration mit den früheren Schemas weiterverwenden
+muss, kann sie ausdrücklich zusätzlich registrieren:
+
+```bash
+./install_linux.sh --legacy-url-schemes
+# bei direkter GitHub-Installation:
+curl -fsSL https://raw.githubusercontent.com/thomaskien/kienzledoku/main/install_linux.sh | bash -s -- --legacy-url-schemes
+```
+
+Auf bereits vorbereiteten Rechnern kann die Paketinstallation mit
+`--skip-packages` ausgelassen werden. Der netzwerkfreie statische Test ist auch
+auf anderen Entwicklungsrechnern ausführbar:
+
+```bash
+./install_linux.sh --self-test
+```
+
+Der Installer:
+
+- fragt den erlaubten T2med-FHIR-Host sowie ASR-, Diarisierungs- und LLM-Ziel
+  getrennt ab;
+- installiert keine Modelle und keine KI-Serverdienste;
+- speichert Konfiguration und Protokoll mit restriktiven Dateirechten;
+- registriert den URL-Handler desktopunabhängig über die XDG-Werkzeuge;
+- übergibt den OAuth-haltigen Deep Link über eine anonyme Pipe an den
+  langlebigen Python-Prozess und schreibt ihn nicht auf den Datenträger;
+- verwendet Secret Service für einen eigenen T2med-API-Schlüssel;
+- führt Selbsttest und Erreichbarkeitsprüfung der drei KI-Dienste aus.
+
+Erfüllt derselbe Ubuntu-Rechner die NVIDIA-/CUDA-Hardwarevoraussetzungen, kann
+die Serverkomponente aus [`server-linux`](server-linux/README.md) separat auf
+diesem Rechner installiert werden. Die Clientinstallation bleibt davon
+unabhängig und verbindet sich dann über die lokalen Dienstports.
 
 ### Alternative: vollständig lokal auf Apple Silicon
 
@@ -183,15 +257,16 @@ Er fragt GPU-Zuordnung und Hugging-Face-Token interaktiv ab. Der ASR-Installer
 ergänzt nach der WhisperLiveKit-Installation automatisch den streng
 versionsgeprüften Endpoint `POST /v1/asr/final-block`.
 
-Danach auf dem Mac `./install_macos.command` ausführen und für ASR,
-Diarisierung und LLM jeweils `SERVER_LAN_IP` sowie die Ports `8179`, `8183` und
-`8080` eintragen. Die Linux-APIs dürfen nur im geschützten Praxisnetz
+Danach auf dem T2med-Arbeitsplatz `./install_linux.sh` beziehungsweise
+`./install_macos.command` ausführen und für ASR, Diarisierung und LLM jeweils
+`SERVER_LAN_IP` sowie die Ports `8179`, `8183` und `8080` eintragen. Die
+Linux-APIs dürfen nur im geschützten Praxisnetz
 erreichbar sein. Eine Host-Firewall auf dem KI-Server ist nicht zwingend,
 kann aber als zusätzliche Absicherung erwogen werden. Hostvorbereitung,
 Einzelinstaller, Rollback und Tests stehen in
 [`server-linux/README.md`](server-linux/README.md).
 
-### App mit vorhandenen KI-Diensten
+### macOS-App mit vorhandenen KI-Diensten
 
 Wenn ASR, Diarisierung und LLM bereits auf diesem Mac oder im Praxisnetz
 laufen, genügt im geklonten oder entpackten Projektverzeichnis:
@@ -265,10 +340,13 @@ noch in Issues oder Screenshots veröffentlicht werden.
 
 ### Dienstkonfiguration
 
-Die vom Installer erzeugte Datei ist die verbindliche Konfigurationsquelle:
+Die vom jeweiligen Installer erzeugte Datei ist die verbindliche
+Konfigurationsquelle:
 
 ```text
-~/Library/Application Support/Kienzledoku/config.json
+Ubuntu: ~/.config/kienzledoku/config.json
+        oder $XDG_CONFIG_HOME/kienzledoku/config.json
+macOS:  ~/Library/Application Support/Kienzledoku/config.json
 ```
 
 Sie enthält den erlaubten T2med-FHIR-Host und die drei KI-Dienstadressen, aber
@@ -331,18 +409,22 @@ Dokumentationsvorgängen. Nach Ausschöpfen des Kontingents muss der
 T2med-/APS-Serverprozess neu gestartet werden, damit der Demo-Key wieder
 verwendet werden kann.
 
-Für den regelmäßigen Betrieb wird ein eigener Schlüssel empfohlen. Er wird mit
-diesem Hilfsskript im macOS-Schlüsselbund gespeichert:
+Für den regelmäßigen Betrieb wird ein eigener Schlüssel empfohlen. Er wird
+unter Ubuntu im Secret-Service-Schlüsselbund und unter macOS im
+macOS-Schlüsselbund gespeichert:
 
 ```bash
+./set_api_key_linux.sh
+# oder unter macOS:
 ./set_api_key_macos.command
 ```
 
 Für einen einzelnen Entwicklerstart kann alternativ
-`KIENZLEDOKU_T2MED_API_KEY` gesetzt werden. Neue Schlüssel werden ausschließlich
-unter dem Schlüsselbund-Dienst `Kienzledoku-T2med-API-Key` gespeichert. Ein
+`KIENZLEDOKU_T2MED_API_KEY` gesetzt werden. Unter macOS werden neue Schlüssel
+unter dem Schlüsselbund-Dienst `Kienzledoku-T2med-API-Key` gespeichert; ein
 vorhandener Schlüssel des früheren WhisperDoku-Dienstnamens wird nur für die
-Migration gelesen.
+Migration gelesen. Unter Linux verwendet Kienzledoku die Secret-Service-
+Attribute `application=kienzledoku` und `service=t2med-api-key`.
 
 - OAuth-Token bleiben ausschließlich im Arbeitsspeicher.
 - Tokens, API-Schlüssel und Dokumentationsinhalte werden nicht protokolliert.
@@ -351,7 +433,9 @@ Migration gelesen.
 - Medizinische Rohdaten, Audiodateien, Tokens und lokale Schlüsseldateien sind
   über `.gitignore` vom Repository ausgeschlossen.
 
-Das Diagnoseprotokoll liegt unter
+Das Diagnoseprotokoll liegt unter Linux in
+`~/.local/state/kienzledoku/kienzledoku.log` beziehungsweise unter
+`$XDG_STATE_HOME/kienzledoku/kienzledoku.log`, unter macOS weiterhin in
 `~/Library/Logs/Kienzledoku.log`. Vor dem Teilen eines Logs muss es trotzdem auf
 personen- oder praxisbezogene Angaben geprüft werden.
 
@@ -383,7 +467,7 @@ geschützten Praxisnetz aber keine technische Voraussetzung für den Betrieb.
 Selbsteinschätzung des Betreibers: Der Betrieb ist datenschutzrechtlich
 unproblematisch, da Verarbeitung und Speicherung der medizinischen Daten
 ausschließlich innerhalb der Praxis erfolgen. Voraussetzung ist
-selbstverständlich, dass Mac, T2med-, Netzwerk- und KI-System sauber
+selbstverständlich, dass Arbeitsplatz, T2med-, Netzwerk- und KI-System sauber
 eingerichtet, geschützt und administriert werden. Der jeweilige
 Praxisbetreiber prüft und verantwortet die konkrete Installation und Nutzung
 in seiner Umgebung.
@@ -425,11 +509,19 @@ Der statische Selbsttest des Ubuntu/NVIDIA-Installers:
 ./server-linux/install_kienzlefon_ai_server.sh --self-test
 ```
 
-Der native WebKit-Container liegt als Universal-Binary bei. Für einen Neubau
-werden die Xcode Command Line Tools benötigt:
+Der Linux-Client-Installer besitzt einen eigenen statischen Selbsttest:
+
+```bash
+./install_linux.sh --self-test
+```
+
+Der native macOS-WebKit-Container liegt als Universal-Binary bei. Für einen
+Neubau werden die Xcode Command Line Tools benötigt. Der Linux-Container wird
+vom Installer aus seinem C-Quelltext gebaut:
 
 ```bash
 ./build_native_window_macos.sh
+./build_native_window_linux.sh
 ```
 
 Beiträge sollten die Regeln in [`CONTRIBUTING.md`](CONTRIBUTING.md) beachten.
@@ -441,24 +533,28 @@ Zugangsdaten enthalten.
 | Problem | Prüfung |
 | --- | --- |
 | ASR, Diarisierung oder LLM ist rot | Dienstadresse in `config.json`, Erreichbarkeit des Hosts und Ports sowie den jeweiligen `/health`- beziehungsweise `/v1/models`-Endpunkt prüfen. |
-| Kein Sprachsignal | Mikrofon in den macOS-Systemeinstellungen erlauben und das richtige Eingabegerät in Kienzledoku wählen. |
-| T2med öffnet die falsche Anwendung | `T2demo://` kann nur einem aktiven Handler zugeordnet sein. Kienzledoku erneut installieren und konkurrierende Test-Apps nicht gleichzeitig registrieren. |
+| Kein Sprachsignal | Das richtige Eingabegerät in Kienzledoku sowie unter Linux PipeWire/PulseAudio beziehungsweise unter macOS die Mikrofonberechtigung prüfen. |
+| T2med öffnet die falsche Anwendung | Das kanonische Schema `kienzledoku://` verwenden. Nur falls erforderlich die alten Linux-Schemata mit `--legacy-url-schemes` registrieren; konkurrierende Handler nicht gleichzeitig verwenden. |
 | Demo-Key wird abgelehnt | Der öffentliche Demo-Key erlaubt höchstens 100 einzelne FHIR-Requests pro APS-Serverprozess. Nach Ausschöpfen muss der T2med-/APS-Serverprozess neu gestartet oder ein eigener T2med-API-Schlüssel eingerichtet werden. |
-| Start schlägt fehl | `~/Library/Logs/Kienzledoku.log` prüfen; keine Deep Links oder Zugangsdaten in öffentliche Issues kopieren. |
-| FHIR-Ziel wird abgelehnt | `install_macos.command` erneut ausführen und den Host der von T2med übergebenen `fhirBasisUrl` als T2med-FHIR-Host eintragen; zusätzlich muss der erwartete API-Pfad stimmen. |
+| Start schlägt fehl | Das oben genannte plattformspezifische Diagnoseprotokoll prüfen; keine Deep Links oder Zugangsdaten in öffentliche Issues kopieren. |
+| FHIR-Ziel wird abgelehnt | `install_linux.sh` beziehungsweise `install_macos.command` erneut ausführen und den Host der von T2med übergebenen `fhirBasisUrl` eintragen; zusätzlich muss der erwartete API-Pfad stimmen. |
+| Zweiter Aufruf startet nicht | Unter Linux ist absichtlich nur eine aktive Dokumentationssitzung erlaubt. Das vorhandene Fenster zuerst abschließen oder schließen. |
+| Linux-Schlüsselbund ist nicht erreichbar | Nach der erstmaligen Installation von `gnome-keyring` einmal ab- und wieder anmelden und danach `set_api_key_linux.sh` erneut ausführen. |
 
 ## Deinstallation
 
-Nur die Kienzledoku-App und ihre Laufzeitdateien entfernen:
+Nur den Kienzledoku-Client und seine Laufzeitdateien entfernen:
 
 ```bash
+./uninstall_linux.sh
+# oder unter macOS:
 ./uninstall_macos.command
 ```
 
-Dadurch werden die App und ihre Laufzeitdateien entfernt. Ein eigener
-T2med-API-Schlüssel bleibt absichtlich im macOS-Schlüsselbund. Mit
-`use_demo_key_macos.command` können der aktuelle und der alte
-WhisperDoku-Schlüsselbund-Eintrag entfernt werden.
+Ein eigener T2med-API-Schlüssel bleibt dabei absichtlich im jeweiligen
+Schlüsselbund. Unter Linux entfernt `use_demo_key_linux.sh` diesen Eintrag;
+unter macOS entfernt `use_demo_key_macos.command` den aktuellen und den alten
+WhisperDoku-Schlüsselbund-Eintrag.
 
 Die lokalen KI-Dienste, Modelle, LaunchAgents und technischen Logs werden
 separat entfernt:

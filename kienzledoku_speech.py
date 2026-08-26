@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Gekapselte Kienzlefon-ASR-Anbindung für Kienzledoku 1.2.1.
+"""Gekapselte Kienzlefon-ASR-Anbindung für Kienzledoku 1.3.0.
 
 Der Prozess verwendet den unveränderten Final-Block-Ablauf der v6.2-Basis.
 Audio, Transkript und LLM-Rohantwort liegen nur in einem geschützten temporären
@@ -197,7 +197,7 @@ class SpeechRecognitionManager(object):
             elapsed = 0
             if self.started_at is not None and self.status in ACTIVE_STATUSES:
                 elapsed = max(0, int(time.time() - self.started_at))
-            device_label = "macOS-Standardgerät"
+            device_label = "System-Standardgerät"
             for item in self.audio_devices:
                 if str(item.get("index")) == self.selected_device:
                     device_label = item.get("name") or device_label
@@ -247,7 +247,7 @@ class SpeechRecognitionManager(object):
             self.health_thread.start()
 
     def set_audio_device(self, device):
-        """Select an input device for the next recording; empty means CoreAudio default."""
+        """Select an input device for the next recording; empty means OS default."""
         value = str(device or "").strip()
         with self.lock:
             if self.status in ACTIVE_STATUSES:

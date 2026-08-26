@@ -34,3 +34,6 @@ letzte_whisperdoku_*.json
 *.npz
 *.part
 models/
+
+# Der Linux-Fenstercontainer wird auf Ubuntu aus dem einsehbaren Quelltext gebaut.
+kienzledoku_window_linux
