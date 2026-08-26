@@ -1,13 +1,18 @@
 #!/bin/bash
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
+if [ -n "$SCRIPT_SOURCE" ] && [ -f "$SCRIPT_SOURCE" ]; then
+    SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$SCRIPT_SOURCE")" && pwd)"
+else
+    SCRIPT_DIR=""
+fi
 ARCHIVE_URL="${KIENZLEDOKU_ARCHIVE_URL:-https://github.com/thomaskien/kienzledoku/archive/refs/heads/main.tar.gz}"
 
 # Bei `curl .../install_linux.sh | bash` liegt nur dieses Skript vor. In diesem
 # Fall wird der dazugehoerige, offen einsehbare Quellbaum in ein temporaeres
 # Verzeichnis geladen und von dort derselbe Installer ausgefuehrt.
-if [ ! -f "$SCRIPT_DIR/native/KienzledokuWindowLinux.c" ]; then
+if [ -z "$SCRIPT_DIR" ] || [ ! -f "$SCRIPT_DIR/native/KienzledokuWindowLinux.c" ]; then
     for bootstrap_command in curl tar mktemp; do
         if ! command -v "$bootstrap_command" >/dev/null 2>&1; then
             echo "FEHLER: Fuer die GitHub-Installation fehlt: $bootstrap_command" >&2
@@ -26,7 +31,16 @@ if [ ! -f "$SCRIPT_DIR/native/KienzledokuWindowLinux.c" ]; then
         echo "FEHLER: Das GitHub-Archiv enthaelt keinen gueltigen Kienzledoku-Installer." >&2
         exit 1
     fi
-    if "${CHECKOUT_DIRS[0]}/install_linux.sh" "$@"; then
+    # Die Skript-Pipe ist kein Eingabekanal fuer die Installationsfragen.
+    # In einer interaktiven Shell werden sie deshalb vom steuernden Terminal
+    # gelesen; automatisierte Aufrufe koennen weiterhin ohne TTY arbeiten.
+    if ( : </dev/tty ) 2>/dev/null; then
+        if "${CHECKOUT_DIRS[0]}/install_linux.sh" "$@" </dev/tty; then
+            INSTALL_STATUS=0
+        else
+            INSTALL_STATUS=$?
+        fi
+    elif "${CHECKOUT_DIRS[0]}/install_linux.sh" "$@"; then
         INSTALL_STATUS=0
     else
         INSTALL_STATUS=$?
