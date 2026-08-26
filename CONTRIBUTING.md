@@ -43,6 +43,10 @@ C-Quelltext gebaut:
 ./build_native_window_linux.sh
 ```
 
+Der produktive Installer legt diesen Helfer root-eigen unter `/usr/local`
+ab. Änderungen an `linux/kienzledoku.apparmor` dürfen die WebKit-Sandbox oder
+Ubuntus systemweite User-Namespace-Beschränkung nicht deaktivieren.
+
 ## Anforderungen an Änderungen
 
 - Patientendaten, Tokens, API-Schlüssel, Zertifikate, Audiodateien und

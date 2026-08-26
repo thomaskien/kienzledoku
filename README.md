@@ -1,4 +1,4 @@
-# Kienzledoku 1.3.0
+# Kienzledoku 1.3.1
 
 [![Video: Lokaler KI-Dokumentationsassistent für die Arztpraxis mit T2med](https://img.youtube.com/vi/6l1U047NSwg/maxresdefault.jpg)](https://www.youtube.com/watch?v=6l1U047NSwg)
 
@@ -12,7 +12,7 @@ Arbeitsplatz oder innerhalb des Praxisnetzes. T2med-Zugangsdaten werden nicht in
 Projektdateien gespeichert.
 
 > [!IMPORTANT]
-> Kienzledoku 1.3.0 ist ein Entwicklungs- und Integrationsstand, kein
+> Kienzledoku 1.3.1 ist ein Entwicklungs- und Integrationsstand, kein
 > zertifiziertes Medizinprodukt. Die erzeugte Dokumentation ist immer ein
 > Entwurf und muss vor der Übernahme vollständig ärztlich geprüft werden. Die
 > in [Sicherheitsgrenzen](#sicherheitsgrenzen) beschriebenen Einschränkungen
@@ -189,7 +189,12 @@ Python mit `venv`, Compiler, GTK 4, WebKitGTK 6.0, PortAudio,
 XDG-/Desktop-Werkzeuge, Secret Service/gnome-keyring und Benachrichtigungen.
 Falls erforderlich, aktiviert er Ubuntu `universe`. Danach baut er den
 Fenstercontainer und installiert den Client benutzerbezogen in den
-XDG-Verzeichnissen. Modelle oder KI-Serverdienste werden nicht installiert.
+XDG-Verzeichnissen. Das kleine Fensterprogramm wird geschützt und root-eigen
+unter `/usr/local/libexec/kienzledoku` abgelegt. Ein eng zugeordnetes
+AppArmor-Profil erlaubt ausschließlich diesem Programm die von WebKitGTK für
+seine Bubblewrap-Sandbox benötigten User-Namespaces. Die Ubuntu-Schutzfunktion
+wird weder global abgeschaltet noch wird die WebKit-Sandbox deaktiviert.
+Modelle oder KI-Serverdienste werden nicht installiert.
 
 Standardmäßig wird nur `kienzledoku://` registriert. Frühere URL-Schemata
 können ausdrücklich zusätzlich aktiviert werden:
@@ -512,6 +517,7 @@ Zugangsdaten enthalten.
 | FHIR-Ziel wird abgelehnt | `install_linux.sh` beziehungsweise `install_macos.command` erneut ausführen und den Host der von T2med übergebenen `fhirBasisUrl` eintragen; zusätzlich muss der erwartete API-Pfad stimmen. |
 | Zweiter Aufruf startet nicht | Unter Linux ist absichtlich nur eine aktive Dokumentationssitzung erlaubt. Das vorhandene Fenster zuerst abschließen oder schließen. |
 | Linux-Schlüsselbund ist nicht erreichbar | Nach der erstmaligen Installation von `gnome-keyring` einmal ab- und wieder anmelden und danach `set_api_key_linux.sh` erneut ausführen. |
+| Linux-Fenster verschwindet sofort; im Log steht `bwrap` oder `dbus-proxy` | Den Client erneut mit dem aktuellen `install_linux.sh` installieren. Version 1.3.1 installiert das für Ubuntu 24.04 benötigte AppArmor-Profil, ohne die User-Namespace-Schutzfunktion global abzuschalten. |
 
 ## Deinstallation
 

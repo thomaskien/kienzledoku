@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Gekapselte Kienzlefon-ASR-Anbindung für Kienzledoku 1.3.0.
+"""Gekapselte Kienzlefon-ASR-Anbindung für Kienzledoku 1.3.1.
 
 Der Prozess verwendet den unveränderten Final-Block-Ablauf der v6.2-Basis.
 Audio, Transkript und LLM-Rohantwort liegen nur in einem geschützten temporären

@@ -92,6 +92,7 @@ prompt_documentation.txt
 native/KienzledokuWindowLinux.c
 linux/kienzledoku-launcher.sh
 linux/kienzledoku.desktop
+linux/kienzledoku.apparmor
 build_native_window_linux.sh
 "
     for relative_path in $required_files; do
@@ -118,6 +119,19 @@ for name in (
     path = os.path.join(root, name)
     with open(path, "r", encoding="utf-8") as handle:
         compile(handle.read(), path, "exec")
+
+profile_path = os.path.join(root, "linux", "kienzledoku.apparmor")
+with open(profile_path, "r", encoding="utf-8") as handle:
+    profile = handle.read()
+for required in (
+    "/usr/local/libexec/kienzledoku/kienzledoku_window_linux",
+    "flags=(unconfined)",
+    "userns,",
+):
+    if required not in profile:
+        raise SystemExit("AppArmor-Profil unvollständig: " + required)
+if "apparmor_restrict_unprivileged_userns=0" in profile:
+    raise SystemExit("AppArmor-Profil darf den Ubuntu-Systemschutz nicht abschalten")
 PY
     if command -v pkg-config >/dev/null 2>&1 && \
        pkg-config --exists gtk4 webkitgtk-6.0; then
@@ -148,11 +162,12 @@ if [ "$(uname -m)" != "x86_64" ]; then
     exit 1
 fi
 
+if ! command -v sudo >/dev/null 2>&1; then
+    echo "FEHLER: sudo wird für die geschützte Fenster- und AppArmor-Installation benötigt." >&2
+    exit 1
+fi
+
 if [ "$SKIP_PACKAGES" -eq 0 ]; then
-    if ! command -v sudo >/dev/null 2>&1; then
-        echo "FEHLER: sudo wird für die Ubuntu-Paketinstallation benötigt." >&2
-        exit 1
-    fi
     echo "Ubuntu-Abhängigkeiten werden installiert ..."
     sudo apt-get update
     if ! apt-cache show libwebkitgtk-6.0-dev >/dev/null 2>&1; then
@@ -161,6 +176,7 @@ if [ "$SKIP_PACKAGES" -eq 0 ]; then
         sudo apt-get update
     fi
     sudo apt-get install -y \
+        apparmor \
         build-essential \
         ca-certificates \
         desktop-file-utils \
@@ -177,7 +193,7 @@ if [ "$SKIP_PACKAGES" -eq 0 ]; then
         xdg-utils
 fi
 
-for command_name in python3 cc desktop-file-validate pkg-config xdg-mime; do
+for command_name in apparmor_parser python3 cc desktop-file-validate install pkg-config xdg-mime; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
         echo "FEHLER: Erforderliches Programm fehlt: $command_name" >&2
         exit 1
@@ -209,6 +225,9 @@ CONFIG_PATH="$CONFIG_DIR/config.json"
 LOG_PATH="$STATE_DIR/kienzledoku.log"
 LAUNCHER_PATH="$BIN_DIR/kienzledoku"
 DESKTOP_PATH="$APPLICATIONS_DIR/kienzledoku.desktop"
+SYSTEM_HELPER_DIR="/usr/local/libexec/kienzledoku"
+SYSTEM_HELPER_PATH="$SYSTEM_HELPER_DIR/kienzledoku_window_linux"
+APPARMOR_PROFILE_PATH="/etc/apparmor.d/kienzledoku-window"
 
 for xdg_path in "$DATA_HOME" "$CONFIG_HOME" "$STATE_HOME"; do
     case "$xdg_path" in
@@ -438,7 +457,21 @@ done
 chmod 700 "$DATA_DIR"/*.py "$DATA_DIR/start_kienzledoku_asr.sh"
 chmod 600 "$DATA_DIR/requirements-asr-client.txt" "$DATA_DIR/prompt_documentation.txt"
 
-"$SCRIPT_DIR/build_native_window_linux.sh" "$DATA_DIR/kienzledoku_window_linux"
+WINDOW_BUILD_PATH="$DATA_DIR/.kienzledoku_window_linux.build"
+"$SCRIPT_DIR/build_native_window_linux.sh" "$WINDOW_BUILD_PATH"
+sudo install -d -o root -g root -m 0755 "$SYSTEM_HELPER_DIR"
+sudo install -o root -g root -m 0755 "$WINDOW_BUILD_PATH" "$SYSTEM_HELPER_PATH"
+rm -f -- "$WINDOW_BUILD_PATH" "$DATA_DIR/kienzledoku_window_linux"
+
+# Remove the previously loaded definition before replacing its source file.
+# This also migrates the temporary per-user profile used during the first
+# Ubuntu field diagnosis without leaving that broader attachment active.
+if [ -f "$APPARMOR_PROFILE_PATH" ]; then
+    sudo apparmor_parser -R "$APPARMOR_PROFILE_PATH" >/dev/null 2>&1 || true
+fi
+sudo install -o root -g root -m 0644 \
+    "$SCRIPT_DIR/linux/kienzledoku.apparmor" "$APPARMOR_PROFILE_PATH"
+sudo apparmor_parser -r "$APPARMOR_PROFILE_PATH"
 
 PY_MM="$("$PYTHON3" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
 PY_TAG="$(printf '%s' "$PY_MM" | tr -d '.')"
@@ -546,8 +579,10 @@ check_service "Diarisierung" "$DIARIZATION_URL" "/health"
 check_service "LLM" "$LLM_URL" "/v1/models"
 
 echo
-echo "Kienzledoku 1.3.0 für Ubuntu 24.04 wurde installiert."
+echo "Kienzledoku 1.3.1 für Ubuntu 24.04 wurde installiert."
 echo "Programmdateien: $DATA_DIR"
+echo "Fensterprogramm: $SYSTEM_HELPER_PATH"
+echo "AppArmor-Profil: $APPARMOR_PROFILE_PATH"
 echo "Konfiguration:   $CONFIG_PATH"
 echo "Diagnoseprotokoll: $LOG_PATH"
 echo "URL-Schema: kienzledoku://"

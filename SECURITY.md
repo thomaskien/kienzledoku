@@ -4,10 +4,11 @@
 
 | Version | Sicherheitsupdates |
 | --- | --- |
-| 1.3.0 | Ja |
+| 1.3.1 | Ja |
+| 1.3.0 | Nein |
 | 1.2.1 und älter | Nein |
 
-Kienzledoku 1.3.0 ist ein Entwicklungs- und Integrationsstand. Die bekannten
+Kienzledoku 1.3.1 ist ein Entwicklungs- und Integrationsstand. Die bekannten
 Einsatzgrenzen sind im Abschnitt
 [Sicherheitsgrenzen](README.md#sicherheitsgrenzen) der README beschrieben.
 
@@ -44,6 +45,8 @@ Bei Änderungen an folgenden Komponenten ist eine zusätzliche Prüfung nötig:
 - Local-AI-Listen-Adresse, LaunchAgents und nicht authentifizierte Dienst-APIs;
 - festgeschriebene Modellrevisionen, Größen und Prüfsummen;
 - Linux-URL-Handler, Einzelsitzung und anonyme Deep-Link-Pipe;
+- root-eigener Linux-Fensterhelfer und eng zugeordnetes AppArmor-Profil für
+  die WebKitGTK-Bubblewrap-Sandbox;
 - Linux-systemd-Dienste, ASR-Backend-Freigabe und Firewallregeln;
 - LLM-JSON-Validierung und atomare FHIR-Transaktion;
 - Protokollierung und Fehlermeldungen.

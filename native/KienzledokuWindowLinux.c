@@ -105,7 +105,7 @@ activate(GtkApplication *application, gpointer user_data)
 {
     KienzledokuWindowData *data = user_data;
     GtkWidget *window = gtk_application_window_new(application);
-    gtk_window_set_title(GTK_WINDOW(window), "Kienzledoku 1.3.0");
+    gtk_window_set_title(GTK_WINDOW(window), "Kienzledoku 1.3.1");
     gtk_window_set_default_size(GTK_WINDOW(window), 1280, 850);
     gtk_window_set_icon_name(GTK_WINDOW(window), "audio-input-microphone");
     gtk_widget_set_size_request(window, 800, 600);
@@ -121,7 +121,7 @@ activate(GtkApplication *application, gpointer user_data)
     WebKitSettings *settings =
         webkit_web_view_get_settings(WEBKIT_WEB_VIEW(web_view));
     webkit_settings_set_user_agent(
-        settings, "Kienzledoku-NativeWindow-Linux/1.3.0");
+        settings, "Kienzledoku-NativeWindow-Linux/1.3.1");
     webkit_settings_set_enable_developer_extras(settings, FALSE);
 
     g_signal_connect(

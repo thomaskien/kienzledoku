@@ -17,7 +17,7 @@ werden.
   Zertifikats-, Konfigurations- oder Logdateien erfasst werden.
 - [ ] Screenshots nochmals auf Patienten-, Praxis- und Zugangsdaten prüfen.
 - [ ] Prüfen, dass alle Versionsangaben in Python, Installer, nativem Fenster
-  und Dokumentation auf `1.3.0` stehen.
+  und Dokumentation auf `1.3.1` stehen.
 - [ ] Netzwerkfreie Tests ausführen.
 - [ ] Modellfreien Selbsttest des Local-AI-Installers ausführen.
 - [ ] Statischen Selbsttest des Ubuntu/NVIDIA-Installers ausführen.
@@ -26,6 +26,9 @@ werden.
 - [ ] Linux-Installer auf Ubuntu 24.04 x86_64 unter X11 und Wayland prüfen.
 - [ ] WebKitGTK-Fenster, kanonischen URL-Handler und Secret Service unter XFCE
   und GNOME prüfen.
+- [ ] Auf Ubuntu 24.04 prüfen, dass `/etc/apparmor.d/kienzledoku-window`
+  geladen ist, der Helfer root-eigen unter `/usr/local/libexec/kienzledoku`
+  liegt und WebKitGTK ohne `bwrap`-/`dbus-proxy`-Fehler startet.
 - [ ] Realen Integrationstest mit synthetischem T2med-Testpatienten,
   Mikrofon, ASR, Diarisierung und LLM dokumentieren.
 - [ ] Bekannte TLS- und Host-Beschränkungen in Release Notes und README
@@ -98,8 +101,8 @@ reale Tokens dürfen nicht enthalten sein.
 
 ## Empfohlene Release-Angaben
 
-- Tag: `v1.3.0`
-- Titel: `Kienzledoku 1.3.0`
+- Tag: `v1.3.1`
+- Titel: `Kienzledoku 1.3.1`
 - Plattform: Kienzledoku-Client für Ubuntu 24.04 x86_64 sowie macOS auf Intel
   und Apple Silicon; Local AI für Apple Silicon mit mindestens 32 GB Unified
   Memory; Serverdienste für Ubuntu 24.04 x86_64 mit NVIDIA/CUDA

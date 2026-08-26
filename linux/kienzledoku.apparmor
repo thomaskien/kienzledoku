@@ -1,0 +1,14 @@
+# Kienzledoku's WebKitGTK process uses bubblewrap for its internal sandbox.
+# Ubuntu 24.04 requires an application-specific userns allowance for binaries
+# that are not shipped by the Ubuntu archive. The helper itself is installed
+# root-owned so an unprivileged user cannot replace the profiled executable.
+
+abi <abi/4.0>,
+
+include <tunables/global>
+
+profile kienzledoku-window /usr/local/libexec/kienzledoku/kienzledoku_window_linux flags=(unconfined) {
+    userns,
+
+    include if exists <local/kienzledoku-window>
+}

@@ -6,6 +6,23 @@ festgehalten. Das Format orientiert sich an
 
 ## [Unveröffentlicht]
 
+- Noch keine Änderungen.
+
+## [1.3.1] – 2026-08-26
+
+### Behoben
+
+- Der WebKitGTK-Fensterprozess erhält unter Ubuntu 24.04 über ein gezieltes
+  AppArmor-Profil die für seine Bubblewrap-Sandbox erforderliche
+  User-Namespace-Berechtigung. Die systemweite Schutzfunktion bleibt aktiv.
+- Das profilierte Fensterprogramm wird root-eigen unter `/usr/local/libexec`
+  installiert und kann daher nicht durch einen unprivilegierten Benutzer
+  ersetzt werden.
+- Native GTK-/WebKit-Fehler und der Exit-Code des Fensterprozesses landen nun
+  im geschützten Diagnoseprotokoll.
+
+### Dokumentation
+
 - Installationsanleitung klar in Clientwahl (macOS oder Ubuntu) und davon
   unabhängige KI-Serverwahl (Apple Silicon oder Ubuntu/NVIDIA) gegliedert.
 

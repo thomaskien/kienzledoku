@@ -8,6 +8,7 @@ from unittest import mock
 
 from kienzledoku import (
     EXTENSION_FREITEXT_KUERZEL,
+    LINUX_NATIVE_WINDOW_PATH,
     PROFILE_FREITEXT,
     VERSION,
     FhirError,
@@ -486,6 +487,36 @@ class LinuxDesktopIntegrationTests(unittest.TestCase):
             [helper, "http://127.0.0.1:43210/"],
             popen.call_args.args[0],
         )
+        self.assertNotIn("stderr", popen.call_args.kwargs)
+
+    def test_linux_prefers_root_owned_profiled_window_helper(self):
+        process = mock.Mock()
+        with mock.patch("kienzledoku.sys.platform", "linux"), \
+             mock.patch("kienzledoku.os.path.isfile", return_value=True), \
+             mock.patch("kienzledoku.os.access", return_value=True), \
+             mock.patch("kienzledoku.subprocess.Popen", return_value=process) as popen:
+            actual_process, kind = open_ui_window(
+                "http://127.0.0.1:43210/", "/untrusted/source-tree"
+            )
+        self.assertIs(process, actual_process)
+        self.assertEqual("native-webkitgtk", kind)
+        self.assertEqual(
+            [LINUX_NATIVE_WINDOW_PATH, "http://127.0.0.1:43210/"],
+            popen.call_args.args[0],
+        )
+
+    def test_linux_apparmor_profile_preserves_webkit_sandbox(self):
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(
+            os.path.join(root, "linux", "kienzledoku.apparmor"),
+            "r",
+            encoding="utf-8",
+        ) as handle:
+            profile = handle.read()
+        self.assertIn(LINUX_NATIVE_WINDOW_PATH, profile)
+        self.assertIn("flags=(unconfined)", profile)
+        self.assertIn("userns,", profile)
+        self.assertNotIn("apparmor_restrict_unprivileged_userns=0", profile)
 
 
 if __name__ == "__main__":

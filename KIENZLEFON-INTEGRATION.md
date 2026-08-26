@@ -1,4 +1,4 @@
-# Kienzlefon AI → Kienzledoku 1.3.0
+# Kienzlefon AI → Kienzledoku 1.3.1
 
 Dieses Dokument definiert die vorbereitete Nahtstelle zwischen den bereits
 vorhandenen Kienzlefon-AI-Diensten und der T2med-Übergabe in Kienzledoku.

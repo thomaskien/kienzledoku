@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Kienzledoku 1.3.0 <-> T2med FHIR client.
+"""Kienzledoku 1.3.1 <-> T2med FHIR client.
 
 Target: Python 3.9+ (macOS 10.14+ and Ubuntu 24.04 LTS).
 No third-party Python packages required.
@@ -57,7 +57,8 @@ from kienzledoku_speech import (
 )
 
 APP_NAME = "Kienzledoku"
-VERSION = "1.3.0"
+VERSION = "1.3.1"
+LINUX_NATIVE_WINDOW_PATH = "/usr/local/libexec/kienzledoku/kienzledoku_window_linux"
 
 # Public test/demo key from T2med's reference application (not a secret).
 # Demo/test/integration only; never use for production.
@@ -1175,7 +1176,10 @@ def open_ui_window(url, script_dir):
     if sys.platform == "darwin":
         helper = os.path.join(script_dir, "kienzledoku_window")
     elif sys.platform.startswith("linux"):
-        helper = os.path.join(script_dir, "kienzledoku_window_linux")
+        helper = LINUX_NATIVE_WINDOW_PATH
+        if not (os.path.isfile(helper) and os.access(helper, os.X_OK)):
+            # Source-tree fallback for development outside an installed client.
+            helper = os.path.join(script_dir, "kienzledoku_window_linux")
     else:
         helper = ""
 
@@ -1190,7 +1194,8 @@ def open_ui_window(url, script_dir):
             command,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            # Inherit the launcher's protected log descriptor. Native GTK,
+            # WebKit and bubblewrap failures must remain diagnosable.
             start_new_session=True,
         )
         return process, (
@@ -1451,8 +1456,11 @@ def run_session(deep_link, no_browser=False):
     started = time.time()
     try:
         while not state.completed_event.wait(2):
-            if state.ui_process is not None and state.ui_process.poll() is not None:
-                break
+            if state.ui_process is not None:
+                window_status = state.ui_process.poll()
+                if window_status is not None:
+                    safe_log("UI window exited", exit_code=window_status)
+                    break
             if time.time() - started > 3600:
                 break
             if time.time() - state.last_activity > 1800:
