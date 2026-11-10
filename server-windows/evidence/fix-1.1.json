@@ -1,0 +1,19 @@
+{
+  "version": "1.1",
+  "reported_error": "SeSecurityPrivilege missing while preparing the installation",
+  "fix": "Replace Set-Acl with direct .NET persistence of a newly constructed access-only FileSecurity object. Only access rules are modified. Read back access rules without audit privileges and validate the three intended identities, full control and disabled inheritance.",
+  "storage_privileges": "No administrator or audit privilege is requested for the user's private files. WSL feature activation and network configuration remain separate elevated operations.",
+  "related_fix": "Detect mapped network drives such as Z: using DriveInfo.DriveType, in addition to UNC paths; stage archives locally before WSL import, reject network-backed active WSL paths and account for the extra local model copy.",
+  "diagnostics": "Wizard failures before engine startup also log installer version, error identifier and stack location, with the visible HF token redacted.",
+  "version_policy": "Central VERSION file. User-requested future release increments: +0.1, next 1.2, then 1.3. No further patch-version releases.",
+  "previous_fix_retained": "Windows PowerShell 5.1 JSON arrays are explicitly enumerated; ExpectedBytes receives one integer.",
+  "tests": {"python_regressions_passed": 53, "powershell_core_passed": 13, "powershell_51_json_simulation_passed": 4, "real_small_https_download": true, "windows_acl_test": "SKIP: Windows runtime not available on build host", "powershell_sources_parse": true},
+  "windows_runtime_tested": false,
+  "full_wsl_cuda_gpu_tested": false,
+  "models_changed": false,
+  "references": [
+    "https://github.com/PowerShell/PowerShell/blob/master/src/System.Management.Automation/namespaces/FileSystemSecurity.cs",
+    "https://learn.microsoft.com/en-us/dotnet/api/system.io.file.setaccesscontrol?view=netframework-4.8.1",
+    "https://learn.microsoft.com/en-us/dotnet/api/system.io.filesystemaclextensions.setaccesscontrol?view=net-10.0"
+  ]
+}

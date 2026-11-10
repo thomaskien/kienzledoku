@@ -1,0 +1,21 @@
+PASS Old configurations default to checked hashes and retained staging; explicit false survives JSON
+PASS Disabled hashes never invoke Get-FileHash or create a false proof, including renamed copies
+PASS Engine-style hash progress callback works across the module boundary
+PASS All models valid in WSL avoid store access, downloads and unnecessary local source conversion
+PASS Retained local staging wins over an unavailable network store
+PASS A local archive is used directly without creating another staging copy
+PASS Only the missing model is read from the store and copied; the store is not rewritten
+PASS Missing ungated download works with hashes disabled and records ownership, not a checksum proof
+PASS Keep option leaves owned staging untouched and requests no import receipt
+PASS Opt-in cleanup removes only unchanged owned files covered by this run receipt
+PASS Failed or stale run receipt cannot authorize cleanup
+PASS Changed owned file is retained even with a current import receipt
+PASS Explicit archive sharing the staging directory is protected
+PASS A local archive alias pointing into staging prevents cleanup
+PASS Legacy network staging is adopted only from the prior matching installation layout
+PASS Mapped share resolving to the staging archive prevents deletion
+PASS Unresolved share identity conservatively retains staging
+PASS Wizard saves file-check and cleanup choices without enabling force when checks are off
+PASS Checkbox event disables and clears force checking while preserving independent server verification
+PASS Startup inventory avoids network roots until the user explicitly checks the archive
+All 20 model-option/source/cleanup cases passed (portable PowerShell; synthetic files and WSL responses).

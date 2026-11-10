@@ -1,0 +1,180 @@
+{
+  "9b-q4": {
+    "label": "Qwen_Qwen3.5-9B-Q4_K_M",
+    "quality": "basis",
+    "repository": "bartowski/Qwen_Qwen3.5-9B-GGUF",
+    "revision": "2dcd842c59ea5eb119267064550a7a4c592b16c3",
+    "min_vram_mib": 8064,
+    "min_ram_bytes": 32000000000,
+    "files": [
+      {
+        "filename": "Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+        "bytes": 6169341984,
+        "sha256": "d784ce9eda1a5a7b51e8f705a9e6310844bf4f173654d115823c775fdea56d43",
+        "path": "9b-q4/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+        "url": "https://huggingface.co/bartowski/Qwen_Qwen3.5-9B-GGUF/resolve/2dcd842c59ea5eb119267064550a7a4c592b16c3/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+        "gated": false
+      }
+    ],
+    "profile": {
+      "context": 32768,
+      "slots": 1,
+      "kv": "q8_0",
+      "backend": "llama.cpp",
+      "gpu_layers": 999
+    },
+    "serial_vram_mib": 7936,
+    "parallel_vram_mib": 16128,
+    "recommended_wsl_gib": 24,
+    "description": "Schneller Einstieg, geringer Grafikspeicherbedarf. Seriell ab 8 GiB VRAM; parallel geladen ab 16 GiB."
+  },
+  "9b-q6": {
+    "label": "Qwen_Qwen3.5-9B-Q6_K",
+    "quality": "gruendlich",
+    "repository": "bartowski/Qwen_Qwen3.5-9B-GGUF",
+    "revision": "2dcd842c59ea5eb119267064550a7a4c592b16c3",
+    "min_vram_mib": 12160,
+    "min_ram_bytes": 32000000000,
+    "files": [
+      {
+        "filename": "Qwen_Qwen3.5-9B-Q6_K.gguf",
+        "bytes": 7958818848,
+        "sha256": "073a9275e65d9c8cd2819cf5f77b99fbaa6e87ba591da6bbaa86ec073a64bfef",
+        "path": "9b-q6/Qwen_Qwen3.5-9B-Q6_K.gguf",
+        "url": "https://huggingface.co/bartowski/Qwen_Qwen3.5-9B-GGUF/resolve/2dcd842c59ea5eb119267064550a7a4c592b16c3/Qwen_Qwen3.5-9B-Q6_K.gguf",
+        "gated": false
+      }
+    ],
+    "profile": {
+      "context": 32768,
+      "slots": 1,
+      "kv": "q8_0",
+      "backend": "llama.cpp",
+      "gpu_layers": 999
+    },
+    "serial_vram_mib": 12032,
+    "parallel_vram_mib": 20224,
+    "recommended_wsl_gib": 28,
+    "description": "Höhere Quantisierungsgenauigkeit. Seriell ab 12 GiB VRAM; parallel geladen ab 20 GiB, 24-GB-Karte empfohlen."
+  },
+  "27b-q4": {
+    "label": "Qwen3.8-27B-UD-Q4_K_M",
+    "quality": "sehr_gruendlich",
+    "repository": "unsloth/Qwen3.8-27B-GGUF",
+    "revision": "4ca720788d1e01f1bff70c033e0d0028fd02e502",
+    "min_vram_mib": 20352,
+    "min_ram_bytes": 32000000000,
+    "files": [
+      {
+        "filename": "Qwen3.8-27B-UD-Q4_K_M.gguf",
+        "bytes": 16464440224,
+        "sha256": "322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482",
+        "path": "27b-q4/Qwen3.8-27B-UD-Q4_K_M.gguf",
+        "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/4ca720788d1e01f1bff70c033e0d0028fd02e502/Qwen3.8-27B-UD-Q4_K_M.gguf",
+        "gated": false
+      }
+    ],
+    "profile": {
+      "context": 32768,
+      "slots": 1,
+      "kv": "q8_0",
+      "backend": "llama.cpp",
+      "gpu_layers": 999
+    },
+    "serial_vram_mib": 20224,
+    "parallel_vram_mib": null,
+    "recommended_wsl_gib": 32,
+    "ram_audio_min_wsl_gib": 24,
+    "description": "Größeres Dokumentationsmodell. Seriell ab 20 GiB VRAM, 24-GB-Karte empfohlen. Kein freigegebenes Parallelprofil."
+  },
+  "gemma12-qat-q4": {
+    "label": "Gemma 4 12B QAT Q4_0",
+    "quality": "gemma12_qat_q4",
+    "repository": "google/gemma-4-12B-it-qat-q4_0-gguf",
+    "revision": "29d097773436b69ff9feafd636ab4cf873786537",
+    "min_vram_mib": 7936,
+    "min_ram_bytes": 32000000000,
+    "files": [
+      {
+        "filename": "gemma-4-12b-it-qat-q4_0.gguf",
+        "bytes": 6975879296,
+        "sha256": "93567e57a8fe10b23569b9d9ec38cd005deedf71e29477c421a4b83f418a538b",
+        "path": "gemma12-qat-q4/gemma-4-12b-it-qat-q4_0.gguf",
+        "url": "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/29d097773436b69ff9feafd636ab4cf873786537/gemma-4-12b-it-qat-q4_0.gguf",
+        "gated": false
+      }
+    ],
+    "profile": {
+      "context": 32768,
+      "slots": 1,
+      "kv": "q8_0",
+      "backend": "llama.cpp",
+      "gpu_layers": 999
+    },
+    "serial_vram_mib": 7936,
+    "parallel_vram_mib": 16128,
+    "recommended_wsl_gib": 24,
+    "description": "Kompaktes Gemma-4-Modell mit QAT. Seriell ab 8 GiB VRAM; parallel geladen ab 16 GiB (z. B. RTX 5060 Ti 16 GB).",
+    "fallbacks": []
+  },
+  "gemma12-q8": {
+    "label": "Gemma 4 12B Q8_0",
+    "quality": "gemma12_q8",
+    "repository": "ggml-org/gemma-4-12B-it-GGUF",
+    "revision": "790d826c6ec7dc8aa0ab23af33e5b8313140a231",
+    "min_vram_mib": 16128,
+    "min_ram_bytes": 32000000000,
+    "files": [
+      {
+        "filename": "gemma-4-12B-it-Q8_0.gguf",
+        "bytes": 12669641920,
+        "sha256": "3730903965b3e57bcad0a387110322ce66409559c356a1ae1b61701024e5ce60",
+        "path": "gemma12-q8/gemma-4-12B-it-Q8_0.gguf",
+        "url": "https://huggingface.co/ggml-org/gemma-4-12B-it-GGUF/resolve/790d826c6ec7dc8aa0ab23af33e5b8313140a231/gemma-4-12B-it-Q8_0.gguf",
+        "gated": false
+      }
+    ],
+    "profile": {
+      "context": 32768,
+      "slots": 1,
+      "kv": "q8_0",
+      "backend": "llama.cpp",
+      "gpu_layers": 999
+    },
+    "serial_vram_mib": 16128,
+    "parallel_vram_mib": 24320,
+    "recommended_wsl_gib": 28,
+    "description": "Gemma 4 mit 8-Bit-Gewichten. Seriell ab 16 GiB VRAM; parallel geladen ab 24 GiB (z. B. RTX 3090/4090).",
+    "fallbacks": []
+  },
+  "gemma26-qat-q4": {
+    "label": "Gemma 4 26B-A4B QAT Q4_0",
+    "quality": "gemma26_qat_q4",
+    "repository": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+    "revision": "d1c082be9cf3c8a514acf63b8761f4b41935842e",
+    "min_vram_mib": 20224,
+    "min_ram_bytes": 32000000000,
+    "files": [
+      {
+        "filename": "gemma-4-26B_q4_0-it.gguf",
+        "bytes": 14439363584,
+        "sha256": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d",
+        "path": "gemma26-qat-q4/gemma-4-26B_q4_0-it.gguf",
+        "url": "https://huggingface.co/google/gemma-4-26B-A4B-it-qat-q4_0-gguf/resolve/d1c082be9cf3c8a514acf63b8761f4b41935842e/gemma-4-26B_q4_0-it.gguf",
+        "gated": false
+      }
+    ],
+    "profile": {
+      "context": 32768,
+      "slots": 1,
+      "kv": "q8_0",
+      "backend": "llama.cpp",
+      "gpu_layers": 999
+    },
+    "serial_vram_mib": 20224,
+    "parallel_vram_mib": 24320,
+    "recommended_wsl_gib": 32,
+    "description": "Gemma 4 mit 26B Gesamt- und ca. 4B aktiven Parametern. Seriell ab 20 GiB VRAM; parallel ab 24 GiB (RTX 3090/4090).",
+    "fallbacks": []
+  }
+}

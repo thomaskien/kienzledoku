@@ -1,0 +1,11 @@
+PASS Unchanged verified file survives a fresh cache load without another hash
+PASS Changed expected checksum and same-sized corruption invalidate proofs
+PASS Explicit full recheck ignores disk proofs but deduplicates within that run
+PASS Copy needs a separate hash while a checked atomic rename preserves the proof
+PASS Corrupt cache is rebuilt instead of blocking installation
+PASS Unexpected process death reports phase, signed and hexadecimal exit code and stderr
+PASS Zero exit without final status and success status with nonzero exit are failures
+PASS Expected restart remains distinct from an unexpected process crash
+PASS Real child stderr and exit code are retained by the result resolver
+PASS Native failure includes command, exit code, stderr and the last program output
+All 10 diagnostics/cache regression cases passed (portable PowerShell; no Windows GUI executed).

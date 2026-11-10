@@ -1,0 +1,10 @@
+PASS Existing WSL 3.0.3 after reboot skips reinstallation and feature activation
+PASS Reported bootstrap exit -1 is accepted only after successful version probe
+PASS Success text cannot hide a failed bootstrap without a working version command
+PASS Feature restart is returned as 3010 without attempting WSL bootstrap
+PASS Pending Windows feature state requests restart without enabling it again
+PASS Old WSL is updated instead of a new distribution being installed
+PASS WSL installer reboot exit is preserved rather than treated as failure
+PASS Help or no-distribution text is not proof of installed modern WSL
+PASS Native UTF-16LE management output retains German text and structured exit code
+All 9 WSL bootstrap regression cases passed (Windows feature/WSL responses simulated; child-process encoding tested).

@@ -1,0 +1,26 @@
+{
+  "version": "1.7",
+  "observed": "User screenshot Screenshot_2026-11-01_12-16-38.png: property SelectedItem missing when continuing from the network page of installer 1.6.",
+  "root_cause": "Legacy startup migration assigns a model ID to unqualified script-level $default. PowerShell is case-insensitive, so this overwrites the ComboBox stored in $script:Default. Build-Config then fails at Default.SelectedItem.",
+  "fix": "Rename the migration data variable to previousDefaultModelId; preserve the default selection control.",
+  "reproduction": {
+    "published_1_6_exe_extracted": true,
+    "actual_embedded_startup_statements_executed": true,
+    "before_exit_code": 1,
+    "selecteditem_error_reproduced": true,
+    "after_migration_cases_passed": 6
+  },
+  "checks": {
+    "wizard_migration_passed": 6,
+    "parallel_selection_passed": 8,
+    "portable_powershell_core_passed": 12,
+    "upstream_wsl_parser_compatibility_passed": 9,
+    "total_passed": 35
+  },
+  "windows_gui_executed": false,
+  "real_windows_upgrade_executed_by_agent": false,
+  "linux_runtime_changed": false,
+  "model_weights_changed": false,
+  "client_changed": false,
+  "important_limit": "Actual startup statements run with simulated controls at script scope in portable PowerShell. The complete Windows Forms GUI was not executed."
+}

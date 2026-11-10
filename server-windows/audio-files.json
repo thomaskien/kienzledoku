@@ -1,0 +1,121 @@
+[
+  {
+    "path": "whisper/config.json",
+    "filename": "config.json",
+    "bytes": 2394,
+    "sha256": null,
+    "git_blob_sha1": "75336feae814999bae6ccccdecf177639ffc6f9d",
+    "url": "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/config.json",
+    "repository": "Systran/faster-whisper-large-v3",
+    "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "gated": false
+  },
+  {
+    "path": "whisper/model.bin",
+    "filename": "model.bin",
+    "bytes": 3087284237,
+    "sha256": "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1",
+    "git_blob_sha1": null,
+    "url": "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/model.bin",
+    "repository": "Systran/faster-whisper-large-v3",
+    "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "gated": false
+  },
+  {
+    "path": "whisper/preprocessor_config.json",
+    "filename": "preprocessor_config.json",
+    "bytes": 340,
+    "sha256": null,
+    "git_blob_sha1": "931c77a740890c46365c7ae0c9d350ba3cca908f",
+    "url": "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/preprocessor_config.json",
+    "repository": "Systran/faster-whisper-large-v3",
+    "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "gated": false
+  },
+  {
+    "path": "whisper/tokenizer.json",
+    "filename": "tokenizer.json",
+    "bytes": 2480617,
+    "sha256": null,
+    "git_blob_sha1": "3a5e2ba63acdcac9a19ba56cf9bd27f185bfff61",
+    "url": "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/tokenizer.json",
+    "repository": "Systran/faster-whisper-large-v3",
+    "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "gated": false
+  },
+  {
+    "path": "whisper/vocabulary.json",
+    "filename": "vocabulary.json",
+    "bytes": 1068114,
+    "sha256": null,
+    "git_blob_sha1": "0adcd01e7c237205d593b707e66dd5d7bc785d2d",
+    "url": "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/vocabulary.json",
+    "repository": "Systran/faster-whisper-large-v3",
+    "revision": "edaa852ec7e145841d8ffdb056a99866b5f0a478",
+    "gated": false
+  },
+  {
+    "path": "pyannote/config.yaml",
+    "filename": "config.yaml",
+    "bytes": 444,
+    "sha256": null,
+    "git_blob_sha1": "4022db43960736338378fdb6b5a85cfdae198910",
+    "url": "https://huggingface.co/pyannote/speaker-diarization-community-1/resolve/3533c8cf8e369892e6b79ff1bf80f7b0286a54ee/config.yaml",
+    "repository": "pyannote/speaker-diarization-community-1",
+    "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+    "gated": true
+  },
+  {
+    "path": "pyannote/embedding/pytorch_model.bin",
+    "filename": "embedding/pytorch_model.bin",
+    "bytes": 26646242,
+    "sha256": "6f10ff60898a1d185fa22e1d11e0bfa8a92efec811f11bca48cb8cafebefd929",
+    "git_blob_sha1": null,
+    "url": "https://huggingface.co/pyannote/speaker-diarization-community-1/resolve/3533c8cf8e369892e6b79ff1bf80f7b0286a54ee/embedding/pytorch_model.bin",
+    "repository": "pyannote/speaker-diarization-community-1",
+    "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+    "gated": true
+  },
+  {
+    "path": "pyannote/plda/plda.npz",
+    "filename": "plda/plda.npz",
+    "bytes": 133852,
+    "sha256": "9b77bcd840692710dd3496f62ecfeed8d8e5f002fd991b785079b244eab7d255",
+    "git_blob_sha1": null,
+    "url": "https://huggingface.co/pyannote/speaker-diarization-community-1/resolve/3533c8cf8e369892e6b79ff1bf80f7b0286a54ee/plda/plda.npz",
+    "repository": "pyannote/speaker-diarization-community-1",
+    "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+    "gated": true
+  },
+  {
+    "path": "pyannote/plda/xvec_transform.npz",
+    "filename": "plda/xvec_transform.npz",
+    "bytes": 134376,
+    "sha256": "325f1ce8e48f7e55e9c8aa47e05d2766b7c48c4b25b8de8dd751e7a4cc5fbe8f",
+    "git_blob_sha1": null,
+    "url": "https://huggingface.co/pyannote/speaker-diarization-community-1/resolve/3533c8cf8e369892e6b79ff1bf80f7b0286a54ee/plda/xvec_transform.npz",
+    "repository": "pyannote/speaker-diarization-community-1",
+    "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+    "gated": true
+  },
+  {
+    "path": "pyannote/segmentation/pytorch_model.bin",
+    "filename": "segmentation/pytorch_model.bin",
+    "bytes": 5906507,
+    "sha256": "7ad24338d844fb95985486eb1a464e32d229f6d7a03c9abe60f978bacf3f816e",
+    "git_blob_sha1": null,
+    "url": "https://huggingface.co/pyannote/speaker-diarization-community-1/resolve/3533c8cf8e369892e6b79ff1bf80f7b0286a54ee/segmentation/pytorch_model.bin",
+    "repository": "pyannote/speaker-diarization-community-1",
+    "revision": "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee",
+    "gated": true
+  },
+  {
+    "path": "whisper/large-v3.pt",
+    "filename": "large-v3.pt",
+    "bytes": 3087371615,
+    "sha256": "e5b1a55b89c1367dacf97e3e19bfd829a01529dbfdeefa8caeb59b3f1b81dadb",
+    "git_blob_sha1": null,
+    "url": "https://openaipublic.azureedge.net/main/whisper/models/e5b1a55b89c1367dacf97e3e19bfd829a01529dbfdeefa8caeb59b3f1b81dadb/large-v3.pt",
+    "gated": false
+  }
+]

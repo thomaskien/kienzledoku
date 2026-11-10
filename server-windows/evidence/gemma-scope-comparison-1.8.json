@@ -1,0 +1,13 @@
+{
+  "previous_version": "1.7",
+  "version": "1.8",
+  "previous_qwen_entries_unchanged": true,
+  "new_models": [
+    "gemma12-q8",
+    "gemma12-qat-q4",
+    "gemma26-qat-q4"
+  ],
+  "linux_runtime_and_audio_assets_unchanged": true,
+  "compared_payload_sources": 23,
+  "comparison_exe_sha256": "64eae363de0468c337d88c1acab9b43d3f44fcb30aadde68d0d7f434a7d87e5e"
+}

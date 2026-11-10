@@ -1,0 +1,15 @@
+{
+  "version": "1.0.1",
+  "reported_error": "ExpectedBytes: System.Object[] cannot be converted to System.Int64",
+  "input_log": "fehler1.txt",
+  "cause": "Windows PowerShell 5.1 ConvertFrom-Json emits a top-level JSON array as one pipeline object. The pyannote access check selected the entire audio manifest and passed an array of byte counts to Get-Download.",
+  "fix": "Read-Json captures the converted value and then emits it normally, enumerating top-level arrays consistently on Windows PowerShell 5.1 and PowerShell 7.",
+  "upstream_reference": "https://github.com/PowerShell/PowerShell/issues/3424",
+  "regression_before_fix": "Exact ExpectedBytes/System.Object[] error reproduced by tests/test_json_compat.ps1 with simulated 5.1 cmdlet output.",
+  "regression_after_fix": "4 compatibility cases pass, including the actual Test-HfAccess call with a stubbed download, scalar manifest sizes, array cardinality, nested configuration, and separate audio inventory.",
+  "core_tests": "All 10 core cases pass, including an actual small public HTTPS download and resume/integrity check. All PowerShell sources parse.",
+  "test_runtime": "PowerShell 7.6.9 on Linux; Windows PowerShell 5.1 cmdlet output simulated in the compatibility test.",
+  "windows_runtime_tested": false,
+  "server_runtime_changed": false,
+  "models_changed": false
+}

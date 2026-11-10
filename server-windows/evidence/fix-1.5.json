@@ -1,0 +1,31 @@
+{
+  "version": "1.5",
+  "observed": "Forwarding 10.0.83.140:8185 -> 127.0.0.1:8185 existed and local /health returned status ok, but Ethernet was Public and the installer firewall rule applied only to Private,Domain.",
+  "fix": "Create the app-specific rule for Profile Any with Enabled True. Retain LocalAddress=selected IPv4, LocalPort=8185, Protocol=TCP, RemoteAddress=LocalSubnet. Read the resulting rule from ActiveStore. Preserve global Windows network category. Label local HTTP checks as local.",
+  "immediate_existing_install_repair": "Run Set-NetFirewallRule -Name kienzledoku-server-8185 -Profile Any in an elevated Windows PowerShell.",
+  "user_reported_non_elevated_error": "Windows System Error 5 / Access denied",
+  "external_health_verified": {
+    "address": "10.0.83.140:8185",
+    "http_status": 200,
+    "body": {
+      "status": "ok",
+      "asr_ready": true,
+      "phase": "asr_ready"
+    },
+    "performed_by": "Codex host, read-only TCP and HTTP probe",
+    "date": "2026-11-01"
+  },
+  "checks": {
+    "network_simulation_passed": 8,
+    "portable_powershell_core_passed": 12,
+    "upstream_wsl_parser_compatibility_passed": 9,
+    "total_current_cases_passed": 29
+  },
+  "network_cmdlet_tests_simulated": true,
+  "windows_gui_tested_by_agent": false,
+  "version_1_5_installation_tested_on_windows": false,
+  "models_changed": false,
+  "linux_runtime_changed": false,
+  "client_changed": false,
+  "important_limit": "External health success confirms the repaired existing server. It does not claim that the new 1.5 EXE was installed or tested end-to-end on Windows."
+}

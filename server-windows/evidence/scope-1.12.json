@@ -1,0 +1,16 @@
+{
+  "previous": "1.11",
+  "version": "1.12",
+  "models_and_audio_unchanged": true,
+  "linux_runtime_unchanged": true,
+  "compared_payload_files": 24,
+  "other_windows_files_unchanged": [
+    "Control.ps1",
+    "Models.ps1",
+    "storage_probe.py",
+    "Engine.ps1",
+    "Core.psm1"
+  ],
+  "wizard_change_only_inner_archive_guidance_quotes": true,
+  "client_payload": false
+}

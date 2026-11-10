@@ -1,0 +1,7 @@
+PASS Legacy 1.4 auto with a resident Q4
+PASS Legacy 1.5 auto with a serial 27B default
+PASS Legacy serial configuration
+PASS Explicit Q6 resident and independent Q4 default
+PASS Explicit all-serial selection
+PASS Fresh installation without previous settings
+All 6 wizard startup migration cases passed (actual startup statements; simulated controls; no Windows GUI executed).

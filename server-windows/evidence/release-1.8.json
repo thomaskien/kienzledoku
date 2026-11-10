@@ -1,0 +1,26 @@
+{
+  "version": "1.8",
+  "changes": [
+    "Additional Gemma 4 12B QAT Q4_0, 12B Q8_0, 26B-A4B QAT Q4_0 models",
+    "Independent default and parallel model choices use the existing dynamic catalogue",
+    "Model cache directory documentation and WSL RAM labels updated"
+  ],
+  "model_count": 6,
+  "serial_models": 6,
+  "parallel_vram_gib": {
+    "gemma12-qat-q4": 16,
+    "gemma12-q8": 24,
+    "gemma26-qat-q4": 24
+  },
+  "python_tests": 76,
+  "portable_powershell_cases": 62,
+  "wsl_cpp_parser_cases": 9,
+  "total_local_test_cases": 147,
+  "windows_gui_executed": false,
+  "windows_gpu_benchmark_executed": false,
+  "model_inference_executed_during_build": false,
+  "publisher_metadata_proof": "gemma-publisher-verification-1.8.json",
+  "scope_proof": "gemma-scope-comparison-1.8.json",
+  "initial_test_fix": "New Gemma test now waits for the full configured baseline, rather than ASR readiness alone; startup intentionally makes audio available before loading the resident LLM.",
+  "client_payload": false
+}

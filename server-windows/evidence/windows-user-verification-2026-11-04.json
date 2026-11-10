@@ -1,0 +1,181 @@
+{
+  "source_attachment_sha256": "dc5c5886a202073f5478063b5fa90744c3ded8e447ab3a218187d23210f34617",
+  "source": "Benutzerprotokoll vom 04.11.2026; keine eigene Ausführung durch den Build-Agenten",
+  "version": "1.8",
+  "ok": true,
+  "synthetic_only": true,
+  "baseline": {
+    "name": "kienzledoku-commander",
+    "vram_gib": 24,
+    "default_quality": "gemma12_q8",
+    "allowed_qualities": [
+      "basis",
+      "gruendlich",
+      "sehr_gruendlich",
+      "gemma12_qat_q4",
+      "gemma12_q8",
+      "gemma26_qat_q4"
+    ],
+    "resident_quality": "gemma12_q8",
+    "loaded_llm_label": "Gemma 4 12B Q8_0",
+    "loaded_llm_mode": "parallel",
+    "phase": "asr_ready",
+    "asr_ready": true,
+    "loaded": {
+      "asr": true,
+      "diar": true,
+      "llm": "gemma12_q8"
+    },
+    "transition_running": false,
+    "pending": {},
+    "active": {},
+    "last_error": null
+  },
+  "cycles": [
+    {
+      "number": 1,
+      "used_quality": "basis",
+      "elapsed_s": 16.710672434001026,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 2,
+      "used_quality": "gruendlich",
+      "elapsed_s": 16.44226380300097,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 3,
+      "used_quality": "sehr_gruendlich",
+      "elapsed_s": 25.22143096400032,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 4,
+      "used_quality": "gemma12_qat_q4",
+      "elapsed_s": 15.94314826199843,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 5,
+      "used_quality": "gemma12_q8",
+      "elapsed_s": 3.0823912329979066,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 6,
+      "used_quality": "gemma26_qat_q4",
+      "elapsed_s": 23.209996207002405,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 7,
+      "used_quality": "basis",
+      "elapsed_s": 11.303415096997924,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 8,
+      "used_quality": "gruendlich",
+      "elapsed_s": 11.569105288999708,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 9,
+      "used_quality": "sehr_gruendlich",
+      "elapsed_s": 25.951833299997816,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 10,
+      "used_quality": "gemma12_qat_q4",
+      "elapsed_s": 15.33091249899735,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 11,
+      "used_quality": "gemma12_q8",
+      "elapsed_s": 2.907418528000562,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 12,
+      "used_quality": "gemma26_qat_q4",
+      "elapsed_s": 22.556041777002974,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 13,
+      "used_quality": "basis",
+      "elapsed_s": 12.57707043100163,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 14,
+      "used_quality": "gruendlich",
+      "elapsed_s": 14.016886130000785,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 15,
+      "used_quality": "sehr_gruendlich",
+      "elapsed_s": 27.812858533001418,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 16,
+      "used_quality": "gemma12_qat_q4",
+      "elapsed_s": 16.03385612999773,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 17,
+      "used_quality": "gemma12_q8",
+      "elapsed_s": 2.9474914350030303,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    },
+    {
+      "number": 18,
+      "used_quality": "gemma26_qat_q4",
+      "elapsed_s": 24.315361441000277,
+      "fallback_used": false,
+      "worker_object_ids_preserved": true
+    }
+  ],
+  "context_stress": {
+    "input_tokens": 24282,
+    "output_tokens": 38,
+    "elapsed_s": 10.018922912000562,
+    "asr_restored": true,
+    "worker_object_ids_preserved": true
+  },
+  "peak_vram_mib": 20163.0,
+  "minimum_free_vram_mib": 4413.0,
+  "stack_cgroup_memory_peak_bytes": 30068637696,
+  "memory_events_after": {
+    "low": "0",
+    "high": "137975",
+    "max": "0",
+    "oom": "0",
+    "oom_kill": "0",
+    "oom_group_kill": "0"
+  },
+  "network_setup_failed_after_successful_inference": true
+}

@@ -1,0 +1,14 @@
+{
+  "previous": "1.9",
+  "version": "1.10",
+  "models_and_audio_unchanged": true,
+  "commander_inference_runtime_unchanged": true,
+  "linux_payload_changes": [
+    "install_server.py",
+    "model_verification.py",
+    "VERSION"
+  ],
+  "unchanged_payload_files": 22,
+  "model_count": 6,
+  "client_payload": false
+}

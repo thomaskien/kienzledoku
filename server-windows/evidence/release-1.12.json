@@ -1,0 +1,38 @@
+{
+  "version": "1.12",
+  "file_version": "1.12.0.0",
+  "fix": "Wizard startup: smart single quotes split the archive guidance into positional arguments; Archiv was incorrectly bound to the integer X coordinate",
+  "introduced_in": "1.10",
+  "previous_published_payloads_reproduced": ["1.10", "1.11"],
+  "reproduction_evidence": "wizard-regression-before-1.12.json",
+  "wizard_control_call_sites_checked": 66,
+  "python_tests": 92,
+  "portable_powershell_cases": 111,
+  "wsl_cpp_parser_cases": 9,
+  "total_local_test_cases": 212,
+  "powershell_suites": {
+    "wizard_arguments": 4,
+    "wizard_migration": 6,
+    "model_options": 20,
+    "admin_retry": 12,
+    "repair_space": 13,
+    "core": 12,
+    "json_compat": 4,
+    "wsl_bootstrap": 9,
+    "diagnostics_cache": 10,
+    "network": 8,
+    "parallel_selection": 8,
+    "gemma_selection": 5
+  },
+  "model_catalogue_unchanged": true,
+  "inference_runtime_unchanged": true,
+  "other_installer_logic_unchanged": true,
+  "scope_proof": "scope-1.12.json",
+  "client_payload": false,
+  "windows_runtime_tested": false,
+  "actual_gpu_benchmarks_executed": false,
+  "limitations": [
+    "Argument tests evaluate the actual source calls and typed parameter declarations, with Forms construction simulated",
+    "A real Windows PowerShell 5.1/Forms run and end-to-end installation on Windows are still required; local passing tests do not prove the absence of all regressions"
+  ]
+}

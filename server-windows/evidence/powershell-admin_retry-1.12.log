@@ -1,0 +1,13 @@
+PASS Accepted network elevation proceeds immediately with the same admin-only helper
+PASS WSL restart result 3010 remains a restart rather than a retry condition
+PASS Two unconfirmed requests each log the required message and wait exactly 30 seconds
+PASS Repeated refusal or timeout has no fixed attempt limit
+PASS Wrapped Win32 cancellation uses the same retry handling
+PASS Access denied launch failure is preserved and never retried
+PASS An already approved helper with a real error does not restart the administrator prompt
+PASS Explicit installer cancellation before the next prompt prevents any elevation
+PASS Cancellation during the 30-second pause stops promptly and prevents the next prompt
+PASS Cancel marker is restricted to the current validated run ID and state directory
+PASS Shell helper preserves native cancellation instead of matching localized error text
+PASS Wizard exposes cancellation only in the retry pause and sends a run-specific request
+All 12 administrator retry cases passed (portable PowerShell; UAC and delays simulated).

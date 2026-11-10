@@ -1,0 +1,32 @@
+{
+  "checked_at_utc": "2026-11-03T09:59:15.205057+00:00",
+  "models": [
+    {
+      "key": "gemma12-qat-q4",
+      "repository": "google/gemma-4-12B-it-qat-q4_0-gguf",
+      "revision": "29d097773436b69ff9feafd636ab4cf873786537",
+      "gated": false,
+      "bytes": 6975879296,
+      "sha256": "93567e57a8fe10b23569b9d9ec38cd005deedf71e29477c421a4b83f418a538b",
+      "matches": true
+    },
+    {
+      "key": "gemma12-q8",
+      "repository": "ggml-org/gemma-4-12B-it-GGUF",
+      "revision": "790d826c6ec7dc8aa0ab23af33e5b8313140a231",
+      "gated": false,
+      "bytes": 12669641920,
+      "sha256": "3730903965b3e57bcad0a387110322ce66409559c356a1ae1b61701024e5ce60",
+      "matches": true
+    },
+    {
+      "key": "gemma26-qat-q4",
+      "repository": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+      "revision": "d1c082be9cf3c8a514acf63b8761f4b41935842e",
+      "gated": false,
+      "bytes": 14439363584,
+      "sha256": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d",
+      "matches": true
+    }
+  ]
+}

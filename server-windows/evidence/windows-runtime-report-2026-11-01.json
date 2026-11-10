@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-01",
+  "source": "User-provided Windows PowerShell runtime status; token was used locally and not included.",
+  "status": {
+    "name": "kienzledoku-commander",
+    "vram_gib": 24,
+    "default_quality": "basis",
+    "allowed_qualities": [
+      "basis",
+      "gruendlich",
+      "sehr_gruendlich"
+    ],
+    "phase": "asr_ready",
+    "asr_ready": true,
+    "loaded": {
+      "asr": true,
+      "diar": true,
+      "llm": "basis"
+    },
+    "transition_running": false,
+    "pending": {},
+    "active": {},
+    "last_error": null
+  },
+  "interpretation": "Whisper, pyannote and the 9B Q4 default LLM are simultaneously loaded. Parallel residency is confirmed.",
+  "external_health_check": {
+    "endpoint": "http://10.0.83.140:8185/health",
+    "http_status": 200,
+    "body": {
+      "status": "ok",
+      "asr_ready": true,
+      "phase": "asr_ready"
+    },
+    "source": "Actual read-only check from Codex host after the firewall change."
+  }
+}

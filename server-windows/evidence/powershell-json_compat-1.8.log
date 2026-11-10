@@ -1,0 +1,5 @@
+PASS pyannote access check passes one file size to ExpectedBytes
+PASS Windows PowerShell 5.1 manifest file enumeration and byte counts
+PASS Empty/single/multiple arrays and nested configuration retain their shape
+PASS Startup inventory evaluates audio files separately
+All 4 Windows PowerShell 5.1 JSON compatibility cases passed (simulated cmdlet output).

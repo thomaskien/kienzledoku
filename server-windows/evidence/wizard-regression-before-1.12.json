@@ -1,0 +1,22 @@
+{
+  "regression_introduced": "1.10",
+  "syntax_valid_but_wrong_argument_binding": true,
+  "fix_version": "1.12",
+  "windows_gui_executed": false,
+  "versions": [
+    {
+      "version": "1.10",
+      "source": "actual published EXE payload",
+      "exit_code": 1,
+      "archive_integer_binding_error_reproduced": true,
+      "output": "Exception: /home/thomas/Codex/8+16gb/kienzledoku-server-installer-windows/tests/test_wizard_arguments.ps1:35\nLine |\n  35 |      catch{throw ('Wizard control argument error, line '+$Call.Extent. \u2026\n     |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | Wizard control argument error, line 94: Cannot process argument\n     | transformation on parameter 'X'. Cannot convert value \"Archiv\" to type\n     | \"System.Int32\". Error: \"The input string 'Archiv' was not in a correct\n     | format.\"\n"
+    },
+    {
+      "version": "1.11",
+      "source": "actual published EXE payload",
+      "exit_code": 1,
+      "archive_integer_binding_error_reproduced": true,
+      "output": "Exception: /home/thomas/Codex/8+16gb/kienzledoku-server-installer-windows/tests/test_wizard_arguments.ps1:35\nLine |\n  35 |      catch{throw ('Wizard control argument error, line '+$Call.Extent. \u2026\n     |            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n     | Wizard control argument error, line 95: Cannot process argument\n     | transformation on parameter 'X'. Cannot convert value \"Archiv\" to type\n     | \"System.Int32\". Error: \"The input string 'Archiv' was not in a correct\n     | format.\"\n"
+    }
+  ]
+}

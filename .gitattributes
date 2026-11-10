@@ -1,0 +1,5 @@
+# Preserve the imported Windows installer and its checksum manifests byte for byte,
+# including UTF-8 BOM and CRLF required by Windows PowerShell 5.1.
+server-windows/** -text whitespace=cr-at-eol
+# Historical captured test output is preserved verbatim, including whitespace.
+server-windows/evidence/*.log -whitespace

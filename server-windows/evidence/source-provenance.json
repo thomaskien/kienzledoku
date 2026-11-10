@@ -1,0 +1,19 @@
+{
+  "source": "../kienzledoku-installer (read-only source)",
+  "files": {
+    "runtime/serial_server.py": "e1d3f28735b4d0817d6c07b2fbe6d825331e6851371b62c68b87441c6e16724e",
+    "runtime/wait_worker.py": "d383e43af9b8ebcd9eaafa5e1b872e0226d44aadbd831e37ccf8cd1f6993cb04",
+    "runtime/kienzledoku_document.py": "0a2d1ca6cd632a4956d3f9b8065f65441f7b74581970475d1087d3c7df169016",
+    "runtime/kienzledoku_commander/api.py": "9c5a888b20194d98f8b01e6bbc5c2265d21e58b4c070d5aa8f04437ee175c2ef",
+    "runtime/kienzledoku_commander/runtime.py": "ce022ee8be9e6624bd18dcc40ef9798457a6988fd74a4c3d67e6cb7e0decfc6d",
+    "runtime/kienzledoku_commander/worker.py": "ec32ccb888af4c2189f41b1ec9244a67de01ad2acbca9007942e0ca972be7747",
+    "runtime/kienzledoku_commander/errors.py": "8201f645082d234351850c0fbac5904e2d5a68b9210907230973f8994ecf5de8",
+    "runtime/kienzledoku_commander/config.py": "ed11461edc9fec1ae7407e1a223231b4d5ac860f4948c45e467fc5a624517d2a",
+    "runtime/kienzledoku_commander/scheduler.py": "7d57f1f1f756e39de0e829334222887c7e62509112f8ba342b035f1bd818caca",
+    "runtime/kienzledoku_commander/__init__.py": "62404cd71d2dc9da3be30309b2c9fe62a9df5c9adb8600c71f8c4bb0bbd3ad8b",
+    "runtime/kienzledoku_commander/ownership.py": "e93474dfc8fa40fd41f0e1a36e4422aeba305b246f8682c196ead704f7fab140",
+    "runtime/kienzledoku_commander/asr_stage.py": "379ac0f69b97c541f551d7211d1a8c83578f0342cdf34a1db3dbc05fb1f0a8aa",
+    "runtime/kienzledoku_commander/patch_workers.py": "22c99efe69a5001065b1d147bf9788c8e9a36db28784ea1ddf9e03a8ca7fc95b",
+    "runtime/kienzledoku_commander/__main__.py": "671d66d0c191f3161b25ca5dd3c3e5ee2f560a9a7ef1f3dccba68be64c97c417"
+  }
+}

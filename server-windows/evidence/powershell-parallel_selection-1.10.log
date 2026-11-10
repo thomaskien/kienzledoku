@@ -1,0 +1,9 @@
+PASS Only the explicitly selected Q6 is parallel while Q4 stays the request default
+PASS An empty parallel selection makes every installed LLM serial
+PASS Only selected models whose GPU parallel profile fits are offered
+PASS Uninstalled, unsupported and GPU-incompatible parallel choices fail explicitly
+PASS A new catalogue entry requires no hard-coded selection list
+PASS Duplicate API model IDs are rejected before configuration overwrites a model
+PASS Wizard selector uses the catalogue and preserves an explicit choice
+PASS Removing a selected model or changing to a smaller GPU clears the incompatible selection
+All 8 explicit parallel-selection cases passed (portable PowerShell; selector controls simulated).

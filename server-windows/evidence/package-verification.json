@@ -1,0 +1,23 @@
+{
+  "exe_sha256": "b02cf71f9b8998a59df62dbf6b43b55c5fe3cccfdaacce5231aecf4e4e29da96",
+  "embedded_files_match": true,
+  "embedded_files": [
+    "VERSION",
+    "models.json",
+    "audio-files.json",
+    "ubuntu.json",
+    "README.txt",
+    "linux-payload.tar",
+    "windows/Control.ps1",
+    "windows/Models.ps1",
+    "windows/storage_probe.py",
+    "windows/Engine.ps1",
+    "windows/Core.psm1",
+    "windows/Wizard.ps1"
+  ],
+  "server_payload_files": 25,
+  "client_payload": false,
+  "server_python_sources_compile": true,
+  "windows_runtime_tested": false,
+  "embedded_storage_probe_compiles": true
+}

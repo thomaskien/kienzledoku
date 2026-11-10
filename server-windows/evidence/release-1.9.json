@@ -1,0 +1,23 @@
+{
+  "version": "1.9",
+  "changes": [
+    "Incremental disk capacity planning using existing Windows/WSL verification proofs",
+    "Separate host-volume and WSL-filesystem capacity checks; 5 GiB prepared-runtime reserve, 35 GiB fresh-runtime reserve",
+    "Stage network source files only when still required by WSL",
+    "Retain process handle and wait for child completion; preserve unavailable exit codes as null",
+    "Preserve explicit finished error messages and explain UAC cancellation/timeout 1223"
+  ],
+  "python_tests": 83,
+  "portable_powershell_cases": 75,
+  "wsl_cpp_parser_cases": 9,
+  "total_local_test_cases": 167,
+  "models_unchanged": true,
+  "linux_runtime_unchanged": true,
+  "client_payload": false,
+  "windows_gui_executed_by_build_agent": false,
+  "windows_gpu_benchmark_executed_by_build_agent": false,
+  "scope_proof": "repair-reproduction-1.9.json",
+  "user_windows_1_8_proof": "windows-user-verification-2026-11-04.json",
+  "new_version_requires_real_windows_repair_test": true,
+  "test_fixture_fix": "Existing two test helpers now await the full configured baseline, not only initial ASR readiness; production runtime unchanged."
+}

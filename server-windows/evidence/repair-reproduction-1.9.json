@@ -1,0 +1,40 @@
+{
+  "previous_version": "1.8",
+  "new_version": "1.9",
+  "old_full_space_rule_confirmed": true,
+  "models_and_linux_runtime_unchanged": true,
+  "compared_payload_files": 24,
+  "result_reproduction": {
+    "after": {
+      "Phase": "error",
+      "Message": "Zu wenig Platz\r\nProzess-Exitcode nicht verfügbar",
+      "Finished": true,
+      "Success": false,
+      "RestartRequired": false,
+      "ExitCode": null,
+      "UnexpectedExit": false,
+      "LastPhase": "error",
+      "StderrPath": "",
+      "StdoutPath": ""
+    },
+    "before": {
+      "Phase": "error",
+      "Message": "Der Installationsprozess wurde ohne abschließendes Ergebnis beendet. Exitcode 0 (0x00000000).\r\nLetzter Schritt: error — Zu wenig Platz",
+      "Finished": true,
+      "Success": false,
+      "RestartRequired": false,
+      "ExitCode": 0,
+      "UnexpectedExit": true,
+      "LastPhase": "error",
+      "StderrPath": "",
+      "StdoutPath": ""
+    }
+  },
+  "windows_executed": false,
+  "synthetic_capacity_case": {
+    "existing_models_gib": 90,
+    "available_host_gib": 10,
+    "old_required_gib": 125,
+    "new_runtime_reserve_gib": 5
+  }
+}

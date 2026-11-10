@@ -1,0 +1,14 @@
+PASS Verified Windows archive requires no new allocation; corrupt same-size target needs a copy
+PASS Requirements on one volume are summed; separate volumes retain separate budgets
+PASS Actual registry paths preserve the WSL volume and remove Windows NT path prefixes
+PASS Existing 90-GiB installation resumes with 10 GiB free and no second network staging copy
+PASS New missing model is included in both WSL growth and its necessary network staging copy
+PASS Actual WSL data volume is checked even when the Windows app lives on another volume
+PASS WSL filesystem exhaustion is checked independently of host free space
+PASS Fresh install still reserves all weights, bootstrap space and 35 GiB runtime space
+PASS Real multiline probe source and manifest survive native argument transport with Unicode paths
+PASS A reported finished error remains an explicit error with zero or unavailable exit code
+PASS Asynchronous real child exit is synchronized and retained
+PASS Cancelled UAC is identified for network and WSL without claiming a server failure
+PASS Other elevation failures retain their error instead of being called a cancellation
+All 13 repair-space/result cases passed (portable PowerShell, Windows/WSL responses simulated).

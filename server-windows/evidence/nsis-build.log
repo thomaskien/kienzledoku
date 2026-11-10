@@ -1,0 +1,22 @@
+MakeNSIS v3.09-4 - Copyright 1999-2023 Contributors
+See the file COPYING for license details.
+Credits can be found in the Users Manual.
+
+Command line defined: "PRODUCT_VERSION=1.12"
+Command line defined: "FILE_VERSION=1.12.0.0"
+Processing script file: "/home/thomas/Codex/8+16gb/kienzledoku-server-installer-windows/build/setup.nsi" (UTF8)
+
+Processed 1 file, writing output (x86-unicode):
+
+Output: "../dist/kienzledoku-Server-Installer-1.12.exe"
+Install: 0 pages (0 bytes), 1 section (1 required) (4120 bytes), 64 instructions (1792 bytes), 58 strings (2498 bytes), 1 language table (162 bytes).
+
+Using lzma (compress whole) compression.
+
+EXE header size:               99840 / 100864 bytes
+Install code:                          (6852 bytes)
+Install data:                          (383599 bytes)
+Compressed data:               93119 / 390451 bytes
+CRC (0xE7DE6980):                  4 / 4 bytes
+
+Total size:                   192963 / 491319 bytes (39.2%)

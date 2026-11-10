@@ -1,0 +1,82 @@
+{
+  "version": "1.12",
+  "cases_passed": 9,
+  "previous_quoting_failure_reproduced": true,
+  "fixture": "Microsoft WSL ParseArgument body compiled and executed on Linux",
+  "command_lines": "actual ConvertTo-NativeArguments PowerShell function output",
+  "windows_runtime_tested": false,
+  "records": [
+    {
+      "Name": "version",
+      "Arguments": [
+        "--version"
+      ],
+      "Raw": "--version",
+      "PreviousRaw": "\"--version\""
+    },
+    {
+      "Name": "install",
+      "Arguments": [
+        "--install",
+        "--no-distribution",
+        "--web-download"
+      ],
+      "Raw": "--install --no-distribution --web-download",
+      "PreviousRaw": "\"--install\" \"--no-distribution\" \"--web-download\""
+    },
+    {
+      "Name": "list",
+      "Arguments": [
+        "--list",
+        "--running",
+        "--quiet"
+      ],
+      "Raw": "--list --running --quiet",
+      "PreviousRaw": "\"--list\" \"--running\" \"--quiet\""
+    },
+    {
+      "Name": "import",
+      "Arguments": [
+        "--import",
+        "kienzledoku-server",
+        "C:\\Users\\Test User\\Server\\wsl",
+        "C:\\Cache Files\\ubuntu.wsl",
+        "--version",
+        "2"
+      ],
+      "Raw": "--import kienzledoku-server \"C:\\Users\\Test User\\Server\\wsl\" \"C:\\Cache Files\\ubuntu.wsl\" --version 2",
+      "PreviousRaw": "\"--import\" \"kienzledoku-server\" \"C:\\Users\\Test User\\Server\\wsl\" \"C:\\Cache Files\\ubuntu.wsl\" \"--version\" \"2\""
+    },
+    {
+      "Name": "exec",
+      "Arguments": [
+        "--distribution",
+        "kienzledoku-server",
+        "--user",
+        "root",
+        "--exec",
+        "python3",
+        "/mnt/c/Cache Files/test.py"
+      ],
+      "Raw": "--distribution kienzledoku-server --user root --exec python3 \"/mnt/c/Cache Files/test.py\"",
+      "PreviousRaw": "\"--distribution\" \"kienzledoku-server\" \"--user\" \"root\" \"--exec\" \"python3\" \"/mnt/c/Cache Files/test.py\""
+    },
+    {
+      "Name": "shutdown",
+      "Arguments": [
+        "--shutdown"
+      ],
+      "Raw": "--shutdown",
+      "PreviousRaw": "\"--shutdown\""
+    },
+    {
+      "Name": "terminate",
+      "Arguments": [
+        "--terminate",
+        "kienzledoku-server"
+      ],
+      "Raw": "--terminate kienzledoku-server",
+      "PreviousRaw": "\"--terminate\" \"kienzledoku-server\""
+    }
+  ]
+}

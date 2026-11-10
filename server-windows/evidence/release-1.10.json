@@ -1,0 +1,38 @@
+{
+  "version": "1.10",
+  "file_version": "1.10.0.0",
+  "features": [
+    "Optional model checksum verification across Windows and WSL; default on",
+    "Optional owned staging cleanup after successful completion; default keep",
+    "WSL and local model sources prioritized before remote store; no required archive refill during repair",
+    "Local-only automatic GUI inventory; network inventory requested explicitly",
+    "Per-file Linux import source map and import receipt scoped to the current run"
+  ],
+  "python_tests": 92,
+  "portable_powershell_cases": 95,
+  "wsl_cpp_parser_cases": 9,
+  "total_local_test_cases": 196,
+  "powershell_suites": {
+    "model_options": 20,
+    "repair_space": 13,
+    "core": 12,
+    "json_compat": 4,
+    "wsl_bootstrap": 9,
+    "diagnostics_cache": 10,
+    "network": 8,
+    "parallel_selection": 8,
+    "wizard_migration": 6,
+    "gemma_selection": 5
+  },
+  "source_integrity_off_saves_no_false_proofs": true,
+  "model_catalogue_unchanged": true,
+  "inference_runtime_unchanged": true,
+  "client_payload": false,
+  "windows_runtime_tested": false,
+  "actual_gpu_benchmarks_executed": false,
+  "scope_proof": "scope-1.10.json",
+  "limitations": [
+    "Windows PowerShell 5.1/Forms and actual WSL repair still require physical Windows testing",
+    "Windows SMB/CIM alias resolution tested through portable guards and simulations, not a live Windows share"
+  ]
+}

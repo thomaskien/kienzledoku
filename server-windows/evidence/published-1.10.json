@@ -1,0 +1,51 @@
+{
+  "version": "1.10",
+  "published_at_utc": "2026-11-04T16:46:23.070386+00:00",
+  "directory": "/run/user/1000/gvfs/smb-share:server=ter.local,share=tausch/kienzledoku-server-installer-windows/dist",
+  "files": [
+    {
+      "file": "kienzledoku-Server-Installer-1.10.exe",
+      "bytes": 191236,
+      "sha256": "a08886d0e5ba27a77bbbcd15ae70e20ae5b3f8c07c9aa214fd6e4d45df03dd23",
+      "verified": true
+    },
+    {
+      "file": "kienzledoku-Server-Installer-1.10.zip",
+      "bytes": 164078,
+      "sha256": "d85b55443a6288440576ed78bb40682ebf6fb4466d298d9ebd2ef4ff7c35ca12",
+      "verified": true
+    },
+    {
+      "file": "kienzledoku-Server-Installer-1.10.exe.sha256",
+      "bytes": 104,
+      "sha256": "ec3db001910dd4e54600fe953be65f7e61995391d3c3b60bbc3793e882823037",
+      "verified": true
+    },
+    {
+      "file": "kienzledoku-Server-Installer-1.10.zip.sha256",
+      "bytes": 104,
+      "sha256": "774773b42643a64a2970a9a740409fd13d3a0db7b1d14bd63bffbc3a90e336f9",
+      "verified": true
+    },
+    {
+      "file": "README-1.10.txt",
+      "bytes": 31010,
+      "sha256": "7d6ab515b4771ea71e426080bc4bc3be7ebdf6ef8fb6d5f515b1b144ffaf8869",
+      "verified": true
+    },
+    {
+      "file": "build-1.10.json",
+      "bytes": 578,
+      "sha256": "c50332106cf0564d186e72d6efe7b957a9ed97fc9b6518943c5404276faf8134",
+      "verified": true
+    },
+    {
+      "file": "release-1.10.json",
+      "bytes": 1401,
+      "sha256": "073f4906e9a604b977f5044efc09ac680dada00dc4916a4208cdff3e87a5a3f9",
+      "verified": true
+    }
+  ],
+  "older_releases_preserved": true,
+  "model_archives_untouched": true
+}

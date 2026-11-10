@@ -1,0 +1,6 @@
+PASS Six catalogue models retain the original Qwen models and add three Gemma models
+PASS 16-GiB GPU offers the QAT 12B parallel selection only among the Gemma entries
+PASS 24-GiB GPU offers all three Gemma entries with exactly one explicit resident
+PASS All six models can be configured serially on a 24-GiB GPU
+PASS Download preparation includes only selected Gemma weights and shared audio
+All 5 Gemma catalogue cases passed (portable PowerShell, no GPU/Windows execution).

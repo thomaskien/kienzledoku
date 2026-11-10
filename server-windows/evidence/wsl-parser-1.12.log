@@ -1,0 +1,10 @@
+PASS version: previous quoted switch rejected; corrected switch recognized
+PASS install: previous quoted switch rejected; corrected switch recognized
+PASS list: previous quoted switch rejected; corrected switch recognized
+PASS import: previous quoted switch rejected; corrected switch recognized
+PASS exec: previous quoted switch rejected; corrected switch recognized
+PASS shutdown: previous quoted switch rejected; corrected switch recognized
+PASS terminate: previous quoted switch rejected; corrected switch recognized
+PASS import paths retain required quotes
+PASS upstream HandleQuotes path parsing preserves spaced values
+All 9 parser compatibility cases passed; this does not execute Windows/WSL.

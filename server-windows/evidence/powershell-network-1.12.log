@@ -1,0 +1,9 @@
+PASS LAN rule covers Public while retaining the selected address, port and subnet
+PASS Repair replaces the previous private-only rule and preserves its cleanup ownership
+PASS Switching back to localhost removes owned forwarding and creates no new rule
+PASS Removal cleans owned networking even when the saved mode is LAN
+PASS Non-admin attempt fails before any networking mutation
+PASS Wildcard, loopback, IPv6 and an address absent from Windows are refused
+PASS An occupied selected endpoint is not replaced
+PASS Readback of an active rule still excluding Public cannot report success
+All 8 network regression cases passed (Windows cmdlets simulated; no Windows firewall modified).

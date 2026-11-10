@@ -1,0 +1,13 @@
+test_additional_model_uses_catalog_hardware_profile_and_declared_fallback (test_resident_selection.ResidentSelection.test_additional_model_uses_catalog_hardware_profile_and_declared_fallback) ... ok
+test_default_request_and_parallel_resident_are_independent (test_resident_selection.ResidentSelection.test_default_request_and_parallel_resident_are_independent) ... ok
+test_diarization_keeps_the_chosen_parallel_model_and_whisper_loaded (test_resident_selection.ResidentSelection.test_diarization_keeps_the_chosen_parallel_model_and_whisper_loaded) ... ok
+test_discovery_reports_chosen_resident_loaded_model_and_serial_availability (test_resident_selection.ResidentSelection.test_discovery_reports_chosen_resident_loaded_model_and_serial_availability) ... ok
+test_generated_runtime_and_final_verification_use_selected_resident (test_resident_selection.ResidentSelection.test_generated_runtime_and_final_verification_use_selected_resident) ... ok
+test_legacy_configs_preserve_the_old_default_based_baseline (test_resident_selection.ResidentSelection.test_legacy_configs_preserve_the_old_default_based_baseline) ... ok
+test_multiple_resident_flags_or_a_missing_selection_are_rejected (test_resident_selection.ResidentSelection.test_multiple_resident_flags_or_a_missing_selection_are_rejected) ... ok
+test_no_parallel_selection_keeps_all_llms_serial (test_resident_selection.ResidentSelection.test_no_parallel_selection_keeps_all_llms_serial) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.600s
+
+OK

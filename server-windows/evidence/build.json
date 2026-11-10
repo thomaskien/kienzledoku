@@ -1,0 +1,20 @@
+{
+  "product": "kienzledoku Server Installer",
+  "version": "1.12",
+  "file_version": "1.12.0.0",
+  "built_at_utc": "2026-11-04T18:18:31.333623+00:00",
+  "nsis": "v3.09-4",
+  "artifacts": [
+    {
+      "file": "kienzledoku-Server-Installer-1.12.exe",
+      "bytes": 192963,
+      "sha256": "b02cf71f9b8998a59df62dbf6b43b55c5fe3cccfdaacce5231aecf4e4e29da96"
+    },
+    {
+      "file": "kienzledoku-Server-Installer-1.12.zip",
+      "bytes": 166959,
+      "sha256": "075ceeb4d6bc8d1bcb6462ba9e8f7adb7f2b17d834ba16ba49ea046a09c83661"
+    }
+  ],
+  "windows_runtime_tested": false
+}

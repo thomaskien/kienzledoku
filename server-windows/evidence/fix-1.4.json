@@ -1,0 +1,31 @@
+{
+  "version": "1.4",
+  "observed": "Windows installer background process ended after the llama.cpp git checkout entry. Shared progress.json still had Finished=false and no final error. User saw a generic failure and lost the log view.",
+  "original_abort_cause_confirmed": false,
+  "changes": [
+    "Keep the same live log control visible on the result page until explicitly closed; add full-log button.",
+    "Redirect background stdout/stderr to private per-run files and keep their paths plus PID in last-operation.json.",
+    "Require an explicit final success status AND zero process exit. Report unexpected termination with decimal/hex exit code, last phase and available output.",
+    "Record external command and PID; native failures include last 15 program output lines. Linux failures include stage, command and traceback in installation-error.json.",
+    "Persist successful per-file model verification on Windows and WSL, keyed by path, size, timestamps/change metadata and expected checksum.",
+    "Check copies independently, preserve proof across validated rename and installer-owned ownership changes, invalidate stale/failed proofs and offer explicit full recheck."
+  ],
+  "tests": {
+    "python_regressions_passed": 61,
+    "portable_powershell_core_passed": 12,
+    "powershell_51_json_simulation_passed": 4,
+    "wsl_bootstrap_simulation_passed": 9,
+    "diagnostics_and_cache_passed": 10,
+    "upstream_wsl_parser_compatibility_passed": 9,
+    "total_passed": 105
+  },
+  "windows_gui_tested": false,
+  "windows_wsl_gpu_installation_tested": false,
+  "limits": [
+    "1.3 has no per-file fingerprints; one full verification is needed on first 1.4 run.",
+    "No claim that the unknown original abort trigger is fixed.",
+    "Windows cache uses path, size, last-write and creation timestamps; WSL also checks device, inode and ctime."
+  ],
+  "models_changed": false,
+  "client_changed": false
+}

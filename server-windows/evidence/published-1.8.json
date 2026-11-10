@@ -1,0 +1,51 @@
+{
+  "version": "1.8",
+  "published_at_utc": "2026-11-03T10:05:18.325350+00:00",
+  "directory": "/run/user/1000/gvfs/smb-share:server=ter.local,share=tausch/kienzledoku-server-installer-windows/dist",
+  "files": [
+    {
+      "file": "kienzledoku-Server-Installer-1.8.exe",
+      "bytes": 182876,
+      "sha256": "451e6ee6bfb5930ad647388af95f762277eb3376c650cbb64a3a5b0d425106ef",
+      "verified": true
+    },
+    {
+      "file": "kienzledoku-Server-Installer-1.8.zip",
+      "bytes": 153809,
+      "sha256": "11bd6f1212b6ce0ffda49d67be6cd3f919e0d27c362797afb190481ddca09c78",
+      "verified": true
+    },
+    {
+      "file": "kienzledoku-Server-Installer-1.8.exe.sha256",
+      "bytes": 103,
+      "sha256": "0be06ea6ba84a917aca795d88b66ce6127891259901ec59a96f59dff9d369ee7",
+      "verified": true
+    },
+    {
+      "file": "kienzledoku-Server-Installer-1.8.zip.sha256",
+      "bytes": 103,
+      "sha256": "565e3c621fc44c5aba9d943deae76973cd68d9ef55cc19eb1fdb5cce931ace23",
+      "verified": true
+    },
+    {
+      "file": "README-1.8.txt",
+      "bytes": 25214,
+      "sha256": "ad524310d81bfdf4e39b8a8f1ed6a6aa49aba6e61af356121c4d64d956c31430",
+      "verified": true
+    },
+    {
+      "file": "build-1.8.json",
+      "bytes": 574,
+      "sha256": "c6323c2d76382e72755dc690c1e562d8f112d854e87400dc93ea033b35ea6fbf",
+      "verified": true
+    },
+    {
+      "file": "release-1.8.json",
+      "bytes": 1009,
+      "sha256": "a2eb671aedf11e6bec0a514401293c418e0757d021f86559dd09a8d90e5b65fb",
+      "verified": true
+    }
+  ],
+  "older_releases_preserved": true,
+  "model_directories_untouched": true
+}

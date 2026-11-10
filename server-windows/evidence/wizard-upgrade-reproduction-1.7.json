@@ -1,0 +1,9 @@
+{
+  "old_exe": "kienzledoku-Server-Installer-1.6.exe",
+  "old_embedded_wizard_used": true,
+  "before_exit_code": 1,
+  "before_selecteditem_failure_reproduced": true,
+  "after_exit_code": 0,
+  "after_cases_passed": 6,
+  "windows_gui_executed": false
+}

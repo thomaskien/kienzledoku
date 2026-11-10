@@ -1,0 +1,9 @@
+{
+  "version": "1.2",
+  "observed": "After the expected feature-enablement reboot, wsl --install --no-distribution --web-download reported WSL 3.0.3 installed but exited -1. The engine then failed the Features step before its own Ubuntu import.",
+  "fixes": ["Skip enabled Windows features and installed modern WSL, handle pending feature restarts", "Install/update WSL only if necessary and verify the resulting installed CLI version independently of bootstrap success text/exit code", "Keep genuine installation failures fatal when no usable version can be verified", "Decode wsl.exe management output as UTF-16LE and Linux --exec output as UTF-8", "Show required reboot as a separate restart checkpoint with exit 3010", "Remove legacy NUL characters from the on-screen log display"],
+  "tests": {"powershell_core_passed": 12, "powershell_51_json_simulation_passed": 4, "wsl_bootstrap_regressions_passed": 9, "child_process_utf16le_decoding_tested": true, "windows_feature_and_wsl_responses_simulated": true, "small_https_test": "Not repeated in 1.2; unchanged downloader was verified in 1.1. Optional network-test approval review timed out; portable core tests completed without that network request."},
+  "models_and_tokens_changed": false,
+  "windows_runtime_tested": false,
+  "manual_resume": "Close old installer after its current operation ends; start EXE 1.2, retain model archive, run installation/repair. No manual Ubuntu installation required."
+}

@@ -1,0 +1,5 @@
+PASS All actual wizard control calls bind their original typed parameters without extra arguments
+PASS Archive inventory guidance stays one text argument at the intended screen position
+PASS Actual model checkbox and description calls bind for every catalogue model
+PASS New checkbox initialization binds null, legacy and explicit saved options with correct booleans
+All 4 wizard argument cases passed (66 actual control call sites; portable PowerShell, Forms construction simulated).

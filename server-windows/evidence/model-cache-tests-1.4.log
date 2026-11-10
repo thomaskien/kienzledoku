@@ -1,0 +1,18 @@
+test_changed_expected_hash_and_replacement_inode_invalidate_proof (test_model_verification.ModelVerification.test_changed_expected_hash_and_replacement_inode_invalidate_proof) ... ok
+test_copy_has_own_verification_but_rename_does_not_rehash (test_model_verification.ModelVerification.test_copy_has_own_verification_but_rename_does_not_rehash) ... Bereits geprüft, unverändert: /tmp/tmpas_rhgj9/new.part
+Bereits geprüft, unverändert: /tmp/tmpas_rhgj9/new.gguf
+ok
+test_forced_recheck_and_corrupt_cache_do_not_accept_stale_proof (test_model_verification.ModelVerification.test_forced_recheck_and_corrupt_cache_do_not_accept_stale_proof) ... ok
+test_install_failure_records_step_command_exception_and_traceback (test_model_verification.ModelVerification.test_install_failure_records_step_command_exception_and_traceback) ... ok
+test_partial_and_bad_git_blob_never_get_success_proofs (test_model_verification.ModelVerification.test_partial_and_bad_git_blob_never_get_success_proofs) ... ok
+test_persisted_proof_avoids_reading_model_content (test_model_verification.ModelVerification.test_persisted_proof_avoids_reading_model_content) ... Bereits geprüft, unverändert: /tmp/tmpuaksz1cg/model.gguf
+ok
+test_repair_reuses_imported_model_after_installer_ownership_change (test_model_verification.ModelVerification.test_repair_reuses_imported_model_after_installer_ownership_change) ... Importiere small.gguf
+Bereits geprüft, unverändert: /tmp/tmpjqvy1hhz/active/models/small.gguf
+ok
+test_same_size_change_with_restored_mtime_still_invalidates_ctime (test_model_verification.ModelVerification.test_same_size_change_with_restored_mtime_still_invalidates_ctime) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.022s
+
+OK

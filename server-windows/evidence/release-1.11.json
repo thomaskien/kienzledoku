@@ -1,0 +1,43 @@
+{
+  "version": "1.11",
+  "file_version": "1.11.0.0",
+  "features": [
+    "Retry unconfirmed administrator requests with native Windows error 1223 indefinitely after each 30 second pause",
+    "Log the unconfirmed request, affected operation and attempt number; retry only elevation",
+    "Preserve native Win32 errors through direct .NET Process.Start with UseShellExecute and runas",
+    "Explicit cancellation during retry pauses through a validated per-run marker and wizard control",
+    "Keep other launch failures, elevated operation failures and reboot code 3010 distinct"
+  ],
+  "python_tests": 92,
+  "portable_powershell_cases": 107,
+  "wsl_cpp_parser_cases": 9,
+  "total_local_test_cases": 208,
+  "powershell_suites": {
+    "admin_retry": 12,
+    "model_options": 20,
+    "repair_space": 13,
+    "core": 12,
+    "json_compat": 4,
+    "wsl_bootstrap": 9,
+    "diagnostics_cache": 10,
+    "network": 8,
+    "parallel_selection": 8,
+    "wizard_migration": 6,
+    "gemma_selection": 5
+  },
+  "uac_and_delays_simulated": true,
+  "model_catalogue_unchanged": true,
+  "inference_runtime_unchanged": true,
+  "client_payload": false,
+  "windows_runtime_tested": false,
+  "actual_gpu_benchmarks_executed": false,
+  "scope_proof": "scope-1.11.json",
+  "limitations": [
+    "Windows PowerShell 5.1/Forms and real UAC consent, cancellation, timeout and retry require physical Windows testing",
+    "No and a non-confirmed request can share ERROR_CANCELLED 1223; use the wizard cancellation control during the pause to stop retries"
+  ],
+  "sources": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shellexecuteexa",
+    "https://github.com/PowerShell/PowerShell/blob/v7.6.9/src/Microsoft.PowerShell.Commands.Management/commands/management/Process.cs"
+  ]
+}

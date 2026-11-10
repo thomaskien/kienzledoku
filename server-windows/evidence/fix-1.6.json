@@ -1,0 +1,29 @@
+{
+  "version": "1.6",
+  "request": "Explicitly select the parallel-resident model independently from installed/serial models and the request default; support catalogue expansion and expose the currently loaded model.",
+  "changes": [
+    "Wizard has an explicit parallel-model selector including none; only selected catalogue entries with fitting GPU profiles are offered.",
+    "Installer selection lists and layout are built from the catalogue instead of a fixed three-model list. Validate unique API IDs and catalogue-based hardware limits.",
+    "New ParallelModel setting produces exactly one parallel profile, while all other installed profiles are serial. Request default remains independent.",
+    "Runtime restores the chosen resident after serial requests and keeps it loaded during diarization as well as ASR. Legacy configs without the field retain the old default-based behavior.",
+    "Status adds resident_quality, loaded_llm_label and loaded_llm_mode. Model discovery adds resident, loaded, default and serial_available.",
+    "Final synthetic verification now expects the explicit resident instead of assuming the request default."
+  ],
+  "checks": {
+    "python_regressions_passed": 69,
+    "powershell_core_passed": 12,
+    "powershell_51_json_simulation_passed": 4,
+    "wsl_bootstrap_simulation_passed": 9,
+    "diagnostics_cache_passed": 10,
+    "network_simulation_passed": 8,
+    "parallel_selector_passed": 8,
+    "upstream_wsl_parser_compatibility_passed": 9,
+    "total_passed": 129
+  },
+  "windows_gui_tested": false,
+  "full_windows_gpu_execution_tested": false,
+  "catalogue_metadata_changed": true,
+  "model_weights_sources_or_checksums_changed": false,
+  "client_changed": false,
+  "limit": "Future catalogue models require complete pinned files/checksums, unique quality ID, runtime profile and measured serial/parallel hardware limits. GUI-control and GPU-worker tests use portable doubles; the new Windows GUI/GPU workflow was not executed by the agent."
+}

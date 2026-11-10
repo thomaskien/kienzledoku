@@ -1,0 +1,29 @@
+{
+  "checked_at_utc": "2026-11-03T10:04:27.131025+00:00",
+  "downloads": [
+    {
+      "model": "gemma12-qat-q4",
+      "status": 200,
+      "bytes": 6975879296,
+      "public_download_access": true
+    },
+    {
+      "model": "gemma12-q8",
+      "status": 200,
+      "bytes": 12669641920,
+      "public_download_access": true
+    },
+    {
+      "model": "gemma26-qat-q4",
+      "status": 200,
+      "bytes": 14439363584,
+      "public_download_access": true
+    }
+  ],
+  "model_weights_downloaded": false,
+  "llama_architecture": {
+    "url": "https://raw.githubusercontent.com/ggml-org/llama.cpp/aedb2a5e9ca3d4064148bbb919e0ddc0c1b70ab3/src/llama-arch.cpp",
+    "sha256": "e8ecc7c45a26500642f73e577e40c291cc83110b98c3403753c964e05e3cc9ff",
+    "gemma4_present": true
+  }
+}

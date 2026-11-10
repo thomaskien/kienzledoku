@@ -1,0 +1,39 @@
+{
+  "version": "1.6",
+  "verified_at_utc": "2026-11-01T10:10:18.242672+00:00",
+  "destination": "/run/user/1000/gvfs/smb-share:server=ter.fritz.box,share=tausch/kienzledoku-server-installer-windows/dist",
+  "files": [
+    {
+      "file": "kienzledoku-Server-Installer-1.6.exe",
+      "bytes": 181608,
+      "sha256": "182cc65108553a9f19e84376ac586a40631cf7134f3d4460fce45bd5e2bb86f9"
+    },
+    {
+      "file": "kienzledoku-Server-Installer-1.6.exe.sha256",
+      "bytes": 103,
+      "sha256": "f30fa70caae4b2f45d7eb8fab4aab6230d1a886e68e8e776bedf64a0470d3cfb"
+    },
+    {
+      "file": "kienzledoku-Server-Installer-1.6.zip",
+      "bytes": 151648,
+      "sha256": "6b81950700afb963e9d87e4f5182e9903a587a52f679ae741ec809e9844cd005"
+    },
+    {
+      "file": "kienzledoku-Server-Installer-1.6.zip.sha256",
+      "bytes": 103,
+      "sha256": "554f9253e40e0e7743aac228a25c7d697263b95a77ed155b3e60dee3c1f4df72"
+    },
+    {
+      "file": "README-1.6.txt",
+      "bytes": 22813,
+      "sha256": "ec7aeec82bd60df16d21c1eedf30fe8db66172c9c9d28d9a0a020d78c1a53af6"
+    },
+    {
+      "file": "build-1.6.json",
+      "bytes": 574,
+      "sha256": "c3699a9ffe0db27055cbc3a14c8f2591dd9aa951fa11cf494b5cc7d6dc263123"
+    }
+  ],
+  "existing_models_changed": false,
+  "older_versions_changed": false
+}

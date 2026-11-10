@@ -1,0 +1,6 @@
+ParentContainsErrorRecordException: /home/thomas/Codex/8+16gb/kienzledoku-server-installer-windows/tests/test_wizard_migration.ps1:45
+Line |
+  45 |      $requestDefault=$script:Default.SelectedItem
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | The property 'SelectedItem' cannot be found on this object. Verify that
+     | the property exists.

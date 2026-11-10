@@ -1,0 +1,107 @@
+test_quality_defaults_and_strict_24gib_policy (test_commander.ProfileTests.test_quality_defaults_and_strict_24gib_policy) ... ok
+test_serial_default_never_keeps_a_large_llm_on_standby (test_commander.ProfileTests.test_serial_default_never_keeps_a_large_llm_on_standby) ... ok
+test_16gib_processing_failure_uses_basis (test_commander.SchedulerTests.test_16gib_processing_failure_uses_basis) ... ok
+test_24gib_gruendlich_failure_never_uses_basis (test_commander.SchedulerTests.test_24gib_gruendlich_failure_never_uses_basis) ... ok
+test_asr_and_diar_are_exclusive_only_on_8gib (test_commander.SchedulerTests.test_asr_and_diar_are_exclusive_only_on_8gib) ... ok
+test_busy_queue_timeout_does_not_downgrade (test_commander.SchedulerTests.test_busy_queue_timeout_does_not_downgrade) ... ok
+test_busy_worker_does_not_trigger_fallback (test_commander.SchedulerTests.test_busy_worker_does_not_trigger_fallback) ... ok
+test_load_failure_falls_back_only_one_permitted_level (test_commander.SchedulerTests.test_load_failure_falls_back_only_one_permitted_level) ... ok
+test_missing_persistent_model_still_restores_asr_and_returns_error (test_commander.SchedulerTests.test_missing_persistent_model_still_restores_asr_and_returns_error) ... ok
+test_new_request_after_restore_loads_again (test_commander.SchedulerTests.test_new_request_after_restore_loads_again) ... ok
+test_partial_worker_change_never_dispatches_into_a_closed_gate (test_commander.SchedulerTests.test_partial_worker_change_never_dispatches_into_a_closed_gate) ... ok
+test_pending_serial_request_drains_asr_before_new_audio (test_commander.SchedulerTests.test_pending_serial_request_drains_asr_before_new_audio) ... ok
+test_persistent_triple_load_is_not_blocked (test_commander.SchedulerTests.test_persistent_triple_load_is_not_blocked) ... ok
+test_processing_failure_restarts_broken_persistent_model (test_commander.SchedulerTests.test_processing_failure_restarts_broken_persistent_model) ... ok
+test_queue_payload_memory_is_bounded (test_commander.SchedulerTests.test_queue_payload_memory_is_bounded) ... ok
+test_queued_same_model_is_used_again_before_unload (test_commander.SchedulerTests.test_queued_same_model_is_used_again_before_unload) ... ok
+test_request_id_deduplicates_and_rejects_other_content (test_commander.SchedulerTests.test_request_id_deduplicates_and_rejects_other_content) ... ok
+test_result_cache_expires_even_without_new_requests (test_commander.SchedulerTests.test_result_cache_expires_even_without_new_requests) ... ok
+test_result_is_available_before_asr_reload_finishes (test_commander.SchedulerTests.test_result_is_available_before_asr_reload_finishes) ... ok
+test_waiting_audio_does_not_interrupt_same_model_batch (test_commander.SchedulerTests.test_waiting_audio_does_not_interrupt_same_model_batch) ... ok
+test_asr_and_diar_proxy_with_explicit_query_validation (test_commander_api.APITests.test_asr_and_diar_proxy_with_explicit_query_validation) ... ok
+test_auth_and_profile_discovery_never_expose_basis_on_24gib (test_commander_api.APITests.test_auth_and_profile_discovery_never_expose_basis_on_24gib) ... ok
+test_extraction_fallback_visible_and_idempotent (test_commander_api.APITests.test_extraction_fallback_visible_and_idempotent) ... ok
+test_http_audio_queues_during_serial_llm_and_health_stays_available (test_commander_api.APITests.test_http_audio_queues_during_serial_llm_and_health_stays_available) ... ok
+test_openai_response_preserves_exact_four_fields (test_commander_api.APITests.test_openai_response_preserves_exact_four_fields) ... ok
+test_unfinished_recording_is_rejected_before_model_switch (test_commander_api.APITests.test_unfinished_recording_is_rejected_before_model_switch) ... ok
+test_validation_and_backend_errors_do_not_echo_input (test_commander_api.APITests.test_validation_and_backend_errors_do_not_echo_input) ... ok
+test_config_rejects_remote_backends_and_invalid_types (test_commander_api.RuntimeTests.test_config_rejects_remote_backends_and_invalid_types) ... ok
+test_document_rejects_partial_duplicate_null_and_trailing_output (test_commander_api.RuntimeTests.test_document_rejects_partial_duplicate_null_and_trailing_output) ... ok
+test_real_child_start_health_inference_and_stop (test_commander_api.RuntimeTests.test_real_child_start_health_inference_and_stop) ... ok
+test_known_files_patch_idempotently_and_rollback_exactly (test_commander_patch.PatchTests.test_known_files_patch_idempotently_and_rollback_exactly) ... ok
+test_one_unknown_file_prevents_both_mutations (test_commander_patch.PatchTests.test_one_unknown_file_prevents_both_mutations) ... ok
+test_rollback_refuses_later_manual_changes_before_any_write (test_commander_patch.PatchTests.test_rollback_refuses_later_manual_changes_before_any_write) ... ok
+test_write_failure_rolls_back_already_patched_file (test_commander_patch.PatchTests.test_write_failure_rolls_back_already_patched_file) ... ok
+test_cancellation_while_parked_leaks_no_lease (test_commander_worker.ASGITests.test_cancellation_while_parked_leaks_no_lease) ... ok
+test_parked_request_waits_then_uses_same_object (test_commander_worker.ASGITests.test_parked_request_waits_then_uses_same_object) ... ok
+test_busy_park_has_no_side_effect_and_socket_protocol_hides_exceptions (test_commander_worker.WorkerTests.test_busy_park_has_no_side_effect_and_socket_protocol_hides_exceptions) ... ok
+test_diar_keeps_pipeline_and_budget_and_gates_handler (test_commander_worker.WorkerTests.test_diar_keeps_pipeline_and_budget_and_gates_handler) ... ok
+test_explicit_group_socket_uses_non_writable_group_directory (test_commander_worker.WorkerTests.test_explicit_group_socket_uses_non_writable_group_directory) ... ok
+test_never_replaces_an_unknown_file (test_commander_worker.WorkerTests.test_never_replaces_an_unknown_file) ... ok
+test_only_one_commander_can_control_the_same_workers (test_commander_worker.WorkerTests.test_only_one_commander_can_control_the_same_workers) ... ok
+test_runtime_and_worker_use_the_same_control_protocol (test_commander_worker.WorkerTests.test_runtime_and_worker_use_the_same_control_protocol) ... ok
+test_whisper_disk_policy_releases_ct2_weights_but_retains_objects (test_commander_worker.WorkerTests.test_whisper_disk_policy_releases_ct2_weights_but_retains_objects) ... ok
+test_whisper_moves_both_existing_parts_and_preserves_cpu_cache (test_commander_worker.WorkerTests.test_whisper_moves_both_existing_parts_and_preserves_cpu_cache) ... ok
+test_16gib_gpu_offers_qat12_parallel_and_rejects_larger_parallel_models (test_gemma_models.GemmaModels.test_16gib_gpu_offers_qat12_parallel_and_rejects_larger_parallel_models) ... ok
+test_all_six_models_have_distinct_public_ids_and_verified_sources (test_gemma_models.GemmaModels.test_all_six_models_have_distinct_public_ids_and_verified_sources) ... ok
+test_diarization_preserves_each_gemma_parallel_selection (test_gemma_models.GemmaModels.test_diarization_preserves_each_gemma_parallel_selection) ... ok
+test_each_gemma_can_be_resident_with_an_independent_qwen_default (test_gemma_models.GemmaModels.test_each_gemma_can_be_resident_with_an_independent_qwen_default) ... ok
+test_each_gemma_supports_all_serial_configuration (test_gemma_models.GemmaModels.test_each_gemma_supports_all_serial_configuration) ... ok
+test_native_start_uses_32k_full_gpu_and_embedded_template_with_thinking_off (test_gemma_models.GemmaModels.test_native_start_uses_32k_full_gpu_and_embedded_template_with_thinking_off) ... ok
+test_serial_gemma_request_restores_explicit_gemma_resident_and_status (test_gemma_models.GemmaModels.test_serial_gemma_request_restores_explicit_gemma_resident_and_status) ... ok
+test_changed_expected_hash_and_replacement_inode_invalidate_proof (test_model_verification.ModelVerification.test_changed_expected_hash_and_replacement_inode_invalidate_proof) ... ok
+test_copy_has_own_verification_but_rename_does_not_rehash (test_model_verification.ModelVerification.test_copy_has_own_verification_but_rename_does_not_rehash) ... Bereits geprüft, unverändert: /tmp/tmpaljkra5_/new.part
+Bereits geprüft, unverändert: /tmp/tmpaljkra5_/new.gguf
+ok
+test_forced_recheck_and_corrupt_cache_do_not_accept_stale_proof (test_model_verification.ModelVerification.test_forced_recheck_and_corrupt_cache_do_not_accept_stale_proof) ... ok
+test_install_failure_records_step_command_exception_and_traceback (test_model_verification.ModelVerification.test_install_failure_records_step_command_exception_and_traceback) ... ok
+test_partial_and_bad_git_blob_never_get_success_proofs (test_model_verification.ModelVerification.test_partial_and_bad_git_blob_never_get_success_proofs) ... ok
+test_persisted_proof_avoids_reading_model_content (test_model_verification.ModelVerification.test_persisted_proof_avoids_reading_model_content) ... Bereits geprüft, unverändert: /tmp/tmpgrlk1_zw/model.gguf
+ok
+test_repair_reuses_imported_model_after_installer_ownership_change (test_model_verification.ModelVerification.test_repair_reuses_imported_model_after_installer_ownership_change) ... Importiere small.gguf
+Bereits geprüft, unverändert: /tmp/tmph8d905pb/active/models/small.gguf
+ok
+test_same_size_change_with_restored_mtime_still_invalidates_ctime (test_model_verification.ModelVerification.test_same_size_change_with_restored_mtime_still_invalidates_ctime) ... ok
+test_additional_model_uses_catalog_hardware_profile_and_declared_fallback (test_resident_selection.ResidentSelection.test_additional_model_uses_catalog_hardware_profile_and_declared_fallback) ... ok
+test_default_request_and_parallel_resident_are_independent (test_resident_selection.ResidentSelection.test_default_request_and_parallel_resident_are_independent) ... FAIL
+test_diarization_keeps_the_chosen_parallel_model_and_whisper_loaded (test_resident_selection.ResidentSelection.test_diarization_keeps_the_chosen_parallel_model_and_whisper_loaded) ... ok
+test_discovery_reports_chosen_resident_loaded_model_and_serial_availability (test_resident_selection.ResidentSelection.test_discovery_reports_chosen_resident_loaded_model_and_serial_availability) ... ok
+test_generated_runtime_and_final_verification_use_selected_resident (test_resident_selection.ResidentSelection.test_generated_runtime_and_final_verification_use_selected_resident) ... ok
+test_legacy_configs_preserve_the_old_default_based_baseline (test_resident_selection.ResidentSelection.test_legacy_configs_preserve_the_old_default_based_baseline) ... ok
+test_multiple_resident_flags_or_a_missing_selection_are_rejected (test_resident_selection.ResidentSelection.test_multiple_resident_flags_or_a_missing_selection_are_rejected) ... ok
+test_no_parallel_selection_keeps_all_llms_serial (test_resident_selection.ResidentSelection.test_no_parallel_selection_keeps_all_llms_serial) ... ok
+test_cached_complete_model_needs_no_second_copy_and_no_weight_read (test_storage_probe.StorageProbe.test_cached_complete_model_needs_no_second_copy_and_no_weight_read) ... ok
+test_changed_checksum_and_escaping_paths_cannot_reuse_an_existing_proof (test_storage_probe.StorageProbe.test_changed_checksum_and_escaping_paths_cannot_reuse_an_existing_proof) ... ok
+test_corrupt_cache_is_conservative_and_force_requires_source_staging (test_storage_probe.StorageProbe.test_corrupt_cache_is_conservative_and_force_requires_source_staging) ... ok
+test_partial_copy_only_requires_remaining_growth (test_storage_probe.StorageProbe.test_partial_copy_only_requires_remaining_growth) ... ok
+test_runtime_reserve_eligibility_requires_every_prepared_component (test_storage_probe.StorageProbe.test_runtime_reserve_eligibility_requires_every_prepared_component) ... ok
+test_same_size_change_with_restored_mtime_invalidates_proof (test_storage_probe.StorageProbe.test_same_size_change_with_restored_mtime_invalidates_proof) ... ok
+test_same_size_without_proof_still_reserves_a_replacement (test_storage_probe.StorageProbe.test_same_size_without_proof_still_reserves_a_replacement) ... ok
+test_checkpoint_maps_to_cpu_and_loader_is_restored_after_transfer (test_windows_server.MappedWhisper.test_checkpoint_maps_to_cpu_and_loader_is_restored_after_transfer) ... ok
+test_archive_has_only_required_audio_assets_and_pinned_model_revisions (test_windows_server.ModelImport.test_archive_has_only_required_audio_assets_and_pinned_model_revisions) ... ok
+test_config_rejects_changed_gpu_and_unproven_27b_low_ram_cache (test_windows_server.ModelImport.test_config_rejects_changed_gpu_and_unproven_27b_low_ram_cache) ... ok
+test_git_blob_sha1_and_sha256_detect_same_size_corruption (test_windows_server.ModelImport.test_git_blob_sha1_and_sha256_detect_same_size_corruption) ... ok
+test_stale_wsl_memory_limit_is_rejected_before_models_start (test_windows_server.ModelImport.test_stale_wsl_memory_limit_is_rejected_before_models_start) ... ok
+test_27b_serial_restores_parallel_default_after_success (test_windows_server.ServerModes.test_27b_serial_restores_parallel_default_after_success) ... ok
+test_failed_27b_falls_back_only_to_installed_9b_and_recovers (test_windows_server.ServerModes.test_failed_27b_falls_back_only_to_installed_9b_and_recovers) ... ok
+test_parallel_q6_keeps_audio_loaded_during_llm_request (test_windows_server.ServerModes.test_parallel_q6_keeps_audio_loaded_during_llm_request) ... ok
+test_q6_parallel_refuses_16gib_full_gpu_and_27b_has_no_parallel_profile (test_windows_server.ServerModes.test_q6_parallel_refuses_16gib_full_gpu_and_27b_has_no_parallel_profile) ... ok
+
+======================================================================
+FAIL: test_default_request_and_parallel_resident_are_independent (test_resident_selection.ResidentSelection.test_default_request_and_parallel_resident_are_independent)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/thomas/Codex/8+16gb/kienzledoku-server-installer-windows/tests/test_resident_selection.py", line 35, in test_default_request_and_parallel_resident_are_independent
+    self.assertEqual({'asr':True,'diar':True,'llm':'gruendlich'},r.loaded)
+AssertionError: {'asr': True, 'diar': True, 'llm': 'gruendlich'} != {'asr': True, 'diar': True, 'llm': None}
+- {'asr': True, 'diar': True, 'llm': 'gruendlich'}
+?                                    ^^^^ -------
+
++ {'asr': True, 'diar': True, 'llm': None}
+?                                    ^^^
+
+
+----------------------------------------------------------------------
+Ran 83 tests in 9.572s
+
+FAILED (failures=1)

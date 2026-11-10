@@ -1,0 +1,34 @@
+{
+  "model_metadata": [
+    {
+      "repository": "bartowski/Qwen_Qwen3.5-9B-GGUF",
+      "revision": "2dcd842c59ea5eb119267064550a7a4c592b16c3",
+      "matches": true
+    },
+    {
+      "repository": "bartowski/Qwen_Qwen3.5-9B-GGUF",
+      "revision": "2dcd842c59ea5eb119267064550a7a4c592b16c3",
+      "matches": true
+    },
+    {
+      "repository": "unsloth/Qwen3.8-27B-GGUF",
+      "revision": "4ca720788d1e01f1bff70c033e0d0028fd02e502",
+      "matches": true
+    }
+  ],
+  "whisper_wheel": {
+    "sha256": "f11ff4c74f3efe11d09b50a08cfd6c33ed74fed4a397429d70254ada3feeeda6",
+    "original_source_verified": true,
+    "final_endpoint_hash_verified": true,
+    "worker_hook_compiles": true
+  },
+  "pyannote_worker": {
+    "original_source_verified": true,
+    "worker_hook_compiles": true
+  },
+  "ubuntu": {
+    "url": "https://releases.ubuntu.com/24.04.5/ubuntu-24.04.5-wsl-amd64.wsl",
+    "http_status": 200,
+    "bytes": "388975696"
+  }
+}

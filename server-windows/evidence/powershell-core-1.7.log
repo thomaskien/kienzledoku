@@ -1,0 +1,13 @@
+PASS Installer version comes from the central VERSION file
+PASS UNC model archives are network paths and the local temp directory is local
+PASS Private file ACL uses direct DACL persistence and access-only reads, no audit provider
+PASS Automatic GPU profiles and unsupported resident 27B
+PASS Serial GPU checks and low memory audio policy
+PASS WSL limit above 50 percent preserves unrelated settings and sections
+PASS Required files include audio and only selected LLMs
+PASS Native process invocation preserves spaces, quotes, Unicode and stderr without false failure
+PASS Local SSD-style import with Unicode and spaces verifies Git blob hashes
+PASS Path traversal and absolute imported model paths are refused
+PASS Interrupted download is shown as incomplete at startup
+PASS A complete partial file is recovered without any network request
+All 12 core cases passed; all PowerShell sources parse.

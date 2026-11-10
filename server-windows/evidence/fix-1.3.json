@@ -1,0 +1,16 @@
+{
+  "version": "1.3",
+  "observed": "Even wsl --version in 1.2 produced the no-installed-distributions error, so its readiness check could not pass.",
+  "root_cause": "Invoke-Native quoted every argument. WslClient.cpp WslMain uses helpers::ParseArgument with default HandleQuotes=false and compares raw tokens to management switches. The token containing quotes around --version does not equal --version and falls through to Linux command launch, which requires a default distro.",
+  "fix": "Central command-line builder leaves nonempty arguments without whitespace/quotes unchanged and quotes/escapes only arguments requiring it. Both management and --exec calls use the corrected builder. Resolve the native Windows system wsl.exe explicitly and log management calls plus installer version/bitness.",
+  "source_confirmation": [
+    "https://github.com/microsoft/WSL/blob/master/src/windows/common/helpers.cpp",
+    "https://github.com/microsoft/WSL/blob/master/src/windows/common/helpers.hpp",
+    "https://github.com/microsoft/WSL/blob/master/src/windows/common/WslClient.cpp"
+  ],
+  "tests": {"powershell_core_passed":12,"json_51_compatibility_passed":4,"wsl_bootstrap_simulation_passed":9,"upstream_cpp_parser_compatibility_passed":9,"previous_quoting_failure_reproduced":true,"actual_generated_command_lines_checked":true,"real_child_process_argument_roundtrip_including_empty_and_quoted_values":true},
+  "windows_runtime_tested": false,
+  "full_wsl_cuda_gpu_tested": false,
+  "models_changed": false,
+  "important_limit": "The upstream parser body is compiled and run on Linux. This verifies the root-cause/fix compatibility but does not execute the complete Windows WSL runtime."
+}
