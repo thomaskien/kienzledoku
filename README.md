@@ -7,7 +7,9 @@ Windows, macOS oder Linux. Der Commander nimmt ASR-, Sprechertrennungs- und
 LLM-Aufträge unter einer gemeinsamen Adresse an und steuert die Modellwechsel.
 Client und Server können auf demselben Rechner oder getrennt im Praxisnetz laufen.
 
-[Video: Lokaler KI-Dokumentationsassistent für T2med](https://www.youtube.com/watch?v=6l1U047NSwg)
+[![Video: Lokaler KI-Dokumentationsassistent für die Arztpraxis mit T2med](https://img.youtube.com/vi/6l1U047NSwg/maxresdefault.jpg)](https://www.youtube.com/watch?v=6l1U047NSwg)
+
+**Video:** [Lokaler KI-Dokumentationsassistent für T2med](https://www.youtube.com/watch?v=6l1U047NSwg)
 
 **Entwicklungsstand vom 10.11.2026:** Die Commander-Anbindung ist mit der
 bestehenden Record-1.3.3-/Connect-Oberfläche zusammengeführt. Der Linux-Servercode
@@ -116,17 +118,49 @@ Direktbetrieb als Entwickler-Override möglich.
 
 ## T2med einrichten und verwenden
 
-In T2med unter **Drittanbieter-Zugriffe verwalten** die URL hinterlegen und
-einem Knopf in der Menüleiste zuordnen. Die Bezeichnung lautet
-**kienzledoku record**. Für Connect:
+### Drittanbieter-Zugriff einrichten
 
-```text
-kienzledoku://record?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}
-```
+Nach der Client-Installation wird kienzledoku record in T2med als
+Drittanbieter-URL hinterlegt. Die Darstellung kann je nach T2med-Version
+geringfügig abweichen.
 
-Für direkten Aufruf das Schema durch `kienzledoku-record://record` ersetzen.
+1. In der T2med-Suche `dritt` eingeben und
+   **Drittanbieter-Zugriffe verwalten** öffnen.
+
+   ![T2med-Suche nach der Verwaltung von Drittanbieter-Zugriffen](docs/images/t2med-drittanbieter-suche.png)
+
+2. Für den derzeit verwendeten Demo-Key **T2med - Demo** auswählen und über
+   das Stiftsymbol bearbeiten.
+3. Eine neue URL hinzufügen. Für den Aufruf über **Connect** diese vollständige
+   Zeile kopieren und unverändert einfügen:
+
+   ```text
+   kienzledoku://record?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}
+   ```
+
+   Bei ausdrücklich gewähltem **Direktbetrieb** stattdessen diese URL verwenden:
+
+   ```text
+   kienzledoku-record://record?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}
+   ```
+
+4. Als Bezeichnung **kienzledoku record** eintragen.
+5. Den URL-Eintrag und anschließend den Drittanbieterzugriff jeweils mit dem
+   Häkchen speichern. Der Eintrag sollte danach als aktiv angezeigt werden.
+
+   ![T2med-Drittanbieter-URL für Kienzledoku eintragen](docs/images/t2med-drittanbieter-url.png)
+
+   Der Screenshot zeigt einen älteren Eintrag mit der Bezeichnung `Whisper7`
+   und einer alten URL. Bitte die passende aktuelle URL aus Schritt 3 verwenden.
+
+6. Einen **Knopf in der Menüleiste einrichten** und ihm den soeben angelegten
+   Drittanbieter-Eintrag **kienzledoku record** zuweisen. Damit wird Record für
+   den aktuell geöffneten Patienten gestartet.
+
 Alte Einträge mit `kienzledoku://?…` müssen beim Wechsel zum Connect-Starter
 auf das neue Muster aktualisiert werden. T2med ersetzt die Platzhalter selbst.
+
+### Aufnahme und Übernahme
 
 1. Testpatient öffnen und Record starten; Patientennamen prüfen.
 2. Aufnahme stoppen, Transkript und alle Dokumentationsfelder prüfen/korrigieren.
