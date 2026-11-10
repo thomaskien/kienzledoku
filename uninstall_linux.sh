@@ -25,12 +25,12 @@ if [ -f "$APPARMOR_PROFILE_PATH" ] || [ -e "$SYSTEM_HELPER_PATH" ]; then
 fi
 
 rm -rf -- "$DATA_DIR"
-rm -rf -- "$CONFIG_DIR"
+# Einstellungen und offene Wiederherstellung bleiben erhalten.
 rm -f -- "$LAUNCHER_PATH" "$DESKTOP_PATH"
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$DATA_HOME/applications"
 fi
 
-echo "Kienzledoku wurde entfernt."
+echo "kienzledoku record wurde entfernt."
 echo "Diagnoseprotokoll und ein eventuell gespeicherter API-Key bleiben absichtlich erhalten."
 echo "Den API-Key entfernt ./use_demo_key_linux.sh."

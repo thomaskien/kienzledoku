@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.20)
+project(KienzledokuRecord LANGUAGES CXX RC)
+if(NOT WIN32 OR NOT MSVC)
+  message(FATAL_ERROR "Use Windows with Visual Studio C++ Build Tools")
+endif()
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set(WEBVIEW2_SDK "" CACHE PATH "Extracted Microsoft.Web.WebView2 NuGet package")
+if(NOT EXISTS "${WEBVIEW2_SDK}/build/native/include/WebView2.h")
+  message(FATAL_ERROR "WEBVIEW2_SDK must point to extracted NuGet package")
+endif()
+add_executable(kienzledoku_window WIN32 KienzledokuWindow.cpp window.rc)
+target_include_directories(kienzledoku_window PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${WEBVIEW2_SDK}/build/native/include")
+target_compile_options(kienzledoku_window PRIVATE /W4 /utf-8)
+target_link_libraries(kienzledoku_window PRIVATE
+  "${WEBVIEW2_SDK}/build/native/x64/WebView2LoaderStatic.lib"
+  user32 ole32 oleaut32 shell32 shlwapi advapi32 version wtsapi32)

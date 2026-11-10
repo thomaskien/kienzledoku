@@ -1,0 +1,28 @@
+# Nur technische Einstellungen; keine API-Keys, OAuth- oder Patientendaten.
+[connection]
+mode = "connect"
+target = "https://127.0.0.1:16567/aps/fhir/api/r4"
+ca_file = ""
+allow_insecure_tls = false
+
+[commander]
+enabled = true
+url = "http://127.0.0.1:8185"
+token_env = "KIENZLEDOKU_COMMANDER_TOKEN"
+# Leer verwendet den über die Einstellungen gespeicherten privaten Zugang.
+token_file = ""
+request_timeout = 2400
+default_quality = "auto"
+
+# Diese Adressen bleiben für vorhandene Installationen mit deaktiviertem
+# Commander verfügbar.
+[services]
+asr = "http://127.0.0.1:8179"
+diarization = "http://127.0.0.1:8183"
+llm = "http://127.0.0.1:8080"
+
+[record]
+diarization = true
+microphone = ""
+output_mode = "structured"
+single_code = "KI"

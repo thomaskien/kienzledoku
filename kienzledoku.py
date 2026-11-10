@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Kienzledoku 1.3.1 <-> T2med FHIR client.
+"""kienzledoku record 1.3.3 <-> T2med FHIR client.
 
-Target: Python 3.9+ (macOS 10.14+ and Ubuntu 24.04 LTS).
-No third-party Python packages required.
+Target: Python 3.9+ (macOS, Ubuntu 24.04 LTS) and bundled Python 3.12 (Windows).
+Platform-independent FHIR/UI core with optional compiled Connect transport.
 
 Security model inherited from the confirmed T2med v0.1.2 round-trip:
 - accepts only loopback and the T2med FHIR host selected during installation
@@ -33,6 +33,11 @@ import urllib.request
 import webbrowser
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+import kienzledoku_config as record_config
+from kienzledoku_connect import ConnectProxy
+from kienzledoku_http import SecureLocalHandler, configure_server
+from kienzledoku_session import Recovery, acquire as acquire_record_session, session_dir, register_window, unregister_window
 
 from kienzledoku_document import (
     DOCUMENT_FIELDS,
@@ -56,8 +61,8 @@ from kienzledoku_speech import (
     SpeechRecognitionManager,
 )
 
-APP_NAME = "Kienzledoku"
-VERSION = "1.3.1"
+APP_NAME = "kienzledoku record"
+VERSION = "1.3.3"
 LINUX_NATIVE_WINDOW_PATH = "/usr/local/libexec/kienzledoku/kienzledoku_window_linux"
 
 # Public test/demo key from T2med's reference application (not a secret).
@@ -87,6 +92,10 @@ else:
     LOG_PATH = os.path.expanduser("~/.kienzledoku/kienzledoku.log")
     SERVICE_CONFIG_PATH = os.path.expanduser("~/.kienzledoku/config.json")
     INSTALLER_NAME = "den Plattform-Installer"
+SERVICE_CONFIG_PATH = str(record_config.config_path())
+if sys.platform == 'win32':
+    LOG_PATH = str(record_config.config_dir() / 'record.log')
+    INSTALLER_NAME = 'den Windows-Installer'
 _LOG_LOCK = threading.Lock()
 _SESSION_LOCK_HANDLE = None
 
@@ -114,6 +123,10 @@ class FhirError(Exception):
         super(FhirError, self).__init__(message)
         self.status = status
         self.body = body
+
+
+class FhirTransactionRejected(FhirError):
+    """A complete T2med transaction outcome explicitly confirms rollback."""
 
 
 def safe_log(event, **fields):
@@ -162,8 +175,8 @@ def notify_start_failure():
         subprocess.run(
             [
                 "notify-send",
-                "--app-name=Kienzledoku",
-                "Kienzledoku konnte nicht gestartet werden",
+                "--app-name=kienzledoku record",
+                "kienzledoku record konnte nicht gestartet werden",
                 "Details stehen im geschützten Diagnoseprotokoll.",
             ],
             stdin=subprocess.DEVNULL,
@@ -242,6 +255,10 @@ def get_api_key():
         if env_key:
             return env_key, "Umgebungsvariable %s" % env_name
 
+    windows_key = record_config.read_windows_key()
+    if windows_key:
+        return windows_key, 'Windows-Zugangsdaten (DPAPI)'
+
     if sys.platform == "darwin":
         for service, label in (
             (KEYCHAIN_SERVICE, "macOS-Schlüsselbund"),
@@ -289,14 +306,23 @@ def parse_deep_link(url, config_path=None):
     parsed = urllib.parse.urlparse(url)
     if not parsed.scheme:
         raise ValueError("Deep Link hat kein URL-Schema")
-    if parsed.scheme.lower() not in ("kienzledoku", "t2demo", "whisperdoku"):
-        raise ValueError("Deep Link verwendet kein erlaubtes Kienzledoku-URL-Schema")
+    if parsed.scheme.lower() not in ("kienzledoku", "kienzledoku-record", "t2demo", "whisperdoku"):
+        raise ValueError("Deep Link verwendet kein erlaubtes kienzledoku record-URL-Schema")
+    if parsed.scheme.lower() == 'kienzledoku-record' and (parsed.netloc != 'record' or parsed.path not in ('', '/') or parsed.fragment):
+        raise ValueError('Direkter Aufruf benötigt kienzledoku-record://record')
 
     query = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
 
     def one(name):
         values = query.get(name, [])
-        return values[0].strip() if values else ""
+        if not values and name == "oAuthToken":
+            return ""
+        if len(values) != 1 or not values[0].strip():
+            raise ValueError('T2med-Aufruf benötigt genau einen Wert für ' + name)
+        value = values[0].strip()
+        if any(ord(char) < 32 for char in value):
+            raise ValueError('Ungültiger Kontextparameter')
+        return value
 
     context_id = one("kontextId")
     fhir_base_url = one("fhirBasisUrl")
@@ -321,6 +347,10 @@ def configured_fhir_hosts(config_path=None):
     """Return loopback plus the exact T2med FHIR host selected by the installer."""
     path = config_path or SERVICE_CONFIG_PATH
     hosts = set(LOOPBACK_FHIR_HOSTS)
+    if str(path).endswith('.toml'):
+        cfg = record_config.load(path)
+        hosts.add(urllib.parse.urlsplit(cfg['connection']['target']).hostname)
+        return hosts
     try:
         with open(path, "r", encoding="utf-8") as handle:
             configured = json.load(handle).get("t2med", {}).get("fhir_host", "")
@@ -334,12 +364,12 @@ def configured_fhir_hosts(config_path=None):
 def validate_local_fhir_url(url, config_path=None):
     parsed = urllib.parse.urlparse(url)
     if parsed.scheme.lower() != "https":
-        raise ValueError("Kienzledoku %s akzeptiert ausschließlich HTTPS-FHIR-URLs" % VERSION)
+        raise ValueError("kienzledoku record %s akzeptiert ausschließlich HTTPS-FHIR-URLs" % VERSION)
     host = (parsed.hostname or "").lower()
     allowed_hosts = configured_fhir_hosts(config_path=config_path)
     if host not in allowed_hosts:
         raise ValueError(
-            "Kienzledoku %s akzeptiert nur explizit freigegebene T2med-FHIR-Hosts. "
+            "kienzledoku record %s akzeptiert nur explizit freigegebene T2med-FHIR-Hosts. "
             "Erlaubt sind %s; erhalten: %s. Bitte %s erneut ausführen."
             % (
                 VERSION,
@@ -393,13 +423,30 @@ def operation_outcome_errors(obj):
 
 
 class T2medFhirClient(object):
-    def __init__(self, base_url, context_id, oauth_token, api_key):
+    def __init__(self, base_url, context_id, oauth_token, api_key, connection=None):
         validate_local_fhir_url(base_url)
         self.base_url = base_url.rstrip("/")
         self.context_id = context_id
         self.oauth_token = oauth_token or ""
         self.api_key = api_key
-        self.ssl_context = local_ssl_context()
+        self.proxy = None
+        if connection is not None:
+            candidate = record_config.defaults()
+            candidate['connection'] = connection
+            record_config.validate_target(base_url, candidate)
+        self.ssl_context = record_config.ssl_context(connection) if connection else local_ssl_context()
+        if connection and connection['mode'] == 'connect':
+            self.proxy = ConnectProxy(connection)
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):
+                return None
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect(), urllib.request.HTTPSHandler(context=self.ssl_context))
+
+    def close(self):
+        if self.proxy:
+            self.proxy.close()
+        self.oauth_token = ''
+        self.api_key = ''
 
     def _headers(self, content=False, patient_profile=False):
         headers = {
@@ -407,8 +454,10 @@ class T2medFhirClient(object):
             "Prefer": "return=OperationOutcome",
             "X-API-Key": self.api_key,
             "X-TreatWarningAsError": "true",
-            "User-Agent": "Kienzledoku/%s" % VERSION,
+            "User-Agent": "kienzledoku-record/%s" % VERSION,
         }
+        if self.proxy:
+            headers['X-Kienzledoku-Connect-Token'] = self.proxy.token
         if self.oauth_token:
             headers["Authorization"] = "Bearer " + self.oauth_token
         if content:
@@ -418,7 +467,7 @@ class T2medFhirClient(object):
         return headers
 
     def _request(self, method, path, body=None, patient_profile=False):
-        url = self.base_url + path
+        url = (self.proxy.url if self.proxy else self.base_url) + (path or "/" if self.proxy else path)
         resource = path.split("?", 1)[0] or "/"
         safe_log("FHIR request", method=method, resource=resource)
         data = None
@@ -432,7 +481,7 @@ class T2medFhirClient(object):
             method=method,
         )
         try:
-            with urllib.request.urlopen(req, context=self.ssl_context, timeout=15) as response:
+            with self.opener.open(req, timeout=60) as response:
                 raw = response.read().decode("utf-8", errors="replace")
                 status = response.getcode()
         except urllib.error.HTTPError as exc:
@@ -450,11 +499,11 @@ class T2medFhirClient(object):
                 msg += ": " + raw[:500]
             raise FhirError(msg, status=exc.code, body=obj)
         except urllib.error.URLError as exc:
-            safe_log("FHIR connection error", method=method, resource=resource, error=str(exc.reason))
-            raise FhirError("FHIR-Verbindung fehlgeschlagen: %s" % exc.reason)
+            safe_log("FHIR connection error", method=method, resource=resource, error=type(exc.reason).__name__)
+            raise FhirError("FHIR-Verbindung fehlgeschlagen. Ziel und Zertifikat prüfen.") from None
         except Exception as exc:
             safe_log("FHIR call error", method=method, resource=resource, error=type(exc).__name__)
-            raise FhirError("FHIR-Aufruf fehlgeschlagen: %s" % exc)
+            raise FhirError("FHIR-Antwort fehlt oder ist ungültig. Schreibausgang gegebenenfalls in T2med prüfen.") from None
 
         safe_log("FHIR response", method=method, resource=resource, status=status)
         if not raw:
@@ -601,7 +650,9 @@ def validate_transaction_response(obj, labels):
     if obj.get("type") != "transaction-response":
         raise FhirError("FHIR-Antwort ist kein transaction-response Bundle", body=obj)
 
-    entries = obj.get("entry", []) or []
+    entries = obj.get("entry", [])
+    if not isinstance(entries, list):
+        raise FhirError("FHIR-Transaction enthält keine gültige Ergebnisliste", body=obj)
     if len(entries) != len(labels):
         raise FhirError(
             "FHIR-Transaction meldet %d statt %d Ergebnissen" % (len(entries), len(labels)),
@@ -609,6 +660,8 @@ def validate_transaction_response(obj, labels):
         )
 
     failures = []
+    rollback_confirmed = False
+    malformed_status = False
     for index, label in enumerate(labels):
         entry = entries[index] if isinstance(entries[index], dict) else {}
         response = entry.get("response", {}) if isinstance(entry, dict) else {}
@@ -619,17 +672,27 @@ def validate_transaction_response(obj, labels):
             status_code = int(raw_status.split()[0])
         except Exception:
             status_code = 0
+        if not 100 <= status_code <= 599:
+            malformed_status = True
         outcome_errors = operation_outcome_errors(response.get("outcome"))
+        # T2med's integration guide explicitly guarantees whole-transaction
+        # rollback for error/fatal entry outcomes. Other failures stay uncertain.
+        if outcome_errors:
+            rollback_confirmed = True
         if status_code < 200 or status_code >= 300 or outcome_errors:
             detail = "; ".join(outcome_errors) or raw_status or "Status fehlt"
             failures.append("%s: %s" % (label, detail))
 
     if failures:
-        raise FhirError(
-            "FHIR-Transaction nicht übernommen; T2med hat den Gesamtvorgang zurückgerollt: %s"
-            % " | ".join(failures),
-            body=obj,
-        )
+        detail = " | ".join(failures)
+        if rollback_confirmed and not malformed_status:
+            message = "Nicht gespeichert: T2med hat die gesamte Transaktion zurückgerollt. " + detail
+            if any('behandlungsort' in error.lower() and 'nicht gesetzt' in error.lower()
+                   for error in failures):
+                message += (" Bitte in T2med den Behandlungsort für den Aufruf prüfen. "
+                            "Der Ort gehört zum T2med-Kontext; Record legt ihn nicht selbst fest.")
+            raise FhirTransactionRejected(message, body=obj)
+        raise FhirError("FHIR-Transaction nicht bestätigt; Schreibausgang in T2med prüfen: " + detail, body=obj)
     return True
 
 
@@ -715,7 +778,14 @@ class SessionState(object):
         self.client = client
         self.key_source = key_source
         self.csrf = secrets.token_urlsafe(24)
+        self.write_uncertain = False
+        self.recovery = None
+        self.recovery_pending = False
+        self.closing = False
         self.patient = None
+        self.patient_error = ""
+        self.patient_loading = False
+        self.initial_work_started = False
         self.encounter = None
         self.message = ""
         self.error = ""
@@ -732,11 +802,62 @@ class SessionState(object):
             urllib.parse.urlparse(link_data.get("fhir_base_url", "")).hostname
             or "unbekannt"
         )
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.last_activity = time.time()
 
     def touch(self):
         self.last_activity = time.time()
+
+
+def start_patient_load(state):
+    """Read context in the background so microphone controls stay responsive."""
+    with state.lock:
+        if state.closing or state.patient_loading:
+            return
+        state.patient_loading = True
+        state.patient_error = ""
+        state.t2med_status = "checking"
+        state.t2med_message = "T2med-Verbindung wird geprüft."
+
+    def load_patient():
+        try:
+            patient = state.client.get_patient_by_context()
+            with state.lock:
+                if not state.closing:
+                    state.patient = patient
+                    state.t2med_status = "ok"
+                    state.t2med_message = "T2med-FHIR erreichbar."
+            safe_log("Patient load OK")
+        except Exception as exc:
+            with state.lock:
+                if not state.closing:
+                    state.patient_error = str(exc)
+                    state.t2med_status = "error"
+                    state.t2med_message = "T2med-FHIR nicht erreichbar."
+            safe_log("Patient load failed", error=type(exc).__name__, status=getattr(exc, "status", ""))
+        finally:
+            with state.lock:
+                state.patient_loading = False
+
+    worker = threading.Thread(target=load_patient, name="Kienzledoku-Patient", daemon=True)
+    worker.start()
+    return worker
+
+
+def start_initial_work(state):
+    """Start each fresh recording once, independently of the FHIR read latency."""
+    with state.lock:
+        if state.initial_work_started or state.closing:
+            return
+        state.initial_work_started = True
+        if not state.recovery_pending:
+            try:
+                state.speech.start()
+                safe_log("Automatic speech recording started")
+            except Exception as exc:
+                state.error = "Spracherkennung konnte nicht automatisch starten: %s" % exc
+                safe_log("Automatic speech recording failed", error=type(exc).__name__)
+    return start_patient_load(state)
 
 
 CSS = """
@@ -745,6 +866,7 @@ html, body { min-height:100%; }
 body { font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin:0; background:#f2f3f5; color:#1d1d1f; }
 main { max-width:1440px; margin:0 auto; padding:12px 18px 42px; }
 .primary-screen { min-height:calc(100vh - 24px); display:flex; flex-direction:column; gap:10px; }
+.record-heading { display:flex; gap:18px; align-items:center; } .record-heading>img { width:100px; height:100px; object-fit:contain; flex-shrink:0; } .record-heading>div { flex:1; min-width:0; }
 .topbar { display:flex; align-items:center; justify-content:space-between; gap:18px; min-height:38px; }
 h1 { display:flex; align-items:baseline; gap:9px; margin:0; white-space:nowrap; } h2 { font-size:17px; margin:0; }
 .brand-link { color:#1d1d1f; font-size:22px; font-weight:760; letter-spacing:-.025em; text-decoration:none; }
@@ -783,6 +905,8 @@ button { border:0; background:#0071e3; color:white; cursor:pointer; font-weight:
 button.secondary { background:#6e6e73; } button.subtle { background:#e8e8ed; color:#1d1d1f; }
 button:disabled { cursor:default; opacity:.45; }
 .button-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:9px; flex-wrap:nowrap; }
+.quality-control { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0; }
+.quality-control label { font-size:12px; font-weight:600; }
 .button-group { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; }
 .button-group button { white-space:nowrap; }
 .device-select { min-width:0; max-width:175px; }
@@ -826,6 +950,10 @@ def _server_badge(element_id, label, host, status, message):
 
 
 def page_html(state):
+    if state.recovery_pending:
+        same = state.recovery.previous.get('context_hash') == state.recovery.identity
+        restore = '<button name="do" value="recovery_restore">Offene Arbeit wiederherstellen</button>' if same else '<p>Ein anderer Patient war zuvor geöffnet. Zum Wiederherstellen bitte diesen Patienten erneut aus T2med aufrufen.</p>'
+        return '<!doctype html><html lang="de"><meta charset="utf-8"><title>kienzledoku record 1.3.3</title><style>%s</style><main><h1>Offene Arbeit vorhanden</h1><p>Vor einem neuen Vorgang muss die alte Arbeit wiederhergestellt oder ausdrücklich verworfen werden. Ein unklarer Schreibausgang ist zuvor in T2med zu prüfen.</p><form method="post" action="/action"><input type="hidden" name="csrf" value="%s">%s<button name="do" value="recovery_discard">Alte Arbeit ausdrücklich verwerfen</button></form></main></html>' % (CSS, html.escape(state.csrf), restore)
     patient = patient_summary(state.patient) if state.patient else None
     encounter = encounter_summary(state.encounter) if state.encounter else None
     speech = state.speech.snapshot() if state.speech is not None else {
@@ -855,6 +983,25 @@ def page_html(state):
     diarization_service = services.get("diarization") or {}
     llm_service = services.get("llm") or {}
 
+    quality_control = ""
+    if speech.get('commander_enabled'):
+        profiles = speech.get('quality_profiles') or []
+        selected_quality = speech.get('selected_quality') or 'auto'
+        default_profile = next((profile for profile in profiles if profile.get('default')), profiles[0] if profiles else None)
+        default_label = default_profile['label'] if default_profile else 'wird geprüft'
+        options = ['<option value="auto"%s>Standard (%s)</option>' % (
+            ' selected' if selected_quality == 'auto' else '', html.escape(default_label))]
+        for profile in profiles:
+            options.append('<option value="%s"%s>%s</option>' % (
+                html.escape(profile['id'], quote=True),
+                ' selected' if selected_quality == profile['id'] else '',
+                html.escape(profile['label'])))
+        quality_control = (
+            '<div class="quality-control"><label for="processing-quality">Verarbeitung</label>'
+            '<select id="processing-quality" name="quality" aria-label="Verarbeitungsqualität"%s>%s</select>'
+            '<span class="small">Wird erst nach dem Ende der Aufnahme angewendet.</span></div>'
+        ) % (' disabled' if not profiles else '', ''.join(options))
+
     status_notices = []
     if state.error:
         status_notices.append(
@@ -865,6 +1012,10 @@ def page_html(state):
         status_notices.append(
             '<div class="notice ok">%s</div>' % html.escape(state.message)
         )
+    if state.write_uncertain:
+        status_notices.append('<div class="notice warn">Schreibausgang unklar. Vor jeder Wiederholung in T2med prüfen.<form method="post" action="/action"><input type="hidden" name="csrf" value="%s"><button name="do" value="write_resolved">In T2med geprüft: Es wurde NICHT übernommen</button></form></div>' % html.escape(state.csrf))
+    if speech.get('commander_notice'):
+        status_notices.append('<div class="notice warn" role="status">%s</div>' % html.escape(speech['commander_notice']))
     status_notices = "".join(status_notices)
 
     patient_name = html.escape(patient["name"] if patient else "Patient wird geladen …")
@@ -890,6 +1041,15 @@ def page_html(state):
         )
     device_options = "".join(device_options)
 
+    requested_label = speech.get('requested_quality_label') or ''
+    used_label = speech.get('used_quality_label') or ''
+    if requested_label and used_label:
+        quality_result = 'Angefordert: %s · Erstellt mit: %s' % (requested_label, used_label)
+    elif used_label:
+        quality_result = 'Erstellt mit: ' + used_label
+    else:
+        quality_result = 'vollständig editierbar'
+
     elapsed = int(speech.get("elapsed_seconds") or 0)
     elapsed_text = "%02d:%02d" % (elapsed // 60, elapsed % 60) if elapsed else ""
     recording_dot = (
@@ -902,9 +1062,10 @@ def page_html(state):
             action = (
                 '<form method="post" action="/action">'
                 '<input type="hidden" name="csrf" value="{csrf}">'
+                '{quality_control}'
                 '<button type="submit" name="do" value="speech_stop">Aufnahme stoppen</button>'
                 '</form>'
-            ).format(csrf=html.escape(state.csrf))
+            ).format(csrf=html.escape(state.csrf), quality_control=quality_control)
             workspace_title = "Aufnahme läuft"
         else:
             action = '<span class="small">Bitte einen Moment warten …</span>'
@@ -919,7 +1080,7 @@ def page_html(state):
             </div>
             {action}
           </div>
-          <div class="small">Mikrofon: <span id="speech-device">{device}</span></div>
+          <div class="small">Mikrofon: <span id="speech-device">{device}</span> · Pegel: <span id="audio-level">0</span></div>
           <textarea id="live-transcript" class="live-text" readonly aria-label="Live-Transkript">{live_transcript}</textarea>
         </section>
         """.format(
@@ -963,6 +1124,7 @@ def page_html(state):
               <form method="post" action="/action">
                 <input type="hidden" name="csrf" value="{csrf}">
                 <textarea id="diarized-text" class="diarization" name="diarized_text" aria-label="Diarisiertes Gespräch">{diarized_text}</textarea>
+                {quality_control}
                 <div class="button-row">
                   <select id="audio-device" class="device-select" name="audio_device" aria-label="Mikrofon">{device_options}</select>
                   <div class="button-group">
@@ -973,7 +1135,7 @@ def page_html(state):
               </form>
             </div>
             <div class="panel">
-              <div class="panel-head"><h2>LLM-Dokumentation</h2><span class="small">vollständig editierbar</span></div>
+              <div class="panel-head"><h2>LLM-Dokumentation</h2><span class="small">{quality_result}</span></div>
               <form method="post" action="/action">
                 <input type="hidden" name="csrf" value="{csrf}">
                 <input type="hidden" name="do" value="write">
@@ -1000,6 +1162,8 @@ def page_html(state):
             csrf=html.escape(state.csrf),
             diarized_text=html.escape(speech.get("diarized_text") or ""),
             device_options=device_options,
+            quality_control=quality_control,
+            quality_result=html.escape(quality_result),
             continue_label=continue_label,
             regenerate_disabled=regenerate_disabled,
             documentation_fields=documentation_fields,
@@ -1042,15 +1206,15 @@ def page_html(state):
         </dl></section>
         <section><h2>T2med-Kontext</h2><dl>
           <dt>Kontext-ID</dt><dd><code>{context}</code></dd>
-          <dt>Patienten-ID</dt><dd><code>{patient_id}</code></dd>
-          <dt>Geschlecht (FHIR)</dt><dd>{gender}</dd>
+          <dt>Patienten-ID</dt><dd><code id="patient-id">{patient_id}</code></dd>
+          <dt>Geschlecht (FHIR)</dt><dd id="patient-gender">{gender}</dd>
         </dl><form method="post" action="/action"><input type="hidden" name="csrf" value="{csrf}">
           <button class="subtle" type="submit" name="do" value="patient">Patient neu laden</button></form></section>
         <section><h2>Behandlungsfall (FHIR Encounter)</h2>{encounter_details}
           <form method="post" action="/action"><input type="hidden" name="csrf" value="{csrf}">
           <button class="subtle" type="submit" name="do" value="encounter">Behandlungsfall laden</button></form></section>
       </div>
-      <p class="small">OAuth-Token wird nur im Arbeitsspeicher gehalten. Für das im Installer freigegebene APS-Ziel wird das lokale Zertifikat akzeptiert.</p>
+      <p class="small">OAuth-Token wird nur im Arbeitsspeicher gehalten. Die Zertifikatsprüfung folgt den T2med-Einstellungen.</p>
     </details>
     """.format(
         base=fhir_base,
@@ -1090,22 +1254,51 @@ def page_html(state):
 
     return """<!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kienzledoku {version}</title><style>{css}</style></head>
+<title>kienzledoku record {version}</title><style>{css}</style></head>
 <body><main>
   <div class="primary-screen">
-    <header class="topbar"><h1><a class="brand-link" href="https://kienzledoku.de" rel="noopener noreferrer">kienzledoku</a>
+    <div class="record-heading"><img src="/logo.svg" alt="kienzledoku record"><div><header class="topbar"><h1><a class="brand-link" href="https://kienzledoku.de" rel="noopener noreferrer">kienzledoku record</a>
       <span class="brand-byline">v{version} · von Dr. Thomas Kienzle</span></h1>
       <div class="server-row">{t2med_badge}{asr_badge}{diarization_badge}{llm_badge}</div></header>
-    <section class="patient-row"><div class="patient-name">{patient_name}</div>
-      <div class="patient-birth">Geburtsdatum: <strong>{birth_date}</strong></div></section>
+    <section class="patient-row"><div class="patient-name" id="patient-name">{patient_name}</div>
+      <div class="patient-birth">Geburtsdatum: <strong id="patient-birth">{birth_date}</strong></div></section></div></div>
+    <div class="notice err" id="patient-error" {patient_error_hidden}>{patient_error}</div>
     {status_notices}
     {workspace}
+    <form method="post" action="/action"><input type="hidden" name="csrf" value="{csrf}"><button class="subtle" name="do" value="close">Sichern und schließen</button> <button class="subtle" name="do" value="discard" onclick="return confirm('Aufnahme und Entwurf wirklich verwerfen? Unklare Übernahme zuvor in T2med prüfen.')">Vorgang verwerfen</button></form>
   </div>
   {technical}
 </main>
 <script>
 (function() {{
   const initialStatus = {initial_status};
+  const csrf = {csrf_json};
+  let draftTimer;
+  async function saveDraft() {{
+    const body = new URLSearchParams({{csrf:csrf, do:'draft'}});
+    for (const name of ['anamnese','befund','therapie','prozedere','diarized_text','output_mode','single_code']) {{
+      const field = document.querySelector('[name="'+name+'"]');
+      if (field) body.set(name, field.value);
+    }}
+    await fetch('/action', {{method:'POST', body}});
+  }}
+  document.addEventListener('input', () => {{clearTimeout(draftTimer); draftTimer=setTimeout(()=>saveDraft().catch(()=>{{}}),400);}});
+  document.addEventListener('submit', async event => {{
+    const action = event.submitter && event.submitter.value;
+    if (!['close','discard'].includes(action)) return;
+    event.preventDefault(); clearTimeout(draftTimer);
+    await saveDraft();
+    const response = await fetch('/action', {{method:'POST',body:new URLSearchParams({{csrf,do:action}})}});
+    if (response.ok) {{ if(window.chrome && window.chrome.webview) window.chrome.webview.postMessage('record-close'); else window.close(); }}
+  }});
+  async function closeRequested() {{
+    if (!confirm('Offene Arbeit sichern und Fenster schließen? Die Aufnahme wird beendet.')) return;
+    await saveDraft();
+    const response = await fetch('/action', {{method:'POST', body:new URLSearchParams({{csrf, do:'close'}})}});
+    if(response.ok) {{ if(window.chrome && window.chrome.webview) window.chrome.webview.postMessage('record-close'); else window.close(); }}
+  }}
+  window.addEventListener('kienzledoku-close-request', closeRequested);
+  window.addEventListener('kienzledoku-audio-interrupted', () => fetch('/action', {{method:'POST', body:new URLSearchParams({{csrf, do:'speech_stop'}})}}));
   const initialRevision = {initial_revision};
   function setServer(id, status, host) {{
     const badge = document.getElementById(id);
@@ -1132,11 +1325,36 @@ def page_html(state):
       if (live) live.value = data.live_transcript || '';
       const device = document.getElementById('speech-device');
       if (device) device.textContent = data.selected_device_name || 'System-Standardgerät';
+      const level = document.getElementById('audio-level'); if(level) level.textContent = String(data.audio_rms || 0);
       const services = data.services || {{}};
+      const quality = document.getElementById('processing-quality');
+      const profiles = data.quality_profiles || [];
+      const signature = JSON.stringify(profiles);
+      if (quality && profiles.length && quality.dataset.profiles !== signature && document.activeElement !== quality) {{
+        const chosen = quality.disabled ? (data.selected_quality || 'auto') : quality.value;
+        const defaultProfile = profiles.find(p => p.default) || profiles[0];
+        quality.textContent = '';
+        quality.add(new Option('Standard (' + defaultProfile.label + ')', 'auto'));
+        profiles.forEach(p => quality.add(new Option(p.label, p.id)));
+        quality.value = [...quality.options].some(option => option.value === chosen) ? chosen : 'auto';
+        quality.disabled = false;
+        quality.dataset.profiles = signature;
+      }}
       setServer('asr-server', (services.asr || {{}}).status || 'checking', (services.asr || {{}}).host || '');
       setServer('diarization-server', (services.diarization || {{}}).status || 'checking', (services.diarization || {{}}).host || '');
       setServer('llm-server', (services.llm || {{}}).status || 'checking', (services.llm || {{}}).host || '');
       setServer('t2med-server', data.t2med_status || 'checking', data.t2med_host || '');
+      const patient = data.patient || {{}};
+      for (const [id, value] of Object.entries({{
+        'patient-name': patient.name || 'Patient wird geladen …',
+        'patient-birth': data.patient_birth || '—',
+        'patient-id': patient.id || '—',
+        'patient-gender': patient.gender || '—',
+      }})) document.getElementById(id).textContent = value;
+      const patientError = document.getElementById('patient-error');
+      patientError.textContent = data.patient_error || '';
+      patientError.hidden = !data.patient_error;
+      document.getElementById('t2med-server').title = data.t2med_message || '';
     }} catch (_error) {{}}
   }}
   window.setInterval(updateStatus, 500);
@@ -1153,15 +1371,19 @@ def page_html(state):
         status_notices=status_notices,
         workspace=workspace,
         technical=technical,
+        csrf=html.escape(state.csrf),
+        csrf_json=json.dumps(state.csrf),
         initial_status=json.dumps(speech["status"]),
         initial_revision=int(state.document_revision),
+        patient_error=html.escape(state.patient_error),
+        patient_error_hidden='' if state.patient_error else 'hidden',
     )
 
 
 def close_page_html():
     return """<!doctype html><html lang="de"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Kienzledoku {version}</title><style>{css}</style></head>
+<title>kienzledoku record {version}</title><style>{css}</style></head>
 <body><main><div class="card"><h1>Dokumentation übernommen</h1>
 <p class="ok">Die Dokumentation wurde in T2med gespeichert. Dieses Fenster wird geschlossen.</p>
 <button type="button" onclick="window.close()">Fenster schließen</button>
@@ -1180,27 +1402,42 @@ def open_ui_window(url, script_dir):
         if not (os.path.isfile(helper) and os.access(helper, os.X_OK)):
             # Source-tree fallback for development outside an installed client.
             helper = os.path.join(script_dir, "kienzledoku_window_linux")
+    elif sys.platform == 'win32':
+        helper = os.path.join(script_dir, 'kienzledoku_window.exe')
     else:
         helper = ""
 
     if helper and os.path.isfile(helper) and os.access(helper, os.X_OK):
-        command = [helper, url]
-        icon_path = os.path.expanduser(
-            "~/Applications/Kienzledoku.app/Contents/Resources/applet.icns"
-        )
+        command = [helper, '--url-stdin']
+        icon_path = os.path.join(script_dir, 'assets', 'kienzledoku-record.icns')
+        if sys.platform == 'win32':
+            profile = tempfile.mkdtemp(prefix='webview-', dir=str(session_dir()))
+            command.extend([profile, os.path.join(script_dir, 'assets', 'kienzledoku-record.ico')])
         if sys.platform == "darwin" and os.path.isfile(icon_path):
             command.append(icon_path)
         process = subprocess.Popen(
             command,
-            stdin=subprocess.DEVNULL,
+            stdin=subprocess.PIPE,
             stdout=subprocess.DEVNULL,
             # Inherit the launcher's protected log descriptor. Native GTK,
             # WebKit and bubblewrap failures must remain diagnosable.
             start_new_session=True,
         )
-        return process, (
-            "native-webkit" if sys.platform == "darwin" else "native-webkitgtk"
-        )
+        # The UI capability must not be readable in another user's process list.
+        try:
+            process.stdin.write((url + '\n').encode('utf-8'))
+            process.stdin.close()
+        except Exception:
+            process.terminate()
+            raise RuntimeError('Das Record-Fenster konnte nicht initialisiert werden') from None
+        if sys.platform == "win32":
+            process.record_profile = profile
+        return process, ('native-webview2' if sys.platform == 'win32' else
+                         'native-webkit' if sys.platform == 'darwin' else 'native-webkitgtk')
+    if sys.platform == 'win32':
+        raise RuntimeError('WebView2-Fenster fehlt. Bitte das vollständige Windows-Paket installieren.')
+    if sys.platform == 'darwin' or sys.platform.startswith('linux'):
+        raise RuntimeError('Natives Record-Fenster fehlt. Bitte den Plattform-Installer erneut ausführen.')
     opened = webbrowser.open(url, new=1, autoraise=True)
     return None, "browser" if opened else "none"
 
@@ -1225,8 +1462,8 @@ def close_ui_window(state):
 
 
 def make_handler(state):
-    class Handler(BaseHTTPRequestHandler):
-        server_version = "Kienzledoku/%s" % VERSION
+    class Handler(SecureLocalHandler, BaseHTTPRequestHandler):
+        server_version = "kienzledoku-record/%s" % VERSION
 
         def log_message(self, fmt, *args):
             # Never log URL/query/token. Keep test client quiet.
@@ -1254,8 +1491,15 @@ def make_handler(state):
             self.wfile.write(data)
 
         def do_GET(self):
+            if not self.authorize():
+                return
             state.touch()
             parsed = urllib.parse.urlparse(self.path)
+            if parsed.path == '/logo.svg':
+                data = Path(__file__).with_name('assets').joinpath('kienzledoku-record.svg').read_bytes()
+                self.send_response(200); self.send_header('Content-Type','image/svg+xml')
+                self.send_header('Content-Length',str(len(data))); self.end_headers(); self.wfile.write(data)
+                return
             if parsed.path == "/":
                 with state.lock:
                     self._send_html(page_html(state))
@@ -1269,18 +1513,25 @@ def make_handler(state):
                     snapshot["document_revision"] = state.document_revision
                     snapshot["t2med_status"] = state.t2med_status
                     snapshot["t2med_host"] = state.t2med_host
+                    snapshot["t2med_message"] = state.t2med_message
+                    snapshot["patient"] = patient_summary(state.patient) if state.patient else None
+                    snapshot["patient_birth"] = display_birth_date(snapshot["patient"]["birth_date"]) if state.patient else ""
+                    snapshot["patient_error"] = state.patient_error
                     self._send_json(snapshot)
                 return
             self._send_html("Nicht gefunden", 404)
 
         def do_POST(self):
+            if not self.authorize():
+                return
             state.touch()
             if urllib.parse.urlparse(self.path).path != "/action":
                 self._send_html("Nicht gefunden", 404)
                 return
-            length = int(self.headers.get("Content-Length", "0") or "0")
-            raw = self.rfile.read(min(length, 1024 * 1024)).decode("utf-8", errors="replace")
-            form = urllib.parse.parse_qs(raw, keep_blank_values=True)
+            try:
+                form = self.read_form()
+            except (ValueError, UnicodeError):
+                self.send_error(400); return
             csrf = (form.get("csrf") or [""])[0]
             if not secrets.compare_digest(csrf, state.csrf):
                 self._send_html("Ungültige Sitzung", 403)
@@ -1291,12 +1542,58 @@ def make_handler(state):
                 state.message = ""
                 state.error = ""
                 try:
-                    if action == "patient":
-                        state.patient = state.client.get_patient_by_context()
-                        p = patient_summary(state.patient)
-                        state.t2med_status = "ok"
-                        state.t2med_message = "T2med-FHIR erreichbar."
-                        state.message = "Patient geladen: %s" % p["name"]
+                    if state.completed_event.is_set() or state.closing:
+                        raise ValueError('Dieser Vorgang wird geschlossen')
+                    if state.recovery_pending:
+                        if action not in ('recovery_restore', 'recovery_discard'):
+                            raise ValueError('Zuerst offene Arbeit klären')
+                        old = state.recovery.previous
+                        if action == 'recovery_restore':
+                            if old.get('context_hash') != state.recovery.identity:
+                                raise ValueError('Wiederherstellung nur mit dem ursprünglichen T2med-Kontext')
+                            state.documentation = normalize_documentation(old['documentation'])
+                            state.speech.set_diarized_text(old.get('transcript',''))
+                            audio_path = Path(old.get('audio') or '/nonexistent')
+                            if audio_path.is_file() and session_dir().resolve() in audio_path.resolve().parents:
+                                state.speech.interrupted_audio = str(audio_path)
+                                state.speech.run_base_transcript = old.get('audio_base_transcript', '')
+                                state.speech.run_base_diarized = old.get('audio_base_diarized', '')
+                                state.message = 'Aufzeichnung war unterbrochen. Mit Aufnahme fortsetzen wird das gesicherte Audio erneut verarbeitet.'
+                            state.write_uncertain = old.get('write_uncertain', False)
+                            state.output_mode = old.get('output_mode', OUTPUT_MODE_STRUCTURED)
+                            state.single_code = old.get('single_code', DEFAULT_SINGLE_CODE)
+                        else:
+                            state.recovery.clear()
+                        state.recovery_pending = False
+                        state.recovery.save(state)
+                    elif action in ('draft', 'close', 'discard'):
+                        if action == 'draft':
+                            for field in DOCUMENT_FIELDS:
+                                if field in form:
+                                    state.documentation[field] = form[field][0]
+                            if 'diarized_text' in form and state.speech.status not in ACTIVE_STATUSES:
+                                state.speech.set_diarized_text(form['diarized_text'][0])
+                            if 'output_mode' in form:
+                                state.output_mode = normalize_output_mode(form['output_mode'][0])
+                            if 'single_code' in form:
+                                state.single_code = normalize_entry_code(form['single_code'][0])
+                        else:
+                            state.closing = True
+                            if state.speech.status == STATUS_RECORDING:
+                                state.speech.stop()
+                            state.close_discard = action == 'discard'
+                            state.completed_event.set()
+                        if state.recovery:
+                            state.recovery.save(state)
+                        self._send_json({'ok': True})
+                        return
+                    elif action == 'write_resolved':
+                        state.write_uncertain = False
+                        if state.recovery:
+                            state.recovery.save(state)
+                        state.message = 'Erneute Übertragung ist nach Ihrer Prüfung wieder möglich.'
+                    elif action == "patient":
+                        start_patient_load(state)
                     elif action == "encounter":
                         state.encounter = state.client.get_encounter()
                         state.message = "Behandlungsfall geladen."
@@ -1307,16 +1604,23 @@ def make_handler(state):
                         diarized_text = (form.get("diarized_text") or [""])[0]
                         state.speech.set_diarized_text(diarized_text)
                         state.speech.set_audio_device(audio_device)
+                        state.speech.set_quality((form.get('quality') or [None])[0])
                         state.speech.start()
                         state.message = ""
                     elif action == "speech_stop":
+                        state.speech.set_quality((form.get('quality') or [None])[0])
                         state.speech.stop()
                         state.message = ""
                     elif action == "llm_regenerate":
                         diarized_text = (form.get("diarized_text") or [""])[0]
+                        state.speech.set_quality((form.get('quality') or [None])[0])
                         state.speech.regenerate(diarized_text)
                         state.message = ""
                     elif action == "write":
+                        if state.write_uncertain:
+                            raise ValueError('Schreibausgang zuerst in T2med prüfen und unten ausdrücklich klären.')
+                        if state.speech.status in ACTIVE_STATUSES:
+                            raise ValueError('Zuerst Aufnahme und Verarbeitung abschließen.')
                         if state.patient is None:
                             raise ValueError("Bitte zuerst den Patienten laden/prüfen.")
                         incoming = {
@@ -1333,6 +1637,9 @@ def make_handler(state):
                         state.single_code = normalize_entry_code(
                             requested_code
                         )
+                        state.write_uncertain = True
+                        if state.recovery:
+                            state.recovery.save(state) # durable before sending anything
                         status, _obj, labels = state.client.write_documentation(
                             state.documentation, state.output_mode, state.single_code
                         )
@@ -1346,6 +1653,10 @@ def make_handler(state):
                             "Dokumentation atomar in T2med übernommen (HTTP %s): %s"
                             % (status, ", ".join(labels))
                         )
+                        state.write_uncertain = False
+                        state.write_succeeded = True
+                        if state.recovery:
+                            state.recovery.clear()
                         self._send_html(close_page_html())
                         close_ui_window(state)
                         state.completed_event.set()
@@ -1353,6 +1664,14 @@ def make_handler(state):
                     else:
                         raise ValueError("Unbekannte Aktion")
                 except Exception as exc:
+                    if action == "write" and isinstance(exc, FhirTransactionRejected):
+                        state.write_uncertain = False
+                        safe_log("Documentation transaction rejected", rollback="confirmed")
+                        if state.recovery:
+                            try:
+                                state.recovery.save(state)
+                            except Exception as save_error:
+                                safe_log("Rejected transaction recovery save failed", error=type(save_error).__name__)
                     if action == "patient":
                         state.t2med_status = "error"
                         state.t2med_message = "T2med-FHIR nicht erreichbar."
@@ -1366,9 +1685,10 @@ def make_handler(state):
 
 
 def run_session(deep_link, no_browser=False):
-    acquire_session_lock()
     safe_log("Python session start", **deep_link_metadata(deep_link))
     link = parse_deep_link(deep_link)
+    if not acquire_record_session(link):
+        return
     safe_log(
         "Deep link parsed",
         scheme=link.get("scheme", ""),
@@ -1376,15 +1696,25 @@ def run_session(deep_link, no_browser=False):
         fhir_host=urllib.parse.urlparse(link.get("fhir_base_url", "")).hostname or "",
         oauth_present="yes" if link.get("oauth_token") else "no",
     )
-    api_key, key_source = get_api_key()
+    cfg = record_config.load()
+    record_config.validate_target(link['fhir_base_url'], cfg)
+    api_key, key_source = (DEMO_API_KEY, 'Connect') if cfg['connection']['mode'] == 'connect' else get_api_key()
     safe_log("API key selected", source=key_source)
     client = T2medFhirClient(
-        link["fhir_base_url"], link["context_id"], link["oauth_token"], api_key
+        link["fhir_base_url"], link["context_id"], link["oauth_token"], api_key, connection=cfg["connection"]
     )
+    if client.proxy:
+        key_source = 'In Connect eingebetteter Key (Demo-Build)'
     state = SessionState(link, client, key_source)
+    state.output_mode = cfg['record']['output_mode']
+    state.single_code = cfg['record']['single_code']
+    state.recovery = Recovery(link)
+    state.recovery_pending = state.recovery.previous is not None
 
     def accept_speech_document(document):
         with state.lock:
+            if state.closing:
+                return
             state.documentation = normalize_documentation(document)
             state.document_revision += 1
             state.message = "Spracherkennung abgeschlossen; Dokumentation zur Prüfung übernommen."
@@ -1403,37 +1733,9 @@ def run_session(deep_link, no_browser=False):
     )
     state.speech.start_service_check()
 
-    # One initial read so the browser opens with the actual patient context visible.
-    try:
-        safe_log("Initial patient load start")
-        state.patient = client.get_patient_by_context()
-        p = patient_summary(state.patient)
-        state.t2med_status = "ok"
-        state.t2med_message = "T2med-FHIR erreichbar."
-        state.message = "T2med-Kontext erfolgreich geladen: %s" % p["name"]
-        safe_log("Initial patient load OK", patient_id_present="yes" if p.get("id") else "no")
-    except Exception as exc:
-        state.t2med_status = "error"
-        state.t2med_message = "T2med-FHIR nicht erreichbar."
-        state.error = str(exc)
-        safe_log(
-            "Initial patient load failed",
-            error=type(exc).__name__,
-            status=getattr(exc, "status", ""),
-        )
-
-    if state.patient is not None:
-        try:
-            state.speech.start()
-            state.message = ""
-            safe_log("Automatic speech recording started")
-        except Exception as exc:
-            state.error = "Spracherkennung konnte nicht automatisch starten: %s" % exc
-            safe_log("Automatic speech recording failed", error=type(exc).__name__)
-
     server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(state))
     port = server.server_address[1]
-    url = "http://127.0.0.1:%d/" % port
+    url = configure_server(server)
 
     thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.5})
     thread.daemon = True
@@ -1444,18 +1746,30 @@ def run_session(deep_link, no_browser=False):
             state.ui_process, window_kind = open_ui_window(
                 url, os.path.dirname(os.path.abspath(__file__))
             )
+            register_window(link, state.ui_process)
             safe_log("UI window open requested", window=window_kind, ui_port=port)
         except Exception as exc:
             safe_log("UI window open failed", error=type(exc).__name__, ui_port=port)
+            state.closing = True
+            state.speech.cancel()
+            if not state.recovery_pending:
+                state.recovery.save(state)
+            client.close()
+            server.shutdown(); server.server_close()
             raise
     else:
         safe_log("Browser suppressed", ui_port=port)
         print(url)
 
+    start_initial_work(state)
+
     # Keep one isolated session alive. Exit after 60 min absolute or 30 min idle.
     started = time.time()
     try:
         while not state.completed_event.wait(2):
+            with state.lock:
+                if not state.recovery_pending:
+                    state.recovery.save(state)
             if state.ui_process is not None:
                 window_status = state.ui_process.poll()
                 if window_status is not None:
@@ -1469,10 +1783,26 @@ def run_session(deep_link, no_browser=False):
         pass
     finally:
         if state.speech is not None:
+            state.closing = True
+            if state.speech.status == STATUS_RECORDING:
+                state.speech.stop()
+            if state.speech.thread and state.speech.thread.is_alive():
+                state.speech.thread.join(timeout=5)
+            if not state.recovery_pending and not getattr(state, 'write_succeeded', False):
+                state.recovery.save(state)
             state.speech.cancel()
+            if not state.recovery_pending and not getattr(state, "write_succeeded", False):
+                state.recovery.save(state)
+            if getattr(state, 'close_discard', False):
+                state.recovery.clear()
+        client.close()
         close_ui_window(state)
         server.shutdown()
         server.server_close()
+        unregister_window()
+        profile = getattr(state.ui_process, 'record_profile', None)
+        if profile:
+            shutil.rmtree(profile, ignore_errors=True)
 
 
 def self_test():
@@ -1579,11 +1909,11 @@ def self_test():
     except FhirError as exc:
         assert "zurückgerollt" in str(exc)
 
-    print("SELF-TEST OK - Kienzledoku %s (Python %s)" % (VERSION, sys.version.split()[0]))
+    print("SELF-TEST OK - kienzledoku record %s (Python %s)" % (VERSION, sys.version.split()[0]))
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Kienzledoku %s mit T2med FHIR" % VERSION)
+    parser = argparse.ArgumentParser(description="kienzledoku record %s mit T2med FHIR" % VERSION)
     deep_link_group = parser.add_mutually_exclusive_group()
     deep_link_group.add_argument(
         "--deep-link",
@@ -1596,6 +1926,10 @@ def main():
     )
     parser.add_argument("--no-browser", action="store_true", help="print local UI URL instead of opening browser")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument('--settings', action='store_true')
+    parser.add_argument('--setup', action='store_true', help='Server während der Installation abfragen')
+    parser.add_argument('--from-connect', action='store_true', help=argparse.SUPPRESS)
+    parser.add_argument('--import-config', metavar='TOML')
     args = parser.parse_args()
 
     safe_log(
@@ -1613,13 +1947,20 @@ def main():
     if args.self_test:
         self_test()
         return 0
+    if args.import_config:
+        record_config.save(record_config.load(args.import_config))
+        return 0
+    if args.setup or args.settings or not (args.deep_link or args.deep_link_stdin):
+        from kienzledoku_settings import run_settings
+        saved = run_settings(no_browser=args.no_browser, window_opener=open_ui_window, setup=args.setup)
+        return 1 if args.setup and not saved else 0
     deep_link = args.deep_link
     if args.deep_link_stdin:
         try:
             deep_link = read_deep_link_stdin()
         except Exception as exc:
             safe_log("Deep-link pipe read failed", error=type(exc).__name__)
-            print("Kienzledoku-Startfehler: %s" % exc, file=sys.stderr)
+            print("kienzledoku record: Startfehler: %s" % exc, file=sys.stderr)
             notify_start_failure()
             return 1
     if not deep_link:
@@ -1631,7 +1972,10 @@ def main():
     except Exception as exc:
         # Never print/log the deep-link itself: it may contain OAuth material.
         safe_log("Session failed", error=type(exc).__name__, status=getattr(exc, "status", ""))
-        print("Kienzledoku-Startfehler: %s" % exc, file=sys.stderr)
+        print("kienzledoku record: %s" % exc, file=sys.stderr)
+        if sys.platform == 'win32':
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.3.3', 0x10)
         notify_start_failure()
         return 1
 

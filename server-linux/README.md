@@ -1,5 +1,16 @@
 # Kienzledoku-KI-Dienste auf Ubuntu/NVIDIA
 
+## Gemeinsamer Einstieg über Commander
+
+Die [Commander-Erweiterung](commander/README.md) nimmt die Client-Aufträge auf
+Port `8185` entgegen und koordiniert ASR, Diarisierung und LLM einschließlich
+Modellwechseln. Die folgenden Abschnitte beschreiben die bisherige Installation
+der einzelnen Worker. Im Commander-Betrieb spricht Record den Commander an;
+die Worker bleiben dessen interne Dienste. Für Windows steht der unveränderte
+[Server-Installer 1.12](../server-windows/README.md) mit eigener WSL2-Laufzeit bereit.
+
+## Bestehende Worker-Installation
+
 Dieser Ordner enthält die Linux-Serverinstallation für einen Kienzledoku-Client
 auf einem anderen Rechner. Die Dienste laufen resident unter systemd:
 

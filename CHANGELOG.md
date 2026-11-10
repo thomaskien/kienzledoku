@@ -1,5 +1,82 @@
 # Änderungsprotokoll
 
+## Commander-Integration – 2026-11-10
+
+- Record 1.3.3 und Connect mit der bestehenden Commander-Anbindung zusammengeführt:
+  gemeinsame KI-Adresse, serverseitiger Modellkatalog und Verarbeitung nach
+  tatsächlichem Aufnahmeende und Abschluss der ASR-Blöcke.
+- Linux-Commander aus der Übergabe übernommen; seine installierten Quellen auf
+  dem bisherigen Server wurden vor der Integration per SHA-256 abgeglichen.
+- Windows-Server-Installer 1.12 einschließlich Quellen und fertiger Pakete
+  unverändert unter `server-windows/` übernommen. Der Benutzer bestätigt den
+  erfolgreichen Windows-Betrieb; historische Prüfberichte bleiben unverändert.
+- Neue Client-Konfigurationen verwenden Commander; bestehende Konfigurationen
+  und ihre ausdrücklich gewählte FHIR-Anbindung bleiben erhalten.
+- Keine Modelländerung, kein neuer Hersteller-Key und kein Server-Deployment.
+
+
+## Record 1.3.3 – 2026-09-27
+
+- UTF-8-Ausgabe im Aufnahmeprozess ausdrücklich gesetzt, auch für die isolierte
+  Windows-Python-Laufzeit, die Umgebungsvariablen ignoriert. Live-Umlaute und
+  Gerätenamen werden unverändert an die Oberfläche übertragen.
+- Neue Aufnahmen beginnen beim Öffnen; die T2med-Patientenabfrage läuft parallel
+  und blockiert die Aufnahmebedienung nicht. Patientendaten erscheinen ohne
+  Seitenneuladen. Wiederherstellung und manuell gestoppte Aufnahmen starten
+  nicht erneut automatisch. Ohne geladenen Patienten bleibt Schreiben gesperrt.
+- Windows-Setup fragt T2med-, ASR-, Sprechertrennungs- und LLM-Adressen samt
+  Betriebsart/Zertifikatsoptionen ab und wartet auf Speichern. Bestehende Werte
+  werden vorbelegt; Mikrofon, Ausgabeformat und eigene Keys bleiben erhalten.
+- Vollständig bestätigter FHIR-Transaktionsrollback wird als „Nicht gespeichert“
+  angezeigt und erzeugt keine widersprüchliche Unklarheitswarnung. Entwurf bleibt
+  erhalten. Fehlende/unvollständige Antworten sperren weiterhin Wiederholungen;
+  es gibt keinen automatischen Schreibversuch.
+- Plattformversionen und Installer auf 1.3.3 aktualisiert. Gemeinsame Korrekturen
+  gelten für Windows, macOS und Linux. Neue Prozess-, HTTP- und Browserprüfungen.
+
+## Record 1.3.2 – 2026-09-27
+
+- Einstellungsseite: Prozentzeichen in der CSS-Vorlage korrekt maskiert. Die
+  Seite wird wieder vollständig ausgeliefert; der durch den Formatierungsfehler
+  verursachte Abbruch mit `ERR_EMPTY_RESPONSE` entfällt.
+- Lokaler UI-Start: Eine kurze lokale HTML-Seite setzt das Sitzungscookie und
+  öffnet anschließend die Oberfläche. Die bisherige HTTP-Weiterleitung konnte
+  in Chromium bei einem externen Navigationskontext zu HTTP 403 führen.
+  `HttpOnly`, `SameSite=Strict`, Host-/Origin-Prüfung und CSRF bleiben aktiv.
+- Einstellungsformular verwendet `Referrer-Policy: same-origin`, damit Chromium
+  bei lokalen Formular-POSTs den korrekten Origin sendet. Die bisherige Richtlinie
+  führte zu `Origin: null` und damit ebenfalls HTTP 403 beim Speichern.
+- Neuer HTTP-Regressionstest für das tatsächliche Öffnen, Speichern und
+  Schließen der Einstellungen; optionaler echter Browser-Test für den Start aus
+  einem leeren Fenster und aus einem externen Navigationskontext.
+- Alle drei Plattform-Installer und Versionsanzeigen auf 1.3.2 angehoben.
+
+## Record 1.3.1 – 2026-09-27
+
+- Windows-Schlüsselabfrage prüft die Plattform vor jedem Profilzugriff; der
+  unter Windows fehlschlagende Linux-Schlüsselbundtest bleibt aktiv und besteht.
+- Connect meldet fehlende Record-Dateien und Laufzeit verständlich und verwendet
+  unter Windows keinen automatischen `python3`-PATH-Fallback mehr (Fehler 9009).
+- Versionsanzeigen, native Fenster, macOS-/Linux-Installer, Windows-Setup und
+  Auslieferungsdateien tragen 1.3.1. Die bisherigen 1.3-Pakete bleiben separat.
+- Windows-Log bestätigt den nativen Build und 34 der damaligen 35 Python-Tests;
+  die korrigierten Tests sind lokal geprüft. Vollständiger Windows-Durchlauf
+  einschließlich Setup steht noch aus.
+
+## 1.3 – kienzledoku record, Windows und Connect (in Vorbereitung)
+
+Die Versionsnummer 1.3 ist der ausdrücklich gewählte neue Produktstand nach
+1.3.1. Neuer Name und vorhandenes Record-Logo auf allen Plattformen.
+
+- Schlanker Go-Connect-Starter und authentifizierter HTTPS-Proxy, der sämtliche
+  eingehenden API-Keys ersetzt und FHIR/OAuth sowie Antworten durchreicht.
+- Expliziter Direktbetrieb bleibt unabhängig von Connect; zunächst Demo-Key.
+- Windows-WebView2-Fenster, gebündelte Python-Laufzeit und Build/Setup-Skripte.
+- macOS-/Linux-Installer für denselben Stand, TOML und grafische Einstellungen.
+- Native Mikrofonformate, stabile Gerätekennung, PCM-Konvertierung und Test.
+- Sitzungsweise Wiederherstellung und Sperre nach unklarem Schreibausgang.
+- Prüfung auf dem Mac; Windows-/RDP-Abnahme noch auszuführen.
+
 Alle wesentlichen Änderungen an Kienzledoku werden in diesem Dokument
 festgehalten. Das Format orientiert sich an
 [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).

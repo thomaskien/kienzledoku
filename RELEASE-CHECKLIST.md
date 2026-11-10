@@ -15,14 +15,23 @@ werden.
 - [ ] Private Schwachstellenmeldungen in GitHub unter `Security` aktivieren.
 - [ ] Sicherstellen, dass keine WAV-/Audio-, Transkript-, Token-, Schlüssel-,
   Zertifikats-, Konfigurations- oder Logdateien erfasst werden.
+  Ausnahme: die ausdrücklich öffentlichen localhost-Zertifikate unter `tests/fixtures`.
 - [ ] Screenshots nochmals auf Patienten-, Praxis- und Zugangsdaten prüfen.
 - [ ] Prüfen, dass alle Versionsangaben in Python, Installer, nativem Fenster
-  und Dokumentation auf `1.3.1` stehen.
+  und Dokumentation auf `1.3.3` stehen; historische Angaben bleiben erhalten.
 - [ ] Netzwerkfreie Tests ausführen.
 - [ ] Modellfreien Selbsttest des Local-AI-Installers ausführen.
 - [ ] Statischen Selbsttest des Ubuntu/NVIDIA-Installers ausführen.
 - [ ] Prüfen, dass Local-AI-Modellrevisionen und Prüfsummen unverändert sind.
 - [ ] Native Intel- und Apple-Silicon-Binärdatei prüfen.
+- [ ] Windows-Build mit `windows\build.cmd` auf x64 ausführen und ZIP/Setup prüfen.
+- [ ] Echter Browser-/WebView-Test: Einstellungen öffnen, Logo, Neuladen,
+  Speichern und Schließen prüfen; optional `tests/ui_startup_smoke.cjs` verwenden.
+- [ ] Windows-Mikrofon, WebView2, Taskleiste und Skalierung lokal abnehmen.
+- [ ] RDP gesondert prüfen: Audio-Umleitung, mehrere Anmeldesitzungen und Wiederaufnahme.
+- [ ] Direkt- und Connect-Betrieb samt Key-Ersetzung und erhaltenem OAuth prüfen.
+- [ ] Wiederherstellung, bewusstes Verwerfen und Sperre bei unklarem Write prüfen.
+- [ ] Updates mit vorhandener JSON/TOML-Konfiguration und eigenem Key prüfen.
 - [ ] Linux-Installer auf Ubuntu 24.04 x86_64 unter X11 und Wayland prüfen.
 - [ ] WebKitGTK-Fenster, kanonischen URL-Handler und Secret Service unter XFCE
   und GNOME prüfen.
@@ -101,9 +110,9 @@ reale Tokens dürfen nicht enthalten sein.
 
 ## Empfohlene Release-Angaben
 
-- Tag: `v1.3.1`
-- Titel: `Kienzledoku 1.3.1`
-- Plattform: Kienzledoku-Client für Ubuntu 24.04 x86_64 sowie macOS auf Intel
+- Tag: `record-v1.3.3` (nach Abnahme)
+- Titel: `kienzledoku record 1.3.3`
+- Plattform: kienzledoku record für Windows x64, Ubuntu 24.04 x86_64 sowie macOS auf Intel
   und Apple Silicon; Local AI für Apple Silicon mit mindestens 32 GB Unified
   Memory; Serverdienste für Ubuntu 24.04 x86_64 mit NVIDIA/CUDA
 - Status: Entwicklungs- und Integrationsstand

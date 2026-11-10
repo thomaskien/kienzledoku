@@ -1,5 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+#include <stdio.h>
+#include <string.h>
 
 @interface KienzledokuWindowDelegate : NSObject
 <NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate>
@@ -35,7 +37,7 @@
         styleMask:style
         backing:NSBackingStoreBuffered
         defer:NO];
-    self.window.title = @"Kienzledoku 1.3.1";
+    self.window.title = @"kienzledoku record 1.3.3";
     self.window.minSize = NSMakeSize(
         MIN(980.0, visible.size.width),
         MIN(700.0, visible.size.height));
@@ -51,7 +53,7 @@
     self.webView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     self.webView.navigationDelegate = self;
     self.webView.UIDelegate = self;
-    self.webView.customUserAgent = @"Kienzledoku-NativeWindow/1.3.1";
+    self.webView.customUserAgent = @"kienzledoku-record/1.3.3";
     [self.window.contentView addSubview:self.webView];
 
     if (self.iconPath.length > 0) {
@@ -89,7 +91,7 @@
     BOOL localHTTP =
         [url.scheme.lowercaseString isEqualToString:@"http"] &&
         [url.host isEqualToString:@"127.0.0.1"] &&
-        url.port != nil;
+        [url.port isEqual:self.startURL.port];
     BOOL harmlessInternal = [url.scheme.lowercaseString isEqualToString:@"about"];
     BOOL productWebsite =
         [url.scheme.lowercaseString isEqualToString:@"https"] &&
@@ -114,7 +116,10 @@ int main(int argc, const char *argv[]) {
             return 2;
         }
 
-        NSString *rawURL = [NSString stringWithUTF8String:argv[1]];
+        char privateURL[8192];
+        if (strcmp(argv[1], "--url-stdin") != 0 || !fgets(privateURL, sizeof(privateURL), stdin)) return 2;
+        privateURL[strcspn(privateURL, "\r\n")] = 0;
+        NSString *rawURL = [NSString stringWithUTF8String:privateURL];
         NSURL *url = [NSURL URLWithString:rawURL];
         BOOL valid =
             url != nil &&

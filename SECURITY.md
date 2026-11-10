@@ -4,11 +4,12 @@
 
 | Version | Sicherheitsupdates |
 | --- | --- |
-| 1.3.1 | Ja |
+| Record 1.3.3 | In Vorbereitung, lokale Abnahme |
+| Kienzledoku 1.3.1 (vor Record) | Historischer Vorgänger |
 | 1.3.0 | Nein |
 | 1.2.1 und älter | Nein |
 
-Kienzledoku 1.3.1 ist ein Entwicklungs- und Integrationsstand. Die bekannten
+kienzledoku record 1.3.3 ist ein Entwicklungs- und Integrationsstand. Die bekannten
 Einsatzgrenzen sind im Abschnitt
 [Sicherheitsgrenzen](README.md#sicherheitsgrenzen) der README beschrieben.
 

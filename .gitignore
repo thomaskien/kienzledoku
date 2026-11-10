@@ -17,8 +17,11 @@ transcripts/
 
 # Zugangsdaten und lokale Schlüsseldateien.
 *token*.txt
+*.token
 *secret*
 *.pem
+!tests/fixtures/localhost-cert.pem
+!tests/fixtures/localhost-key.pem
 *.key
 
 # Lokale Laufzeitkonfiguration und macOS-Metadaten.
@@ -37,3 +40,12 @@ models/
 
 # Der Linux-Fenstercontainer wird auf Ubuntu aus dem einsehbaren Quelltext gebaut.
 kienzledoku_window_linux
+
+# Local builds and private runtime state
+config.toml
+build/
+dist/
+kienzleconnect
+kienzleconnect.exe
+*.dpapi
+sessions/

@@ -44,9 +44,19 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
+from kienzledoku_commander_client import CommanderClient, FINALIZED_HEADER, direct_open
+
 SR = 16000
 CHANNELS = 1
 EVENT_PREFIX = 'KIENZLEDOKU_EVENT '
+
+
+def configure_output_encoding():
+    # The Windows embeddable runtime ignores PYTHONIOENCODING in isolated mode.
+    # Record reads this pipe as UTF-8, including live transcripts and device names.
+    for stream in (sys.stdout, sys.stderr):
+        if stream is not None and hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
 
 
 def emit_event(event_type, **fields):
@@ -317,21 +327,24 @@ def _multipart_final_block(wav_bytes, language, filename='block.wav'):
     return bytes(body), 'multipart/form-data; boundary=' + boundary
 
 
-def transcribe_final_block_http(url, wav_bytes, language, api_key=None, timeout=120.0):
+def transcribe_final_block_http(url, wav_bytes, language, api_key=None, timeout=120.0, commander=False):
     body, content_type = _multipart_final_block(wav_bytes, language)
     headers = {
         'Accept': 'application/json',
         'Content-Type': content_type,
-        'User-Agent': 'Kienzledoku-ASR/1.3.1',
+        'User-Agent': 'Kienzledoku-ASR/1.3.3',
     }
     if api_key:
         headers['Authorization'] = 'Bearer ' + api_key
 
     req = Request(url, data=body, headers=headers, method='POST')
     try:
-        with urlopen(req, timeout=timeout) as response:
+        opener = direct_open if commander else urlopen
+        with opener(req, timeout=timeout) as response:
             raw = response.read()
     except HTTPError as exc:
+        if commander:
+            raise RuntimeError('Commander-ASR fehlgeschlagen (HTTP %d). Audio wurde nicht vollständig transkribiert.' % exc.code) from None
         try:
             detail = exc.read().decode('utf-8', errors='replace')
         except Exception:
@@ -422,7 +435,8 @@ def http_json(url, method='GET', payload=None, api_key=None, timeout=120):
         return json.loads(response.read().decode('utf-8'))
 
 
-def diarize_wav(base_url, wav_path, min_speakers, max_speakers, num_speakers, timeout):
+def diarize_wav(base_url, wav_path, min_speakers, max_speakers, num_speakers,
+                timeout, api_key=None, recording_finalized=False, commander=False):
     params = {}
     if num_speakers is not None:
         params['num_speakers'] = int(num_speakers)
@@ -437,13 +451,19 @@ def diarize_wav(base_url, wav_path, min_speakers, max_speakers, num_speakers, ti
         url += '?' + urlencode(params)
 
     body = Path(wav_path).read_bytes()
+    headers = {'Content-Type': 'audio/wav', 'Accept': 'application/json'}
+    if api_key:
+        headers['Authorization'] = 'Bearer ' + api_key
+    if recording_finalized:
+        headers[FINALIZED_HEADER] = 'true'
     req = Request(
         url,
         data=body,
-        headers={'Content-Type': 'audio/wav', 'Accept': 'application/json'},
+        headers=headers,
         method='POST',
     )
-    with urlopen(req, timeout=timeout) as response:
+    opener = direct_open if commander else urlopen
+    with opener(req, timeout=timeout) as response:
         return json.loads(response.read().decode('utf-8'))
 
 
@@ -651,6 +671,7 @@ async def asr_worker(args, audio, queue, block_results, stats):
                 args.language,
                 args.asr_api_key,
                 args.asr_timeout,
+                bool(getattr(args, 'commander', None)),
             )
             client_elapsed = time.monotonic() - t0
 
@@ -759,6 +780,8 @@ def _run_payload(block_results, duration, final_wav_path, args, stats, diarizati
         'diarization': diarization,
         'speaker_transcript': speaker_text,
         'llm': llm,
+        'recording_finalized': bool(getattr(args, 'recording_finalized', False)),
+        'commander': getattr(args, 'commander_metadata', None),
     }
 
 
@@ -884,35 +907,19 @@ async def run_recording(args):
         except Exception as exc:
             raise RuntimeError('sounddevice fehlt für Mikrofonbetrieb: %s' % exc)
 
-        def callback(indata, frames, timing, status):
-            if status:
-                sys.stderr.write('\n[AUDIO] %s\n' % status)
-            audio.append(bytes(indata))
-
-        stream = sd.RawInputStream(
-            samplerate=SR,
-            blocksize=max(160, int(SR * args.audio_chunk_ms / 1000.0)),
-            device=device,
-            channels=CHANNELS,
-            dtype='int16',
-            callback=callback,
-        )
-        waiter = loop.run_in_executor(None, sys.stdin.readline)
+        from kienzledoku_audio import create_input
+        stream, audio_failure = create_input(sd, device, audio.append, emit_event, args.audio_chunk_ms)
+        waiter = loop.create_future()
+        def wait_for_stop():
+            sys.stdin.readline()
+            try:
+                loop.call_soon_threadsafe(lambda: None if waiter.done() else waiter.set_result(None))
+            except RuntimeError:
+                pass
+        threading.Thread(target=wait_for_stop, daemon=True).start()
         stream.start()
-        input_devices = []
-        for index, info in enumerate(sd.query_devices()):
-            if int(info.get('max_input_channels') or 0) > 0:
-                input_devices.append({'index': index, 'name': str(info.get('name') or index)})
-        selected_device = getattr(stream, 'device', None)
-        if isinstance(selected_device, (list, tuple)):
-            selected_device = selected_device[0]
-        emit_event(
-            'audio_devices',
-            devices=input_devices,
-            selected=selected_device,
-        )
 
-    print('\n=== Kienzledoku 1.3.1 Final-Block-ASR ===')
+    print('\n=== kienzledoku record 1.3.3 Final-Block-ASR ===')
     print('Final-ASR:         %s' % normalize_final_asr_url(args.asr))
     print('Pausenschnitt:     %.2f s bestätigt' % args.pause_seconds)
     print('Kurze Äußerung:    Schnitt spätestens nach %.2f s Stille' % args.short_block_pause_seconds)
@@ -932,8 +939,19 @@ async def run_recording(args):
         print('Quelle:            Mikrofon')
         print('ENTER:             Aufnahme stoppen')
 
+    journal_path = str(args.wav) + '.partial.wav'
+    journal = wave.open(journal_path, 'wb')
+    journal.setnchannels(CHANNELS); journal.setsampwidth(SAMPLE_WIDTH); journal.setframerate(SR)
+    journal_cursor = 0
+    last_journal = 0.0
     try:
         while True:
+            if stream is not None and (audio_failure or not stream.active):
+                raise RuntimeError(audio_failure[0] if audio_failure else 'Mikrofonverbindung unterbrochen')
+            if time.monotonic()-last_journal > .5:
+                chunk = audio.bytes_between(journal_cursor)
+                journal.writeframes(chunk); journal_cursor += len(chunk)
+                last_journal = time.monotonic()
             process_available_frames()
             await enqueue_ready(force=False)
 
@@ -959,12 +977,16 @@ async def run_recording(args):
                 break
             await asyncio.sleep(0.02)
     finally:
+        journal.writeframes(audio.bytes_between(journal_cursor))
+        journal.close()
         if stream is not None:
             stream.stop()
             stream.close()
 
     if replay_task is not None:
         await replay_task
+
+    emit_event('phase', phase='audio_stopped')
 
     # Eventuelle letzte Frames noch verarbeiten.
     process_available_frames()
@@ -1002,6 +1024,11 @@ async def run_recording(args):
     await asr_queue.put(None)
     await worker
 
+    # The input source is closed and every queued final block has completed.
+    # Only now may later stages attest finalization to Commander.
+    args.recording_finalized = not bool(stats['failed'])
+    emit_event('phase', phase='recording_finalized')
+
     block_results.sort(key=lambda x: x.get('id', 0))
 
     pcm = audio.all_pcm()
@@ -1026,7 +1053,7 @@ async def run_recording(args):
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description='Kienzledoku 1.3.1: natürliche Pausen + residenter Final-Block-ASR + pyannote + LLM'
+        description='kienzledoku record 1.3.3: natürliche Pausen + residenter Final-Block-ASR + pyannote + LLM'
     )
     p.add_argument('--asr', '--final-asr', dest='asr', default='http://127.0.0.1:8179')
     p.add_argument(
@@ -1075,12 +1102,32 @@ def parse_args():
     p.add_argument('--temperature', type=float, default=0.1)
     p.add_argument('--max-tokens', type=int, default=1600)
     p.add_argument('--no-llm', action='store_true')
+    p.add_argument('--commander', default=None,
+                   help='Commander-Basisadresse; übernimmt alle drei KI-Dienste.')
+    p.add_argument('--commander-token-env', default='KIENZLEDOKU_COMMANDER_TOKEN')
+    p.add_argument('--commander-timeout', type=float, default=2400)
+    p.add_argument('--quality', default='auto')
     p.add_argument('--allow-partial-asr', action='store_true',
                    help='Trotz fehlgeschlagener ASR-Blöcke Diarisierung/LLM fortsetzen.')
-    return p.parse_args()
+    args = p.parse_args()
+    args.commander_client = None
+    args.commander_metadata = None
+    args.recording_finalized = False
+    if args.commander:
+        try:
+            client = CommanderClient(args.commander, args.commander_token_env,
+                                     args.commander_timeout)
+            args.asr = args.diarization = args.llm = client.url
+            args.asr_api_key = args.llm_api_key = client.token
+            args.asr_timeout = args.diarization_timeout = client.timeout
+            args.commander_client = client
+        except ValueError as exc:
+            p.error(str(exc))
+    return args
 
 
 def main():
+    configure_output_encoding()
     args = parse_args()
 
     if args.list_devices:
@@ -1129,7 +1176,7 @@ def main():
     print('WAV:               %s' % final_wav_path)
     print('JSON:              %s' % args.json)
 
-    if stats.get('failed', 0) and not args.allow_partial_asr:
+    if stats.get('failed', 0) and (args.commander or not args.allow_partial_asr):
         print(
             '\nFEHLER: Mindestens ein Final-ASR-Block ist fehlgeschlagen. '
             'WAV und JSON wurden gespeichert; Diarisierung/LLM werden absichtlich nicht mit Teiltranskript gestartet.\n'
@@ -1154,6 +1201,9 @@ def main():
                 args.max_speakers,
                 args.num_speakers,
                 args.diarization_timeout,
+                api_key=args.commander_client.token if args.commander_client else None,
+                recording_finalized=bool(args.commander and payload.get('recording_finalized')),
+                commander=bool(args.commander),
             )
             diarization_result = result
             diar_segments = result.get('segments') or []
@@ -1203,7 +1253,15 @@ def main():
         emit_event('phase', phase='llm')
         try:
             t0 = time.monotonic()
-            llm_answer = call_llm(args, llm_transcript)
+            if args.commander_client:
+                document, metadata = args.commander_client.extract(
+                    llm_transcript, args.quality, args.commander_client.profiles(),
+                    recording_finalized=payload.get('recording_finalized') is True)
+                args.commander_metadata = metadata
+                emit_event('commander_result', **metadata)
+                llm_answer = json.dumps(document, ensure_ascii=False)
+            else:
+                llm_answer = call_llm(args, llm_transcript)
             print(llm_answer)
             print('\nLLM-Zeit: %.3f s' % (time.monotonic() - t0))
         except Exception as exc:

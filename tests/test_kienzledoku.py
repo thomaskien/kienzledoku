@@ -12,6 +12,7 @@ from kienzledoku import (
     PROFILE_FREITEXT,
     VERSION,
     FhirError,
+    FhirTransactionRejected,
     SessionState,
     T2medFhirClient,
     close_page_html,
@@ -150,8 +151,38 @@ class T2medTransactionTests(unittest.TestCase):
                 }
             }],
         }
-        with self.assertRaisesRegex(FhirError, "zurückgerollt"):
+        with self.assertRaisesRegex(FhirTransactionRejected, "zurückgerollt"):
             validate_transaction_response(response, ["Anamnese"])
+
+    def test_only_complete_error_or_fatal_outcomes_confirm_rollback(self):
+        for severity in ('error', 'fatal'):
+            response = {'resourceType': 'Bundle', 'type': 'transaction-response', 'entry': [
+                {'response': {'status': '201 Created'}},
+                {'response': {'status': '422 Unprocessable Entity', 'outcome': {
+                    'resourceType': 'OperationOutcome', 'issue': [{'severity': severity,
+                    'diagnostics': 'Behandlungsort ist nicht gesetzt.'}]}}},
+            ]}
+            with self.assertRaisesRegex(FhirTransactionRejected, 'in T2med den Behandlungsort'):
+                validate_transaction_response(response, ['Anamnese', 'Befund'])
+
+        for entries in ([{'response': {'status': '500 Internal Server Error'}}],
+                        [{'response': {}}], [], {'response': {'status': '201'}}):
+            response = {'resourceType': 'Bundle', 'type': 'transaction-response', 'entry': entries}
+            with self.assertRaises(FhirError) as result:
+                validate_transaction_response(response, ['Anamnese'])
+            self.assertNotIsInstance(result.exception, FhirTransactionRejected)
+            self.assertNotIn('zurückgerollt', str(result.exception))
+
+        # A malformed companion entry must not turn an incomplete response into
+        # a confirmed rollback, even if another entry contains a real error.
+        response['entry'] = [
+            {'response': {'status': '200', 'outcome': {'resourceType': 'OperationOutcome',
+                'issue': [{'severity': 'error', 'diagnostics': 'rejected'}]}}},
+            {'response': {'status': 'invalid'}},
+        ]
+        with self.assertRaises(FhirError) as result:
+            validate_transaction_response(response, ['Anamnese', 'Befund'])
+        self.assertNotIsInstance(result.exception, FhirTransactionRejected)
 
 
 class T2medHostConfigurationTests(unittest.TestCase):
@@ -313,7 +344,7 @@ class SpeechIntegrationTests(unittest.TestCase):
     def test_recording_stops_by_signal_and_returns_document(self):
         received = []
         with tempfile.TemporaryDirectory() as script_dir:
-            runner = os.path.join(script_dir, "start_kienzledoku_asr.sh")
+            runner = os.path.join(script_dir, "kienzledoku_asr_v6.py")
             prompt = os.path.join(script_dir, "prompt_documentation.txt")
             with open(prompt, "w", encoding="utf-8") as handle:
                 handle.write("test")
@@ -321,33 +352,40 @@ class SpeechIntegrationTests(unittest.TestCase):
                 handle.write(
                     "#!/usr/bin/env python3\n"
                     "import json,sys\n"
+                    "sys.stdout.reconfigure(encoding='cp1252')\n"
+                    "sys.stderr.reconfigure(encoding='cp1252')\n"
+                    "sys.path.insert(0, %r)\n" % os.path.dirname(os.path.dirname(__file__)) +
+                    "from kienzledoku_asr_v6 import configure_output_encoding, emit_event\n"
+                    "configure_output_encoding()\n"
                     "target=sys.argv[sys.argv.index('--json')+1]\n"
-                    "print('KIENZLEDOKU_EVENT '+json.dumps({'type':'audio_devices','devices':[{'index':2,'name':'Testmikrofon'}],'selected':2}),flush=True)\n"
-                    "print('KIENZLEDOKU_EVENT '+json.dumps({'type':'final_block','block_id':1,'text':'Live erkannt'}),flush=True)\n"
+                    "emit_event('audio_devices',devices=[{'index':2,'name':'Äußeres Mikrofon'}],selected=2)\n"
+                    "emit_event('final_block',block_id=1,text='Ärztliche Äußerung: Öl, Füße, Übelkeit – α.')\n"
                     "sys.stdin.readline()\n"
-                    "print('KIENZLEDOKU_EVENT '+json.dumps({'type':'diarization','text':'[SPEAKER_00] Live erkannt','speaker_labels':True}),flush=True)\n"
+                    "emit_event('diarization',text='[SPEAKER_00] Ärztliche Äußerung: Öl, Füße, Übelkeit – α.',speaker_labels=True)\n"
                     "llm=None if '--no-llm' in sys.argv else {'anamnese':'A','befund':'B','therapie':'T','prozedere':'P'}\n"
                     "with open(target,'w',encoding='utf-8') as f:\n"
-                    " json.dump({'transcript':'Live erkannt','speaker_transcript':'[SPEAKER_00] Live erkannt','llm':llm},f)\n"
+                    " json.dump({'transcript':'Ärztliche Äußerung: Öl, Füße, Übelkeit – α.','speaker_transcript':'[SPEAKER_00] Ärztliche Äußerung: Öl, Füße, Übelkeit – α.','llm':llm},f)\n"
                 )
             os.chmod(runner, 0o700)
 
             manager = SpeechRecognitionManager(script_dir, on_document=received.append)
+            manager.native_python = True
+            manager.runner_path = runner
             manager.start()
             self.assertEqual(STATUS_RECORDING, manager.snapshot()["status"])
             deadline = time.time() + 3
             while not manager.snapshot()["live_transcript"] and time.time() < deadline:
                 time.sleep(0.02)
-            self.assertEqual("Live erkannt", manager.snapshot()["live_transcript"])
+            self.assertEqual("Ärztliche Äußerung: Öl, Füße, Übelkeit – α.", manager.snapshot()["live_transcript"])
             manager.stop()
             deadline = time.time() + 3
             while manager.snapshot()["status"] != STATUS_READY and time.time() < deadline:
                 time.sleep(0.02)
             self.assertEqual(STATUS_READY, manager.snapshot()["status"])
             self.assertEqual("A", received[0]["anamnese"])
-            self.assertEqual("[SPEAKER_00] Live erkannt", manager.snapshot()["diarized_text"])
+            self.assertEqual("[SPEAKER_00] Ärztliche Äußerung: Öl, Füße, Übelkeit – α.", manager.snapshot()["diarized_text"])
             self.assertEqual("2", manager.snapshot()["selected_device"])
-            self.assertEqual("Testmikrofon", manager.snapshot()["selected_device_name"])
+            self.assertEqual("Äußeres Mikrofon", manager.snapshot()["selected_device_name"])
             manager.set_audio_device("")
             self.assertEqual("System-Standardgerät", manager.snapshot()["selected_device_name"])
             with self.assertRaisesRegex(ValueError, "nicht mehr verfügbar"):
@@ -363,14 +401,14 @@ class SpeechIntegrationTests(unittest.TestCase):
                 while manager.snapshot()["status"] != STATUS_READY and time.time() < deadline:
                     time.sleep(0.02)
             self.assertEqual(
-                "[SPEAKER_00] ärztlich korrigiert\n\n[SPEAKER_00] Live erkannt",
+                "[SPEAKER_00] ärztlich korrigiert\n\n[SPEAKER_00] Ärztliche Äußerung: Öl, Füße, Übelkeit – α.",
                 manager.snapshot()["diarized_text"],
             )
-            self.assertEqual("Live erkannt\n\nLive erkannt", manager.snapshot()["live_transcript"])
+            self.assertEqual("Ärztliche Äußerung: Öl, Füße, Übelkeit – α.\n\nÄrztliche Äußerung: Öl, Füße, Übelkeit – α.", manager.snapshot()["live_transcript"])
             self.assertEqual("Gesamt", received[-1]["anamnese"])
             llm.assert_called_once_with(
                 mock.ANY,
-                "[SPEAKER_00] ärztlich korrigiert\n\n[SPEAKER_00] Live erkannt",
+                "[SPEAKER_00] ärztlich korrigiert\n\n[SPEAKER_00] Ärztliche Äußerung: Öl, Füße, Übelkeit – α.",
             )
 
     def test_edited_diarization_can_be_sent_to_llm_again(self):
@@ -409,7 +447,7 @@ class SpeechIntegrationTests(unittest.TestCase):
         state.t2med_status = "ok"
         state.speech = SpeechRecognitionManager(os.path.dirname(os.path.dirname(__file__)))
         rendered = page_html(state)
-        self.assertIn(">kienzledoku</a>", rendered)
+        self.assertIn(">kienzledoku record</a>", rendered)
         self.assertIn("v%s · von Dr. Thomas Kienzle" % VERSION, rendered)
         self.assertIn('href="https://kienzledoku.de"', rendered)
         self.assertIn("Kienzle, Thomas", rendered)
@@ -426,7 +464,8 @@ class SpeechIntegrationTests(unittest.TestCase):
         self.assertIn("http://127.0.0.1:8080", rendered)
         self.assertIn("Konfiguration", rendered)
         self.assertIn("Lokale Standardwerte", rendered)
-        self.assertNotIn("confirm(", rendered)
+        write_form = rendered.split('name="do" value="write"')[1].split("</form>")[0]
+        self.assertNotIn("confirm(", write_form)
         self.assertIn("window.close()", close_page_html())
 
         state.speech.status = STATUS_RECORDING
@@ -455,10 +494,12 @@ class LinuxDesktopIntegrationTests(unittest.TestCase):
         completed = mock.Mock(returncode=0, stdout="praxis-key\n")
         with mock.patch.dict(os.environ, {}, clear=True), \
              mock.patch("kienzledoku.sys.platform", "linux"), \
+             mock.patch("kienzledoku_config.Path.home", side_effect=RuntimeError("Could not determine home directory.")) as home, \
              mock.patch("kienzledoku.shutil.which", return_value="/usr/bin/secret-tool"), \
              mock.patch("kienzledoku.subprocess.run", return_value=completed) as run:
             key, source = get_api_key()
         self.assertEqual("praxis-key", key)
+        home.assert_not_called()
         self.assertIn("Secret Service", source)
         self.assertEqual(
             [
@@ -484,10 +525,12 @@ class LinuxDesktopIntegrationTests(unittest.TestCase):
         self.assertIs(process, actual_process)
         self.assertEqual("native-webkitgtk", kind)
         self.assertEqual(
-            [helper, "http://127.0.0.1:43210/"],
+            [helper, "--url-stdin"],
             popen.call_args.args[0],
         )
         self.assertNotIn("stderr", popen.call_args.kwargs)
+        process.stdin.write.assert_called_once_with(b"http://127.0.0.1:43210/\n")
+        process.stdin.close.assert_called_once()
 
     def test_linux_prefers_root_owned_profiled_window_helper(self):
         process = mock.Mock()
@@ -501,7 +544,7 @@ class LinuxDesktopIntegrationTests(unittest.TestCase):
         self.assertIs(process, actual_process)
         self.assertEqual("native-webkitgtk", kind)
         self.assertEqual(
-            [LINUX_NATIVE_WINDOW_PATH, "http://127.0.0.1:43210/"],
+            [LINUX_NATIVE_WINDOW_PATH, "--url-stdin"],
             popen.call_args.args[0],
         )
 

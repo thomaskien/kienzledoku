@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-10",
+  "linux_reference": {
+    "host": "10.0.83.140",
+    "path": "/opt/kienzledoku-commander",
+    "service_state_at_read": "inactive",
+    "health_port_8185": "connection refused",
+    "handover": "commander-dev, 2026-11-09",
+    "all_13_source_files_match_handover": true,
+    "sha256": {
+      "kienzledoku_commander/__init__.py": "62404cd71d2dc9da3be30309b2c9fe62a9df5c9adb8600c71f8c4bb0bbd3ad8b",
+      "kienzledoku_commander/__main__.py": "671d66d0c191f3161b25ca5dd3c3e5ee2f560a9a7ef1f3dccba68be64c97c417",
+      "kienzledoku_commander/api.py": "9c5a888b20194d98f8b01e6bbc5c2265d21e58b4c070d5aa8f04437ee175c2ef",
+      "kienzledoku_commander/config.py": "ed11461edc9fec1ae7407e1a223231b4d5ac860f4948c45e467fc5a624517d2a",
+      "kienzledoku_commander/errors.py": "8201f645082d234351850c0fbac5904e2d5a68b9210907230973f8994ecf5de8",
+      "kienzledoku_commander/ownership.py": "e93474dfc8fa40fd41f0e1a36e4422aeba305b246f8682c196ead704f7fab140",
+      "kienzledoku_commander/patch_workers.py": "f8320827f8e4549b2316e2704eb049fed998e65e211b4ca9d09eaa2a39e727d4",
+      "kienzledoku_commander/runtime.py": "ce022ee8be9e6624bd18dcc40ef9798457a6988fd74a4c3d67e6cb7e0decfc6d",
+      "kienzledoku_commander/scheduler.py": "7d57f1f1f756e39de0e829334222887c7e62509112f8ba342b035f1bd818caca",
+      "kienzledoku_commander/worker.py": "9cf30b8e01c9b5bbd1e21802bdfc31ba41cc2dd47e7a50613d5aa419bf2bec17",
+      "kienzledoku_commander_client.py": "2c5749923d34761e009fbb2955316cf49671644a4b1733073c118e0f92cf5bb9",
+      "kienzledoku_document.py": "0a2d1ca6cd632a4956d3f9b8065f65441f7b74581970475d1087d3c7df169016",
+      "prompt_documentation.txt": "c402ac6a9e8e8111ab5b0405cf53f6009a9fdb4ac1d12fd83e97e5cf9b72a153"
+    }
+  },
+  "windows_installer": {
+    "version": "1.12",
+    "source": "kienzledoku-server-installer-windows, handover 2026-11-09",
+    "source_and_packages_unchanged": true,
+    "user_confirmed_working": "2026-11-10",
+    "copied_files_excluding_python_caches": 266,
+    "exe_sha256": "b02cf71f9b8998a59df62dbf6b43b55c5fe3cccfdaacce5231aecf4e4e29da96",
+    "zip_sha256": "075ceeb4d6bc8d1bcb6462ba9e8f7adb7f2b17d834ba16ba49ea046a09c83661"
+  },
+  "scope": {
+    "client_baseline": "Record 1.3.3 with Connect, previously uncommitted changes preserved",
+    "server_deployed": false,
+    "models_changed": false,
+    "manufacturer_key_changed": false,
+    "benchmarks_run": false
+  }
+}

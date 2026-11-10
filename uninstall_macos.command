@@ -1,6 +1,4 @@
 #!/bin/bash
-set -e
-rm -rf "$HOME/Applications/Kienzledoku.app"
-rm -rf "$HOME/Library/Application Support/Kienzledoku"
-echo "Kienzledoku entfernt."
-echo "Ein evtl. gespeicherter eigener API-Key bleibt absichtlich im Schlüsselbund."
+set -euo pipefail
+rm -rf "$HOME/Applications/kienzledoku record.app" "$HOME/Applications/kienzledoku connect.app"
+echo 'Programmverknüpfungen entfernt. Einstellungen, Schlüssel und offene Wiederherstellungsdaten bleiben erhalten.'

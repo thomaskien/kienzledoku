@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Kienzledoku
+Name=kienzledoku record
 Comment=Lokaler Dokumentationsassistent für T2med
 Exec="@LAUNCHER_EXEC@" %u
-Icon=audio-input-microphone
+Icon=kienzledoku-record
 Terminal=false
 NoDisplay=true
 StartupNotify=true

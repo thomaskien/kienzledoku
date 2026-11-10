@@ -105,9 +105,9 @@ activate(GtkApplication *application, gpointer user_data)
 {
     KienzledokuWindowData *data = user_data;
     GtkWidget *window = gtk_application_window_new(application);
-    gtk_window_set_title(GTK_WINDOW(window), "Kienzledoku 1.3.1");
+    gtk_window_set_title(GTK_WINDOW(window), "kienzledoku record 1.3.3");
     gtk_window_set_default_size(GTK_WINDOW(window), 1280, 850);
-    gtk_window_set_icon_name(GTK_WINDOW(window), "audio-input-microphone");
+    gtk_window_set_icon_name(GTK_WINDOW(window), "kienzledoku-record");
     gtk_widget_set_size_request(window, 800, 600);
 
     WebKitNetworkSession *network_session =
@@ -121,7 +121,7 @@ activate(GtkApplication *application, gpointer user_data)
     WebKitSettings *settings =
         webkit_web_view_get_settings(WEBKIT_WEB_VIEW(web_view));
     webkit_settings_set_user_agent(
-        settings, "Kienzledoku-NativeWindow-Linux/1.3.1");
+        settings, "kienzledoku-record/1.3.3");
     webkit_settings_set_enable_developer_extras(settings, FALSE);
 
     g_signal_connect(
@@ -143,8 +143,11 @@ main(int argc, char **argv)
         return 2;
     }
 
+    char private_uri[8192];
+    if (strcmp(argv[1], "--url-stdin") != 0 || fgets(private_uri, sizeof(private_uri), stdin) == NULL) return 2;
+    private_uri[strcspn(private_uri, "\r\n")] = 0;
     GError *error = NULL;
-    GUri *parsed = g_uri_parse(argv[1], G_URI_FLAGS_NONE, &error);
+    GUri *parsed = g_uri_parse(private_uri, G_URI_FLAGS_NONE, &error);
     if (parsed == NULL) {
         fprintf(stderr, "Ungültige lokale Kienzledoku-URL: %s\n",
                 error != NULL ? error->message : "unbekannter Fehler");
@@ -167,7 +170,7 @@ main(int argc, char **argv)
     }
 
     KienzledokuWindowData data = {
-        .start_uri = argv[1],
+        .start_uri = private_uri,
         .start_port = port,
     };
     GtkApplication *application = gtk_application_new(

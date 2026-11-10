@@ -3,3 +3,5 @@
 server-windows/** -text whitespace=cr-at-eol
 # Historical captured test output is preserved verbatim, including whitespace.
 server-windows/evidence/*.log -whitespace
+# Keep the existing exported logo's line endings unchanged.
+assets/*.svg -text whitespace=cr-at-eol

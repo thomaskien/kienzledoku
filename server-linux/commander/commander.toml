@@ -1,0 +1,41 @@
+# Python 3.12+, Ubuntu 24.04; Änderungen wirken nach Commander-Neustart.
+[server]
+host = "127.0.0.1"
+port = 8185
+# Für LAN-Bind zwingend setzen, z.B. über /etc/kienzledoku-commander/token.env.
+token_env = "KIENZLEDOKU_COMMANDER_TOKEN"
+
+[gpu]
+index = 0
+vram_gib = "auto" # oder 8, 16, 24
+diar_allocator_mib = 2048
+
+[policy]
+default_quality = "auto" # basis | gruendlich | sehr_gruendlich (profilabhängig)
+max_pending = 128
+max_remembered = 256
+max_payload_mib = 256
+remember_seconds = 300
+backend_timeout = 600
+load_timeout = 180
+control_timeout = 180
+queue_timeout = 900
+asr_parallel = 1
+diar_parallel = 1
+
+[backends]
+asr_url = "http://127.0.0.1:8179"
+diar_url = "http://127.0.0.1:8183"
+llm_url = "http://127.0.0.1:8086"
+llama_binary = "/opt/kienzlefon-ai/bin/llama-server"
+control_dir = "/run/kienzledoku-commander"
+diar_control_dir = "/run/kienzledoku-commander-diar"
+prompt_path = "/opt/kienzledoku-commander/prompt_documentation.txt"
+
+[models.basis]
+path = "/opt/kienzlefon-ai/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+[models.gruendlich]
+path = "/opt/kienzlefon-ai/models/Qwen_Qwen3.5-9B-Q6_K.gguf"
+[models.sehr_gruendlich]
+# Benchmark-Datei aus /tmp vor produktiver Verwendung dauerhaft bereitstellen.
+path = "/opt/kienzlefon-ai/models/Qwen3.8-27B-UD-Q4_K_M.gguf"
