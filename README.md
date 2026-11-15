@@ -2,7 +2,8 @@
 
 ![KienzleDoku: Gespräch und strukturierter Dokumentationsentwurf](docs/images/kienzledoku-record.jpg)
 
-KienzleDoku erstellt aus dem Arzt-Patienten-Gespräch einen strukturierten
+KienzleDoku ist **Open Source und kostenlos**. Die Software erstellt aus dem
+Arzt-Patienten-Gespräch einen strukturierten
 Dokumentationsentwurf für **T2med**. Die KI verarbeitet das Gespräch auf dem
 eigenen Rechner oder einem eigenen Server innerhalb der Praxis. Sie prüfen und
 bearbeiten den Entwurf und übernehmen ihn anschließend bewusst in die Patientenakte.
