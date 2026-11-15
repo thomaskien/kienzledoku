@@ -52,6 +52,7 @@ passendes Release vorliegt, beendet er sich mit einer Erklärung ohne Installati
 | 4 | [Mikrofontest](https://www.youtube.com/watch?v=spvwjsQWLHA) |
 | 5 | [GPU-Unlock unter Windows](https://www.youtube.com/watch?v=k0Zndclce9A) |
 | 6 | [Lasttest](https://www.youtube.com/watch?v=-isFceLORfQ) |
+| 7 | [Erstvorstellung KienzleDoku](https://www.youtube.com/watch?v=6l1U047NSwg) |
 
 ## Hardware und Modelle
 

@@ -25,7 +25,7 @@ def main():
     assert len(page.ids)==len(set(page.ids)), 'Duplicate IDs'
     sections=['aufmacher','download','videos','hardware','ablauf','pegel']
     assert [page.ids.index(x) for x in sections]==sorted(page.ids.index(x) for x in sections)
-    assert page.videos==['RlPRxwvj6ks','_Mn_QjbPdmc','09TLE3R1GjU','spvwjsQWLHA','k0Zndclce9A','-isFceLORfQ']
+    assert page.videos==['RlPRxwvj6ks','_Mn_QjbPdmc','09TLE3R1GjU','spvwjsQWLHA','k0Zndclce9A','-isFceLORfQ','6l1U047NSwg']
     for url in page.urls:
         target=urlsplit(url)
         if target.scheme or target.netloc:continue
@@ -55,7 +55,7 @@ def main():
     for line in (site/'SHA256SUMS').read_text().splitlines():
         digest,name=line.split('  ',1)
         assert hashlib.sha256((site/name).read_bytes()).hexdigest()==digest,name
-    print('PASS: section order, six videos, lazy player, local links, shared images, documentation links/anchors and all asset checksums')
+    print('PASS: section order, seven videos, lazy player, local links, shared images, documentation links/anchors and all asset checksums')
 
 
 if __name__=='__main__':main()

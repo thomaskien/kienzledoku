@@ -56,5 +56,5 @@ Beim Fortsetzen erscheint eine Abschnittsmarkierung; Sprecherkennungen können
 sich zwischen Abschnitten unterscheiden. Die Markierung wird nicht als
 medizinischer Befund übernommen.
 
-[Weitere Anwendungsdemo](https://www.youtube.com/watch?v=6l1U047NSwg)
+[Erstvorstellung KienzleDoku](https://www.youtube.com/watch?v=6l1U047NSwg)
 · [Technik und Fehlerhilfe](technik.md)
