@@ -64,8 +64,7 @@ Laufzeiten und Speicherbedarf und kennzeichnen Messwerte und Schätzungen.
 [Grafikkarten Kaufberatung](https://kienzledoku.de/grafikkarten.html)
 · [Voraussetzungen](docs/installation.md)
 
-\* Oft ist es notwendig, ein stärkeres PC-Netzteil zu kaufen, z. B. 750 W
-(ab 50 Euro).
+Bitte Netzteil beachten, 750W sinnvoll (ab 50 Euro)
 
 ## Technischer Ablauf
 

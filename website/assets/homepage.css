@@ -4,8 +4,8 @@
 .home-page .app-opener img{display:block;width:100%;height:auto;border-radius:18px;box-shadow:0 14px 36px #10172212}
 .home-intro{display:grid;grid-template-columns:1fr;gap:28px;padding:8px 0 48px;align-items:start}
 .home-heading h1{font-size:clamp(2rem,3.5vw,3.2rem);margin:8px 0 0}.home-heading h1 span{color:var(--red)}
-.intro-copy{max-width:960px}
-.intro-copy p{color:#526171}.intro-copy p:last-child{margin-bottom:0}.intro-copy .lead{font-size:18px}
+.intro-copy{width:100%}
+.intro-copy p{color:#526171}.intro-copy p:last-child{margin-bottom:0}.intro-copy .lead{font-size:18px;max-width:none}
 .download-area{grid-column:1/-1}.download-heading{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;margin:8px 0 18px}.download-heading h2{font-size:22px;margin:0}.download-heading a{font-size:14px}
 .download-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.download-card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px}.download-card h3{font-size:22px}.download-card p{color:var(--muted);font-size:14px}.download-actions{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.download-actions>a:last-child{font-size:14px}
 .download-status{font-size:14px;color:#526171;margin:16px 0 0;max-width:940px}.linux-command{margin-top:18px;padding:14px 20px;background:#fff;border:1px solid var(--line);border-radius:14px;font-size:14px}.linux-command summary{cursor:pointer;font-weight:650}.linux-command pre{overflow-x:auto;background:#f4f6f8;border-radius:8px;padding:16px;line-height:1.65;max-width:100%;font-size:13px}.linux-command p{color:#526171;max-width:900px;margin-bottom:10px}
