@@ -66,9 +66,24 @@ Entwicklungswerkzeuge werden für dieses Paket nicht benötigt.
 3. Verbindungen, Modelle und Dokumentationsfelder prüfen und die Zusammenfassung bestätigen.
 4. Bei Clientinstallation die angezeigte Adresse in [T2med einrichten](t2med.md).
 
-Das Paket ist lokal signiert, aber noch nicht von Apple notarisiert. Der ältere
-Intel-Clientweg aus dem Quellcode ist im [Archiv](archiv/direktbetrieb.md) eingeordnet;
-das ARM-Paket ist kein Intel-Installer.
+Das Paket ist **lokal signiert, aber noch nicht von Apple notarisiert**.
+„Lokal signiert“ bedeutet **keine Bindung an einen bestimmten Rechner**:
+KienzleDoku lässt sich auch auf einem anderen kompatiblen Mac mit Apple Silicon
+installieren. Der ältere Intel-Clientweg aus dem Quellcode ist im
+[Archiv](archiv/direktbetrieb.md) eingeordnet; das ARM-Paket ist kein Intel-Installer.
+
+### Wenn macOS den ersten Start blockiert
+
+Wird der Start wegen fehlender Notarisierung oder eines nicht bestätigten
+Entwicklers blockiert, lässt sich die App normalerweise einzeln freigeben.
+Voraussetzung ist, dass Sie der Downloadquelle vertrauen und die App unverändert ist.
+
+1. **kienzledoku Installation** einmal zu öffnen versuchen.
+2. **Systemeinstellungen → Datenschutz & Sicherheit** öffnen und nach unten scrollen.
+3. Bei der Meldung zur App **Dennoch öffnen** wählen.
+4. Im folgenden Dialog den Start mit **Öffnen** bestätigen.
+
+[Apple-Anleitung: Sicher Apps auf dem Mac öffnen](https://support.apple.com/de-de/102445).
 
 [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc)
 
