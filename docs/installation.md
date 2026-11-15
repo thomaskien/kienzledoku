@@ -30,7 +30,7 @@ freier Speicherplatz richten sich nach den gewählten Modellen.
 3. Installation starten und bis zur abschließenden Prüfung warten.
 4. Bei Clientinstallation die angezeigte Adresse in [T2med einrichten](t2med.md).
 
-[Installationsvideo Windows](https://www.youtube.com/watch?v=RlPRxwvj6ks)
+[Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks)
 · [GPU-Unlock unter Windows](https://www.youtube.com/watch?v=k0Zndclce9A)
 
 ## macOS
@@ -49,7 +49,7 @@ Das Paket ist lokal signiert, aber noch nicht von Apple notarisiert. Der ältere
 Intel-Clientweg aus dem Quellcode ist im [Archiv](archiv/direktbetrieb.md) eingeordnet;
 das ARM-Paket ist kein Intel-Installer.
 
-[Installationsvideo Mac und Linux](https://www.youtube.com/watch?v=_Mn_QjbPdmc)
+[Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc)
 
 ## Linux
 
@@ -95,7 +95,7 @@ prüft die Prüfsumme, entpackt das Archiv und startet darin `./install_linux.sh
 Der im Paket enthaltene Installer und der Download-Starter haben denselben Namen;
 der Starter lädt das Paket, der enthaltene Installer führt die Einrichtung aus.
 
-[Installationsvideo Mac und Linux](https://www.youtube.com/watch?v=_Mn_QjbPdmc)
+[Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc)
 · [Quellcode des Download-Starters](../bootstrap/install_linux.sh)
 
 ## Modelle und Verbindungen

@@ -34,17 +34,20 @@ def main():
     gpu = (baseline/'grafikkarten.html').read_text()
     old_notice = '<h3>Aktuelle Version und Modellwahl</h3><p><strong>Kienzledoku 1.3.1 setzt noch eine Grafikkarte mit 24 GB Grafikspeicher voraus.</strong> Die Übersicht enthält auch Karten für den neueren seriellen Betrieb ab 8 GB sowie passend konfigurierte, parallel geladene Modelle ab 16 GB.</p>'
     new_notice = '<h3>Modellwahl und Installationsstand</h3><p>Die Anforderungen richten sich nach Modell und Betriebsart: serieller Modellwechsel ab <strong>8 GB Grafikspeicher</strong> oder bei passender Modellauswahl parallel geladene Modelle ab 16 GB. Die gemeinsamen Installer werden nach Freigabe auf GitHub bereitgestellt. <a href="https://github.com/thomaskien/kienzledoku/blob/main/docs/installation.md">Aktuelle Installationshinweise ↗</a></p>'
-    assert gpu.count(old_notice) == 1, 'GPU baseline notice changed; review before replacing.'
-    (output/'grafikkarten.html').write_text(gpu.replace(old_notice, new_notice))
+    if gpu.count(old_notice) == 1 and new_notice not in gpu:
+        (output/'grafikkarten.html').write_text(gpu.replace(old_notice, new_notice))
+    else:
+        assert old_notice not in gpu and gpu.count(new_notice) == 1, 'GPU baseline notice changed; review before replacing.'
     css_hash = digest(output/'assets/homepage.css')[:12]
     html = (output/'index.html').read_text().replace('/assets/homepage.css"', '/assets/homepage.css?v='+css_hash+'"')
     html = html.replace('/assets/ki-ablauf.svg"', '/assets/ki-ablauf.svg?v='+digest(output/'assets/ki-ablauf.svg')[:12]+'"')
     (output/'index.html').write_text(html)
     after = {str(p.relative_to(output)):digest(p) for p in output.rglob('*') if p.is_file() and p.name != 'SHA256SUMS'}
     changed = [name for name in before if name != 'SHA256SUMS' and before[name] != after.get(name)]
-    assert set(changed) == {'index.html','assets/ki-ablauf.svg','grafikkarten.html'}, changed
+    allowed_changes = {'index.html','assets/homepage.css','assets/ki-ablauf.svg','grafikkarten.html'}
+    assert set(changed) <= allowed_changes, changed
     for name in before:
-        if name not in {'index.html','assets/ki-ablauf.svg','grafikkarten.html','SHA256SUMS'}:
+        if name not in allowed_changes | {'SHA256SUMS'}:
             assert before[name] == after[name], name
     (output/'SHA256SUMS').write_text(''.join(value+'  '+name+'\n' for name,value in sorted(after.items())))
     report = {'changed_existing_files':changed,'new_files':sorted(set(after)-set(before)),

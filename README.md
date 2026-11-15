@@ -16,9 +16,9 @@ den neuen Installerstand; der bisherige Quellcode auf `main` ist noch älter.
 
 | Betriebssystem | Download und Anleitung | Installationsvideo |
 | --- | --- | --- |
-| Windows x64 | [Windows installieren](docs/installation.md#windows) | [Windows-Anleitung ansehen](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
-| macOS / Apple Silicon | [Mac installieren](docs/installation.md#macos) | [Mac und Linux ansehen](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
-| Ubuntu 24.04 / x86_64 | [Linux installieren](docs/installation.md#linux) | [Mac und Linux ansehen](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
+| Windows x64 | [Windows installieren](docs/installation.md#windows) | [Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
+| macOS / Apple Silicon | [Mac installieren](docs/installation.md#macos) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
+| Ubuntu 24.04 / x86_64 | [Linux installieren](docs/installation.md#linux) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
 
 [Veröffentlichte Pakete auf GitHub](https://github.com/thomaskien/kienzledoku/releases)
 · [Homepage](https://kienzledoku.de/)
@@ -43,8 +43,8 @@ passendes Release vorliegt, beendet er sich mit einer Erklärung ohne Installati
 
 | Reihenfolge | Video |
 | --- | --- |
-| 1 | [Installation unter Windows](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
-| 2 | [Installation unter Mac und Linux](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
+| 1 | [Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
+| 2 | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
 | 3 | [KienzleDoku mit 8 GB Grafikspeicher](https://www.youtube.com/watch?v=09TLE3R1GjU) |
 | 4 | [Mikrofontest](https://www.youtube.com/watch?v=spvwjsQWLHA) |
 | 5 | [GPU-Unlock unter Windows](https://www.youtube.com/watch?v=k0Zndclce9A) |
@@ -58,9 +58,13 @@ ist der NVIDIA-Serverbetrieb ab **8 GB Grafikspeicher** vorgesehen; Apple Silico
 verwendet gemeinsamen Arbeitsspeicher. Die Benchmarks vergleichen Qualität,
 Laufzeiten und Speicherbedarf und kennzeichnen Messwerte und Schätzungen.
 
-[Benchmarks und Modelle](https://kienzledoku.de/benchmarks.html)
-· [Grafikkarten vergleichen](https://kienzledoku.de/grafikkarten.html)
+[Benchmarks und Modelle](https://kienzledoku.de/benchmarks.html): Qualität und Geschwindigkeit der Sprachmodelle.
+
+[Grafikkarten Kaufberatung](https://kienzledoku.de/grafikkarten.html)
 · [Voraussetzungen](docs/installation.md)
+
+\* Oft ist es notwendig, ein stärkeres PC-Netzteil zu kaufen, z. B. 750 W
+(ab 50 Euro).
 
 ## Technischer Ablauf
 
