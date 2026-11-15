@@ -4,7 +4,7 @@
 
 Diese Seite bündelt historische und technische Hintergrundinformationen. Der
 normale Einstieg für den gemeinsamen Installer ist die [Connect-Einrichtung in
-T2med](../t2med.md). **Direktbetrieb bleibt ein vorhandener Sonderweg**; das
+T2med](../../README.md#t2med-einrichten-und-verwenden). **Direktbetrieb bleibt ein vorhandener Sonderweg**; das
 Auslagern dieser Erklärung entfernt keine Programmfunktion.
 
 ## Zwei Wege zu T2med

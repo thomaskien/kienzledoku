@@ -1,6 +1,6 @@
 # Aufnahme, Prüfung und Übernahme
 
-[Zur Übersicht](../README.md) · [T2med einrichten](t2med.md)
+[Zur Übersicht](../README.md) · [T2med einrichten](../README.md#t2med-einrichten-und-verwenden)
 
 Diese Hinweise beschreiben den gemeinsamen Installerstand; die öffentlichen
 Pakete folgen nach Freigabe. Ältere Quellcode-Ausgaben können abweichen.

@@ -1,6 +1,6 @@
 # Installation
 
-[Zur Übersicht](../README.md) · [T2med einrichten](t2med.md)
+[Zur Übersicht](../README.md) · [T2med einrichten](../README.md#t2med-einrichten-und-verwenden)
 
 Diese Anleitung beschreibt die neue gemeinsame Installer-Ausgabe für Windows,
 macOS und Linux. **Die öffentlichen Pakete folgen nach Freigabe.** Der bisherige
@@ -49,7 +49,7 @@ freier Speicherplatz richten sich nach den gewählten Modellen.
 1. Nach Freigabe die Windows-x64-Setup-Datei aus den [Releases](https://github.com/thomaskien/kienzledoku/releases) laden und starten.
 2. Client, Server oder beides wählen. Den Assistenten bis zur Zusammenfassung durchgehen.
 3. Installation starten und bis zur abschließenden Prüfung warten.
-4. Bei Clientinstallation die angezeigte Adresse in [T2med einrichten](t2med.md).
+4. Bei Clientinstallation die angezeigte Adresse in [T2med einrichten](../README.md#t2med-einrichten-und-verwenden).
 
 [Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks)
 · [GPU-Unlock unter Windows](https://www.youtube.com/watch?v=k0Zndclce9A)
@@ -64,7 +64,7 @@ Entwicklungswerkzeuge werden für dieses Paket nicht benötigt.
 1. Nach Freigabe die macOS-arm64-DMG aus den [Releases](https://github.com/thomaskien/kienzledoku/releases) laden und öffnen.
 2. **kienzledoku Installation** starten und Client, Server oder beides wählen.
 3. Verbindungen, Modelle und Dokumentationsfelder prüfen und die Zusammenfassung bestätigen.
-4. Bei Clientinstallation die angezeigte Adresse in [T2med einrichten](t2med.md).
+4. Bei Clientinstallation die angezeigte Adresse in [T2med einrichten](../README.md#t2med-einrichten-und-verwenden).
 
 Das Paket ist **lokal signiert, aber noch nicht von Apple notarisiert**.
 „Lokal signiert“ bedeutet **keine Bindung an einen bestimmten Rechner**:
