@@ -20,7 +20,7 @@ HOST = os.environ.get("KIENZLEDOKU_ASR_HOST", "127.0.0.1")
 PORT = int(os.environ.get("KIENZLEDOKU_ASR_PORT", "8179"))
 MODEL_DIR = os.environ.get("KIENZLEDOKU_WHISPER_MODEL", "")
 MODEL_ID = "mlx-community/whisper-large-v3-mlx"
-MAX_BYTES = int(os.environ.get("KIENZLEDOKU_ASR_MAX_BYTES", str(100 * 1024 * 1024)))
+MAX_BYTES = int(os.environ.get("KIENZLEDOKU_ASR_MAX_BYTES", str(256 * 1024 * 1024)))
 
 RUNTIME: dict[str, object] = {}
 
@@ -221,9 +221,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, normalize_result(result, elapsed, duration))
         except ValueError as exc:
             self.send_json(400, {"error": "invalid_request", "detail": str(exc)})
-        except Exception as exc:
-            print("Final-Block-ASR-Fehler: %r" % (exc,), flush=True)
-            self.send_json(500, {"error": "asr_failed", "detail": str(exc)})
+        except Exception:
+            # Backend exceptions may contain decoded fragments or model paths.
+            self.send_json(500, {"error": "asr_failed", "detail": "Technischer ASR-Fehler"})
 
 
 def self_test() -> None:

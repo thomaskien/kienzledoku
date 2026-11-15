@@ -66,7 +66,7 @@ class ConfigurationTests(unittest.TestCase):
                        'https://u:p@127.0.0.1:16567/aps/fhir/api/r4'):
             with self.assertRaises(ValueError):config.validate_target(target,cfg)
     def test_direct_client_has_no_connect_process(self):
-        cfg=config.defaults()
+        cfg=config.defaults();cfg['connection']['mode']='direct'
         with mock.patch('kienzledoku.ConnectProxy') as proxy:
             client=record.T2medFhirClient(cfg['connection']['target'],'context','oauth','own-key',cfg['connection'])
             self.assertEqual(client._headers()['X-API-Key'],'own-key')
@@ -122,18 +122,15 @@ class SessionStartupTests(unittest.TestCase):
         record.start_patient_load(state).join(3)
         state.speech.start.assert_not_called()
 
-    def test_recovery_does_not_start_recording_and_failed_patient_read_keeps_capture(self):
-        for recovery in (False, True):
-            with self.subTest(recovery=recovery):
-                state = self.make_state()
-                state.recovery_pending = recovery
-                state.client.get_patient_by_context.side_effect = record.FhirError('Synthetic read failure')
-                record.start_initial_work(state).join(3)
-                self.assertEqual(state.speech.start.call_count, 0 if recovery else 1)
-                state.speech.stop.assert_not_called()
-                self.assertEqual(state.t2med_status, 'error')
-                self.assertEqual(state.patient_error, 'Synthetic read failure')
-                self.assertIsNone(state.patient)
+    def test_failed_patient_read_keeps_fresh_ram_capture_running(self):
+        state = self.make_state()
+        state.client.get_patient_by_context.side_effect = record.FhirError('Synthetic read failure')
+        record.start_initial_work(state).join(3)
+        state.speech.start.assert_called_once_with()
+        state.speech.stop.assert_not_called()
+        self.assertEqual(state.t2med_status, 'error')
+        self.assertEqual(state.patient_error, 'Synthetic read failure')
+        self.assertIsNone(state.patient)
 
     def test_closed_session_does_not_accept_late_patient_result(self):
         state = self.make_state()
@@ -193,36 +190,27 @@ class LocalHTTPTests(unittest.TestCase):
         self.post({'do':'write','anamnese':'Synthetic documentation'})
         self.assertEqual(self.client.write_documentation.call_count,2)
     def test_confirmed_rollback_keeps_draft_without_uncertainty_or_retry(self):
-        from kienzledoku_session import Recovery
-        with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
-                os.environ, {'KIENZLEDOKU_CONFIG_DIR': directory}):
-            self.state.recovery = Recovery(self.state.link_data)
-            saved_flags = []
-            def rejected_write(document, mode, code):
-                # The write is durably uncertain until a complete response arrives.
-                saved_flags.append(json.loads(self.state.recovery.path.read_text())['write_uncertain'])
-                record.validate_transaction_response({
-                    'resourceType': 'Bundle', 'type': 'transaction-response', 'entry': [
-                        {'response': {'status': '200 OK', 'outcome': {
-                            'resourceType': 'OperationOutcome', 'issue': [{'severity': 'error',
-                            'diagnostics': 'Behandlungsort ist nicht gesetzt.'}]}}}
-                    ]}, ['Anamnese'])
-            self.client.write_documentation.side_effect = rejected_write
-            self.post({'do': 'write', 'anamnese': 'Synthetic draft'})
-            self.assertEqual(saved_flags, [True])
-            self.assertEqual(self.client.write_documentation.call_count, 1)
-            self.assertFalse(self.state.write_uncertain)
-            self.assertFalse(self.state.completed_event.is_set())
-            self.assertEqual(self.state.documentation['anamnese'], 'Synthetic draft')
-            saved = json.loads(self.state.recovery.path.read_text())
-            self.assertFalse(saved['write_uncertain'])
-            self.assertEqual(saved['documentation']['anamnese'], 'Synthetic draft')
-            page = self.request('GET', '/', headers={'Cookie': self.cookie})[1].decode()
-            self.assertIn('Nicht gespeichert: T2med', page)
-            self.assertNotIn('Schreibausgang unklar.', page)
-            # A fresh user click is permitted, but no automatic retry took place.
-            self.post({'do': 'write', 'anamnese': 'Synthetic draft'})
-            self.assertEqual(self.client.write_documentation.call_count, 2)
+        uncertain_during_call = []
+        def rejected_write(document, mode, code, fields):
+            uncertain_during_call.append(self.state.write_uncertain)
+            record.validate_transaction_response({
+                'resourceType': 'Bundle', 'type': 'transaction-response', 'entry': [
+                    {'response': {'status': '200 OK', 'outcome': {
+                        'resourceType': 'OperationOutcome', 'issue': [{'severity': 'error',
+                        'diagnostics': 'Behandlungsort ist nicht gesetzt.'}]}}}
+                ]}, ['Anamnese'])
+        self.client.write_documentation.side_effect = rejected_write
+        self.post({'do': 'write', 'anamnese': 'Synthetic draft'})
+        self.assertEqual(uncertain_during_call, [True])
+        self.assertEqual(self.client.write_documentation.call_count, 1)
+        self.assertFalse(self.state.write_uncertain)
+        self.assertFalse(self.state.completed_event.is_set())
+        self.assertEqual(self.state.documentation['anamnese'], 'Synthetic draft')
+        page = self.request('GET', '/', headers={'Cookie': self.cookie})[1].decode()
+        self.assertIn('Nicht gespeichert: T2med', page)
+        self.assertNotIn('Schreibausgang unklar.', page)
+        self.post({'do': 'write', 'anamnese': 'Synthetic draft'})
+        self.assertEqual(self.client.write_documentation.call_count, 2)
     def test_cross_origin_and_bad_csrf_cannot_write(self):
         self.request('POST','/action','do=write',{'Cookie':self.cookie,'Origin':'https://untrusted.example'})
         self.assertEqual(self.request('POST','/action','do=write',{'Cookie':self.cookie,'Origin':'null'})[0],403)
@@ -272,18 +260,24 @@ class SettingsHTTPTests(unittest.TestCase):
                         status, page, _ = request('GET', '/', headers=headers)
                         self.assertEqual(status, 200)
                         self.assertIn('Server für die Installation einrichten', page)
-                        self.assertIn('http://existing.local:8179', page)
+                        self.assertIn(config.DEFAULT_COMMANDER_URL, page)
+                        self.assertNotIn('http://existing.local:8179', page)
+                        self.assertNotIn('name="commander.enabled"', page)
+                        self.assertNotIn('name="services.', page)
                         self.assertNotIn('name="record.microphone"', page)
                         self.assertNotIn('name="direct_key"', page)
                         csrf = re.search(r'name="csrf" value="([^"]+)"', page).group(1)
                         form = {'csrf': csrf, 'action': 'save' if save else 'close'}
                         for section, key, _label, kind in settings.FIELDS:
-                            if section not in ('connection', 'services'):
+                            if section not in ('connection', 'commander'):
                                 continue
                             value = initial[section][key]
                             if kind != 'checkbox' or value:
                                 form[section + '.' + key] = 'on' if kind == 'checkbox' else value
                         form['services.asr'] = 'http://new.local:8180'
+                        form['commander.url'] = 'http://new-commander.local:8185'
+                        form['commander.enabled'] = ''
+                        form['commander.enabled-present'] = '1'
                         # The setup endpoint cannot silently replace hidden options or keys.
                         form['record.microphone'] = 'overwrite attempt'
                         form['direct_key'] = 'synthetic-injected-key'
@@ -301,7 +295,7 @@ class SettingsHTTPTests(unittest.TestCase):
                     key_store.assert_not_called()
                 expected = copy.deepcopy(initial)
                 if save:
-                    expected['services']['asr'] = 'http://new.local:8180'
+                    expected['commander']['url'] = 'http://new-commander.local:8185'
                 self.assertEqual(config.load(), expected)
 
     def test_initial_page_save_and_close_use_real_session_cookie(self):
@@ -333,6 +327,8 @@ class SettingsHTTPTests(unittest.TestCase):
                 self.assertEqual(page_headers['Referrer-Policy'], 'same-origin')
                 self.assertIn('width:100%;', page)
                 self.assertIn('Test &lt;Mikrofon&gt; &quot;Ä&quot;', page)
+                self.assertNotIn('name="commander.enabled"', page)
+                self.assertNotIn('name="services.', page)
                 csrf = re.search(r'name="csrf" value="([^"]+)"', page).group(1)
                 form = {'csrf': csrf, 'action': 'save'}
                 for section, key, _label, kind in settings.FIELDS:
@@ -376,55 +372,14 @@ class AudioConversionTests(unittest.TestCase):
         self.assertEqual(result,PcmConverter(48000,2).feed(data))
 
 class RecoveryTests(unittest.TestCase):
-    def test_replayed_segment_replaces_partial_text_instead_of_appending_it_twice(self):
-        from kienzledoku_session import session_dir
-        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'KIENZLEDOKU_CONFIG_DIR':d}):
-            root=Path(d)
-            runner=root/'kienzledoku_asr_v6.py'
-            runner.write_text("import json,sys\npath=sys.argv[sys.argv.index('--json')+1]\nwith open(path,'w') as f:json.dump({'transcript':'complete segment','speaker_transcript':'complete segment'},f)\n")
-            (root/'prompt_documentation.txt').write_text('test')
-            manager=SpeechRecognitionManager(root)
-            manager.native_python=True;manager.runner_path=str(runner)
-            spool=session_dir()/'audio-interrupted';spool.mkdir()
-            partial=spool/'aufnahme.wav.partial.wav';partial.write_bytes(b'synthetic fixture')
-            manager.interrupted_audio=str(partial)
-            manager.live_transcript='earlier recording\npartial segment'
-            manager.diarized_text=manager.live_transcript
-            manager.run_base_transcript='earlier recording'
-            manager.run_base_diarized='earlier recording'
-            with mock.patch('kienzledoku_speech.call_llm',return_value='{"anamnese":"test","befund":"","therapie":"","prozedere":""}'):
-                manager.start()
-                manager.thread.join(timeout=5)
-            self.assertFalse(manager.thread.is_alive())
-            self.assertEqual(manager.status,'ready',manager.message)
-            self.assertIn('earlier recording',manager.diarized_text)
-            self.assertIn('complete segment',manager.diarized_text)
-            self.assertNotIn('partial segment',manager.diarized_text)
-            self.assertFalse(partial.exists())
-
-    def test_recovery_keeps_draft_and_audio_but_no_credentials_and_cleans_only_owned_spool(self):
-        from kienzledoku_session import Recovery, session_dir
-        with tempfile.TemporaryDirectory() as d, mock.patch.dict(os.environ, {'KIENZLEDOKU_CONFIG_DIR':d}):
-            link={'context_id':'synthetic-context', 'fhir_base_url':config.defaults()['connection']['target'], 'oauth_token':'synthetic-secret'}
-            recovery=Recovery(link)
-            state=record.SessionState(link,mock.Mock(),'synthetic-key')
-            state.speech=SpeechRecognitionManager(str(Path(record.__file__).parent))
-            state.documentation['anamnese']='Synthetic draft'
-            state.speech.run_base_diarized='Earlier completed recording'
-            spool=session_dir()/'audio-test';spool.mkdir()
-            audio=spool/'aufnahme.wav.partial.wav';audio.write_bytes(b'synthetic audio')
-            preserved=session_dir()/'user-file.txt';preserved.write_text('keep')
-            state.speech.interrupted_audio=str(audio)
-            state.write_uncertain=True
-            recovery.save(state)
-            raw=recovery.path.read_text()
-            self.assertNotIn('synthetic-secret',raw)
-            self.assertNotIn('synthetic-key',raw)
-            self.assertNotIn('synthetic-context',raw)
-            recovered=Recovery(link)
-            self.assertEqual(recovered.previous['documentation']['anamnese'],'Synthetic draft')
-            self.assertTrue(recovered.previous['write_uncertain'])
-            self.assertEqual(recovered.previous['audio_base_diarized'],'Earlier completed recording')
-            recovered.clear()
-            self.assertFalse(audio.exists());self.assertFalse(recovery.path.exists())
+    def test_legacy_recovery_is_deleted_and_never_recreated(self):
+        from kienzledoku_session import cleanup_legacy_patient_data
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root/'recovery.json').write_text('old patient data')
+            spool = root/'audio-test'; spool.mkdir(); (spool/'aufnahme.wav').write_bytes(b'audio')
+            preserved = root/'user-file.txt'; preserved.write_text('keep')
+            cleanup_legacy_patient_data(root)
+            self.assertFalse((root/'recovery.json').exists())
+            self.assertFalse(spool.exists())
             self.assertTrue(preserved.exists())

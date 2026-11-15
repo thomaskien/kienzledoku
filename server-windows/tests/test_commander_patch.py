@@ -35,7 +35,7 @@ class PatchTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        root = Path(self.temp.name)
+        root = Path(self.temp.name).resolve()
         self.paths = {r: root / (r + ".py") for r in ("whisper", "diar")}
         for r, text in (("whisper", WHISPER), ("diar", DIAR)):self.paths[r].write_bytes(text)
         self.hashes = {r: hashlib.sha256(path.read_bytes()).hexdigest() for r, path in self.paths.items()}

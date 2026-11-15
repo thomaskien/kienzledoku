@@ -75,8 +75,9 @@ import plistlib,sys
 path,ident,scheme,mode=sys.argv[1:]
 with open(path,'rb') as f: p=plistlib.load(f)
 p.update(CFBundleIdentifier=ident,CFBundleName='kienzledoku '+mode,CFBundleDisplayName='kienzledoku '+mode,
-         CFBundleShortVersionString='1.3.3',CFBundleVersion='1.3.3',LSUIElement=True,
+         CFBundleShortVersionString='1.7',CFBundleVersion='1.7',LSUIElement=True,
          NSMicrophoneUsageDescription='kienzledoku record benötigt das Mikrofon für die Gesprächsaufzeichnung.',
+         NSLocalNetworkUsageDescription='Kienzledoku verbindet sich mit T2med und Commander im Praxisnetz, um den geöffneten Patienten zu laden und Ihre Dokumentation zu übertragen.',
          CFBundleIconFile='applet.icns',
          CFBundleURLTypes=[dict(CFBundleURLName=ident,CFBundleURLSchemes=[scheme])])
 with open(path,'wb') as f: plistlib.dump(p,f)
@@ -95,5 +96,5 @@ if [ -f "$OLD_APP/Contents/Info.plist" ] && [ "$(/usr/libexec/PlistBuddy -c 'Pri
 fi
 "$PYTHON3" "$SUPPORT_DIR/kienzledoku.py" --self-test
 "$PYTHON3" "$SUPPORT_DIR/kienzledoku.py" --settings >/dev/null 2>&1 &
-echo 'kienzledoku record 1.3.3 installiert. Bestehende Einstellungen bleiben erhalten.'
+echo 'kienzledoku record 1.7 installiert. Bestehende Einstellungen bleiben erhalten.'
 echo 'Direkt: kienzledoku-record://record · Connect: kienzledoku://record'

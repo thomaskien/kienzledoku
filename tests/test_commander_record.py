@@ -1,3 +1,4 @@
+from kienzledoku_vad import AudioControls
 import json
 import math
 import os
@@ -57,6 +58,7 @@ class CommanderRecordTests(unittest.TestCase):
             def run():
                 with mock.patch.object(sys, 'argv', argv):
                     args = asr.parse_args()
+                args.audio_controls = AudioControls(False)  # Synthetic tone tests HTTP lifecycle, not VAD.
                 result['args'] = args
                 result['payload'] = asyncio.run(asr.run_recording(args))
             with mock.patch.object(asr, 'transcribe_final_block_http', side_effect=transcribe), \
@@ -80,8 +82,6 @@ class CommanderRecordTests(unittest.TestCase):
     def test_commander_is_exclusive_waits_for_runner_and_reprocesses(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            sessions = root / 'sessions'
-            sessions.mkdir()
             (root / 'prompt_documentation.txt').write_text('synthetic', encoding='utf-8')
             (root / 'config.json').write_text(json.dumps({
                 'services': {'asr': 'http://legacy.invalid:8179',
@@ -91,42 +91,31 @@ class CommanderRecordTests(unittest.TestCase):
                               'token_env': 'TEST_COMMANDER_TOKEN',
                               'default_quality': 'gemma12_q8'},
             }), encoding='utf-8')
-            runner = root / 'runner.py'
-            runner.write_text('''
-import json, pathlib, sys, time
-assert '--commander' in sys.argv and 'http://commander.invalid:8185' in sys.argv
-assert '--no-llm' in sys.argv
-root = pathlib.Path(__file__).parent
-print('KIENZLEDOKU_EVENT '+json.dumps({'type':'final_block','block_id':1,'text':'synthetic'}), flush=True)
-sys.stdin.readline()
-(root/'stop-received').touch()
-while not (root/'allow-finalization').exists(): time.sleep(.01)
-target = pathlib.Path(sys.argv[sys.argv.index('--json')+1])
-target.write_text(json.dumps({'transcript':'synthetic','speaker_transcript':'[SPEAKER_00] synthetic','llm':None,'recording_finalized':True}))
-''', encoding='utf-8')
             extracts = []
-            def extract(_client, text, quality, profiles, recording_finalized=False):
+            def extract(_client, text, quality, profiles, recording_finalized=False, fields=None):
                 extracts.append((text, quality, recording_finalized))
                 return DOC, {'requested_quality': 'gemma12_q8', 'used_quality': 'gemma12_q8',
                              'fallback_used': False, 'notice': ''}
             received = []
+            release = threading.Event()
+            def ram_pipeline(manager, _base_transcript, _base_diarized, _continued):
+                manager._handle_event({'type':'final_block','block_id':1,'text':'synthetic'})
+                manager.stop_event.wait(2); release.wait(2)
+                manager.diarized_text='[SPEAKER_00] synthetic'
+                document=manager._document_text(manager.diarized_text)
+                manager.status=STATUS_READY; received.append(document)
             with mock.patch.dict(os.environ, {'TEST_COMMANDER_TOKEN': 'synthetic-token'}), \
-                 mock.patch('kienzledoku_speech.session_dir', return_value=sessions), \
                  mock.patch('kienzledoku_commander_client.CommanderClient.profiles', return_value=PROFILES), \
                  mock.patch('kienzledoku_commander_client.CommanderClient.extract', new=extract):
                 manager = SpeechRecognitionManager(str(root), on_document=received.append)
-                manager.native_python = True
-                manager.runner_path = str(runner)
-                manager.set_quality('gemma12_q8') if manager.quality_profiles else None
-                manager.start()
-                eventually(lambda: manager.snapshot()['live_transcript'])
-                self.assertEqual(STATUS_RECORDING, manager.status)
-                self.assertEqual({'http://commander.invalid:8185'}, set(manager.service_urls.values()))
-                manager.stop()
-                eventually(lambda: (root / 'stop-received').exists())
-                self.assertFalse(extracts)
-                (root / 'allow-finalization').touch()
-                eventually(lambda: manager.status == STATUS_READY and received)
+                manager.quality_profiles=PROFILES; manager.set_quality('gemma12_q8')
+                with mock.patch.object(manager, '_run_ram_pipeline',
+                        side_effect=lambda *args: ram_pipeline(manager, *args)):
+                    manager.start(); eventually(lambda: manager.snapshot()['live_transcript'])
+                    self.assertEqual(STATUS_RECORDING, manager.status)
+                    self.assertEqual({'http://commander.invalid:8185'}, set(manager.service_urls.values()))
+                    manager.stop(); self.assertFalse(extracts); release.set()
+                    eventually(lambda: manager.status == STATUS_READY and received)
                 self.assertEqual('[SPEAKER_00] synthetic', extracts[0][0])
                 self.assertTrue(extracts[0][2])
                 manager.regenerate('[SPEAKER_00] changed')
@@ -145,6 +134,7 @@ target.write_text(json.dumps({'transcript':'synthetic','speaker_transcript':'[SP
         state.write_uncertain = False
         state.csrf = 'synthetic'
         state.documentation = dict(DOC)
+        state.active_fields = ('anamnese','befund','therapie','prozedere')
         state.output_mode = 'structured'
         state.single_code = 'KI'
         state.link_data = {'context_id': 'ctx', 'fhir_base_url': 'https://127.0.0.1:16567/aps/fhir/api/r4'}

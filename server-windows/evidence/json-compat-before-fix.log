@@ -1,3 +1,0 @@
-Get-Download: Cannot process argument transformation on parameter 'ExpectedBytes'. Cannot
-convert the "System.Object[]" value of type "System.Object[]" to type
-"System.Int64".

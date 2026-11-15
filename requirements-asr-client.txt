@@ -1,3 +1,5 @@
 sounddevice==0.5.5
 tomli==2.2.1; python_version < '3.11'
 audioop-lts==0.2.2; python_version >= '3.13'
+numpy==1.26.4
+onnxruntime==1.19.2

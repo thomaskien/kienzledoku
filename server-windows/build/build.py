@@ -22,6 +22,7 @@ FILE_VERSION=VERSION+'.0.0'
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--makensis',default=shutil.which('makensis'))
     args=parser.parse_args()
+    if any((ROOT/f'dist/kienzledoku-Server-Installer-{VERSION}.{suffix}').exists() for suffix in ('exe','zip')): raise SystemExit('Diese Ausgabe existiert bereits. VERSION erhöhen.')
     if not args.makensis: raise SystemExit('NSIS 3 erforderlich; --makensis /PFAD/ZU/makensis')
     # Windows PowerShell 5.1 otherwise reads BOM-less UTF-8 as the ANSI code page.
     for path in list((ROOT/'windows').glob('*'))+list((ROOT/'tests').glob('*')):

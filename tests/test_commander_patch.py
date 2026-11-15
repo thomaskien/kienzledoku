@@ -66,7 +66,7 @@ class PatchTests(unittest.TestCase):
         failed = False
         def writing(path, data, metadata):
             nonlocal failed
-            if path == self.paths["diar"] and b"start_diar_control" in data and not failed:
+            if path.resolve() == self.paths["diar"].resolve() and b"start_diar_control" in data and not failed:
                 failed = True
                 raise OSError("synthetic write failure")
             return real(path, data, metadata)

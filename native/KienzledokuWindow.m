@@ -1,5 +1,6 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
+#import "KienzledokuMenus.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -19,7 +20,8 @@
     NSRect visible = screen != nil
         ? screen.visibleFrame
         : NSMakeRect(0, 0, 1280, 800);
-    CGFloat width = MIN(1440.0, floor(visible.size.width * 0.94));
+    CGFloat minimumWidth = MIN(1100.0, visible.size.width);
+    CGFloat width = MAX(minimumWidth, MIN(1440.0, floor(visible.size.width * 0.94)));
     CGFloat height = MIN(960.0, floor(visible.size.height * 0.94));
     NSRect frame = NSMakeRect(
         NSMidX(visible) - width / 2.0,
@@ -37,12 +39,13 @@
         styleMask:style
         backing:NSBackingStoreBuffered
         defer:NO];
-    self.window.title = @"kienzledoku record 1.3.3";
+    self.window.title = @"kienzledoku record 1.7.6";
     self.window.minSize = NSMakeSize(
-        MIN(980.0, visible.size.width),
+        minimumWidth,
         MIN(700.0, visible.size.height));
     self.window.delegate = self;
     self.window.releasedWhenClosed = NO;
+    KienzledokuInstallMenus(self.window, @"kienzledoku record");
 
     WKWebViewConfiguration *configuration = [[WKWebViewConfiguration alloc] init];
     configuration.websiteDataStore = [WKWebsiteDataStore nonPersistentDataStore];
@@ -53,7 +56,7 @@
     self.webView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     self.webView.navigationDelegate = self;
     self.webView.UIDelegate = self;
-    self.webView.customUserAgent = @"kienzledoku-record/1.3.3";
+    self.webView.customUserAgent = @"kienzledoku-record/1.7.6";
     [self.window.contentView addSubview:self.webView];
 
     if (self.iconPath.length > 0) {
@@ -84,6 +87,23 @@
 }
 
 - (void)webView:(WKWebView *)webView
+    runJavaScriptConfirmPanelWithMessage:(NSString *)message
+    initiatedByFrame:(WKFrameInfo *)frame
+    completionHandler:(void (^)(BOOL))completionHandler {
+    (void)webView;
+    (void)frame;
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = @"Aufnahme verwerfen?";
+    alert.informativeText = message;
+    alert.alertStyle = NSAlertStyleWarning;
+    [alert addButtonWithTitle:@"Verwerfen und schließen"];
+    [alert addButtonWithTitle:@"Abbrechen"];
+    [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response) {
+        completionHandler(response == NSAlertFirstButtonReturn);
+    }];
+}
+
+- (void)webView:(WKWebView *)webView
     decidePolicyForNavigationAction:(WKNavigationAction *)navigationAction
     decisionHandler:(void (^)(WKNavigationActionPolicy))decisionHandler {
     (void)webView;
@@ -109,8 +129,32 @@
 
 @end
 
+static NSAlert *KienzledokuStartupAlert(NSString *category) {
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.alertStyle = NSAlertStyleWarning;
+    alert.messageText = @"kienzledoku konnte nicht gestartet werden";
+    if ([category isEqualToString:@"commander"]) {
+        alert.messageText = @"Commander konnte nicht abgefragt werden";
+        alert.informativeText = @"Bitte prüfen, ob der Commander läuft und erreichbar ist. Während eines Serverupdates bitte dessen Abschluss abwarten und Kienzledoku danach erneut aus T2med öffnen. Es wurde noch keine Aufnahme gestartet.";
+    } else if ([category isEqualToString:@"commander-auth"]) {
+        alert.messageText = @"Commander-Zugang abgelehnt";
+        alert.informativeText = @"Bitte den Commander-Token in den Kienzledoku-Einstellungen prüfen und danach erneut aus T2med öffnen. Es wurde noch keine Aufnahme gestartet.";
+    } else {
+        alert.informativeText = @"Bitte die Kienzledoku-Client-Einstellungen prüfen. Weitere technische Angaben stehen im Diagnoseprotokoll.";
+    }
+    [alert addButtonWithTitle:@"OK"];
+    return alert;
+}
+
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        if (argc == 3 && strcmp(argv[1], "--startup-error") == 0) {
+            NSApplication *application = [NSApplication sharedApplication];
+            [application setActivationPolicy:NSApplicationActivationPolicyAccessory];
+            [application activateIgnoringOtherApps:YES];
+            [KienzledokuStartupAlert([NSString stringWithUTF8String:argv[2]]) runModal];
+            return 0;
+        }
         if (argc < 2 || argc > 3) {
             fprintf(stderr, "usage: kienzledoku_window http://127.0.0.1:PORT/ [icon.icns]\n");
             return 2;

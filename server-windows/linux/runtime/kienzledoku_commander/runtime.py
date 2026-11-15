@@ -5,6 +5,7 @@ from pathlib import Path
 import signal
 import socket
 import subprocess
+import threading
 import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -21,9 +22,9 @@ class LocalOnly(HTTPRedirectHandler):
         return None  # Validated local destinations must not redirect medical data elsewhere.
 
 
-def document(raw):
+def document(raw, fields=None):
     try:
-        parsed = parse_documentation_json(raw)
+        parsed = parse_documentation_json(raw, fields)
         text = raw.strip()
         if text.startswith("```") and text.endswith("```"):
             text = "\n".join(text.splitlines()[1:-1]).strip()
@@ -34,7 +35,7 @@ def document(raw):
             value.encode("utf-8")
         return parsed
     except (ValueError, TypeError, AttributeError):
-        raise BackendFailure("Das LLM hat keine vollständige Vier-Felder-Dokumentation geliefert.") from None
+        raise BackendFailure("Das LLM hat keine vollständige Dokumentation geliefert.") from None
 
 
 class Runtime:
@@ -43,6 +44,8 @@ class Runtime:
         self.process = None
         self.model = None
         self.log = None
+        self.worker_processes = {"asr": None, "diar": None}
+        self._shutdown = threading.Event()
         self.http = build_opener(ProxyHandler({}), LocalOnly())
 
     def control(self, role, operation):
@@ -77,21 +80,97 @@ class Runtime:
             raise BackendFailure("Die Worker-Steuerung ist nicht verfügbar.") from None
 
     def load_asr(self):
-        self.control("asr", "load")
+        if self.settings.platform == "macos":
+            self._start_worker("asr")
+        else:
+            self.control("asr", "load")
 
     def park_asr(self):
-        self.control("asr", "park")
+        if self.settings.platform == "macos":
+            self._stop_worker("asr")
+        else:
+            self.control("asr", "park")
 
     def load_diar(self):
-        self.control("diar", "load")
+        if self.settings.platform == "macos":
+            self._start_worker("diar")
+        else:
+            self.control("diar", "load")
 
     def park_diar(self):
-        self.control("diar", "park")
+        if self.settings.platform == "macos":
+            self._stop_worker("diar")
+        else:
+            self.control("diar", "park")
 
-    def _http(self, url, body=None, content_type="application/json", timeout=None, token=None):
+    def _start_worker(self, role):
+        if self._shutdown.is_set():
+            raise BackendFailure('Commander wird beendet.')
+        proc = self.worker_processes[role]
+        if proc is not None and proc.poll() is None:
+            return
+        command = self.settings.asr_command if role == "asr" else self.settings.diar_command
+        url = self.settings.asr_url if role == "asr" else self.settings.diar_url
+        address = urlsplit(url)
+        try:
+            with socket.create_connection((address.hostname, address.port), timeout=.2):
+                raise BackendFailure("Der Worker-Port wird bereits von einem fremden Prozess verwendet.")
+        except OSError:
+            pass
+        env = dict(os.environ)
+        if role == "asr":
+            env.update(KIENZLEDOKU_WHISPER_MODEL=self.settings.asr_model_path,
+                       KIENZLEDOKU_ASR_HOST=address.hostname, KIENZLEDOKU_ASR_PORT=str(address.port))
+        else:
+            env.update(KIENZLEDOKU_PYANNOTE_MODEL=self.settings.diar_model_path,
+                       KIENZLEDOKU_DIARIZATION_HOST=address.hostname, KIENZLEDOKU_DIARIZATION_PORT=str(address.port),
+                       PYTORCH_ENABLE_MPS_FALLBACK="0")
+        try:
+            proc = subprocess.Popen(list(command), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL, start_new_session=True, env=env)
+            self.worker_processes[role] = proc
+            deadline = time.monotonic() + self.settings.load_timeout
+            while time.monotonic() < deadline and not self._shutdown.is_set():
+                if proc.poll() is not None:
+                    raise BackendFailure()
+                try:
+                    health = self._http(url + "/health", timeout=1)
+                    if health.get("ok") is True or health.get("status") == "ok":
+                        return
+                except BackendFailure:
+                    pass
+                time.sleep(.05)
+            self._stop_worker(role)
+        except (OSError, BackendFailure):
+            self._stop_worker(role)
+        raise BackendFailure("Der Worker konnte nicht geladen werden.")
+
+    def _stop_worker(self, role):
+        proc = self.worker_processes[role]
+        if proc is None:
+            return
+        if proc.poll() is None:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                proc.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                proc.wait(timeout=15)
+        else:
+            proc.wait()
+        self.worker_processes[role] = None
+
+    def _http(self, url, body=None, content_type="application/json", timeout=None, token=None, extra_headers=None):
         headers = {"Content-Type": content_type}
         if token:
             headers["Authorization"] = "Bearer " + token
+        headers.update(extra_headers or {})
         try:
             with self.http.open(Request(url, data=body, headers=headers), timeout=timeout or self.settings.backend_timeout) as response:
                 result = response.read(MAX_REPLY + 1)
@@ -102,7 +181,23 @@ class Runtime:
             # Backend errors can echo a prompt, filename or transcript. Never expose them.
             raise BackendFailure() from None
 
+    def remote_get(self, path):
+        if not self.settings.remote_llm_url:
+            raise BackendFailure()
+        return self._http(self.settings.remote_llm_url.rstrip("/") + path,
+                          timeout=self.settings.metadata_timeout,
+                          token=os.environ.get(self.settings.remote_llm_token_env),
+                          extra_headers={"X-Kienzledoku-Commander-Hop": "1"})
+
+    def _remote_post(self, path, value):
+        return self._http(self.settings.remote_llm_url.rstrip("/") + path,
+                          json.dumps(value).encode(), timeout=self.settings.backend_timeout,
+                          token=os.environ.get(self.settings.remote_llm_token_env),
+                          extra_headers={"X-Kienzledoku-Commander-Hop": "1"})
+
     def load_llm(self, quality):
+        if self._shutdown.is_set():
+            raise BackendFailure('Commander wird beendet.')
         if self.process is not None:
             if self.model == quality and self.process.poll() is None:
                 return
@@ -128,12 +223,15 @@ class Runtime:
             "--log-disable"]
         # llama.cpp can log request bodies at verbose levels. No medical server output is retained.
         env = dict(os.environ)
-        env["CUDA_VISIBLE_DEVICES"] = str(self.settings.gpu_index)
+        if self.settings.platform == "linux":
+            env["CUDA_VISIBLE_DEVICES"] = str(self.settings.gpu_index)
         try:
             self.process = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL, start_new_session=True, env=env)
             start = time.monotonic()
             while True:
+                if self._shutdown.is_set():
+                    raise BackendFailure('Commander wird beendet.')
                 if self.process.poll() is not None:
                     raise BackendFailure("Das LLM konnte nicht gestartet werden.")
                 try:
@@ -183,18 +281,42 @@ class Runtime:
         if job.role == "diar":
             return self._http(self.settings.diar_url + "/v1/diarize" + job.payload.get("query", ""),
                 job.payload["body"], job.payload["content_type"])
+        if self.settings.remote_llm_url:
+            remote = job.payload.get("remote")
+            if not remote or job.payload.get("hop"):
+                raise BackendFailure("Die Remote-Weiterleitung wurde wegen einer Schleife abgelehnt.")
+            value = self._remote_post(remote["path"], remote["body"])
+            if remote["path"].endswith("/extract"):
+                parsed = value["documentation"]
+                parsed = parse_documentation_json(parsed, job.payload["fields"])
+                completion = {"choices": [{"finish_reason": "stop", "message": {
+                    "role": "assistant", "content": json.dumps(parsed, ensure_ascii=False)}}]}
+                return {"documentation": parsed, "completion": completion,
+                        "remote_commander": value.get("commander", {})}
+            choice = value["choices"][0]
+            parsed = document(choice["message"]["content"], job.payload["fields"])
+            choice["message"]["content"] = json.dumps(parsed, ensure_ascii=False)
+            return {"documentation": parsed, "completion": value,
+                    "remote_commander": value.get("commander", {})}
         request = dict(job.payload["llm"])
-        request.update(model=job.quality, stream=False, cache_prompt=False)
+        request.update(model=self.settings.runtime_quality(job.quality), stream=False, cache_prompt=False)
         value = self._http(self.settings.llm_url + "/v1/chat/completions", json.dumps(request).encode())
         try:
             choice = value["choices"][0]
             if choice.get("finish_reason") != "stop":
                 raise BackendFailure("Die LLM-Antwort wurde nicht vollständig abgeschlossen.")
-            parsed = document(choice["message"]["content"])
+            parsed = document(choice["message"]["content"], job.payload.get("fields"))
             choice["message"]["content"] = json.dumps(parsed, ensure_ascii=False)
         except (KeyError, IndexError, TypeError):
             raise BackendFailure("Das LLM hat keine vollständige Dokumentation geliefert.") from None
         return {"documentation": parsed, "completion": value}
 
+    def cancel_loading(self):
+        """Interrupt cold starts when shutting down; never abandon children."""
+        self._shutdown.set()
+
     def close(self):
+        self.cancel_loading()
         self.stop_llm()
+        for role in ("asr", "diar"):
+            self._stop_worker(role)

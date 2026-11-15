@@ -1,0 +1,201 @@
+{
+  "version": "1.7.6",
+  "hardware": {
+    "platform": "darwin",
+    "arch": "arm64",
+    "ram_gib": 32,
+    "free_gib": 100,
+    "server_supported": true
+  },
+  "models": [
+    {
+      "id": "qwen4-q4",
+      "label": "Qwen3.5 4B Q4",
+      "quality": "basis",
+      "repository": "unsloth/Qwen3.5-4B-GGUF",
+      "revision": "e87f176479d0855a907a41277aca2f8ee7a09523",
+      "filename": "Qwen3.5-4B-Q4_K_M.gguf",
+      "bytes": 2740937888,
+      "sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+      "min_ram_gib": 16,
+      "default": true,
+      "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf",
+      "context": 32768,
+      "kv": "q8_0",
+      "supported": true,
+      "reason": ""
+    },
+    {
+      "id": "9b-q4",
+      "label": "Qwen_Qwen3.5-9B-Q4_K_M",
+      "quality": "basis",
+      "repository": "bartowski/Qwen_Qwen3.5-9B-GGUF",
+      "revision": "2dcd842c59ea5eb119267064550a7a4c592b16c3",
+      "filename": "Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+      "bytes": 6169341984,
+      "sha256": "d784ce9eda1a5a7b51e8f705a9e6310844bf4f173654d115823c775fdea56d43",
+      "min_ram_gib": 24,
+      "default": false,
+      "url": "https://huggingface.co/bartowski/Qwen_Qwen3.5-9B-GGUF/resolve/2dcd842c59ea5eb119267064550a7a4c592b16c3/Qwen_Qwen3.5-9B-Q4_K_M.gguf",
+      "context": 32768,
+      "kv": "q8_0",
+      "supported": true,
+      "reason": ""
+    },
+    {
+      "id": "gemma12-qat-q4",
+      "label": "Gemma 4 12B QAT Q4_0",
+      "quality": "basis",
+      "repository": "google/gemma-4-12B-it-qat-q4_0-gguf",
+      "revision": "29d097773436b69ff9feafd636ab4cf873786537",
+      "filename": "gemma-4-12b-it-qat-q4_0.gguf",
+      "bytes": 6975879296,
+      "sha256": "93567e57a8fe10b23569b9d9ec38cd005deedf71e29477c421a4b83f418a538b",
+      "min_ram_gib": 24,
+      "default": false,
+      "url": "https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf/resolve/29d097773436b69ff9feafd636ab4cf873786537/gemma-4-12b-it-qat-q4_0.gguf",
+      "context": 32768,
+      "kv": "q8_0",
+      "supported": true,
+      "reason": ""
+    },
+    {
+      "id": "9b-q6",
+      "label": "Qwen_Qwen3.5-9B-Q6_K",
+      "quality": "gruendlich",
+      "repository": "bartowski/Qwen_Qwen3.5-9B-GGUF",
+      "revision": "2dcd842c59ea5eb119267064550a7a4c592b16c3",
+      "filename": "Qwen_Qwen3.5-9B-Q6_K.gguf",
+      "bytes": 7958818848,
+      "sha256": "073a9275e65d9c8cd2819cf5f77b99fbaa6e87ba591da6bbaa86ec073a64bfef",
+      "min_ram_gib": 24,
+      "default": false,
+      "url": "https://huggingface.co/bartowski/Qwen_Qwen3.5-9B-GGUF/resolve/2dcd842c59ea5eb119267064550a7a4c592b16c3/Qwen_Qwen3.5-9B-Q6_K.gguf",
+      "context": 32768,
+      "kv": "q8_0",
+      "supported": true,
+      "reason": ""
+    },
+    {
+      "id": "gemma12-q8",
+      "label": "Gemma 4 12B Q8_0",
+      "quality": "gruendlich",
+      "repository": "ggml-org/gemma-4-12B-it-GGUF",
+      "revision": "790d826c6ec7dc8aa0ab23af33e5b8313140a231",
+      "filename": "gemma-4-12B-it-Q8_0.gguf",
+      "bytes": 12669641920,
+      "sha256": "3730903965b3e57bcad0a387110322ce66409559c356a1ae1b61701024e5ce60",
+      "min_ram_gib": 24,
+      "default": true,
+      "url": "https://huggingface.co/ggml-org/gemma-4-12B-it-GGUF/resolve/790d826c6ec7dc8aa0ab23af33e5b8313140a231/gemma-4-12B-it-Q8_0.gguf",
+      "context": 32768,
+      "kv": "q8_0",
+      "supported": true,
+      "reason": ""
+    },
+    {
+      "id": "27b-q4",
+      "label": "Qwen3.8-27B-UD-Q4_K_M",
+      "quality": "sehr_gruendlich",
+      "repository": "unsloth/Qwen3.8-27B-GGUF",
+      "revision": "4ca720788d1e01f1bff70c033e0d0028fd02e502",
+      "filename": "Qwen3.8-27B-UD-Q4_K_M.gguf",
+      "bytes": 16464440224,
+      "sha256": "322e194ff79741c7baa497c240f677f54b201b0efab44ca8e50f122b39123482",
+      "min_ram_gib": 32,
+      "default": true,
+      "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/4ca720788d1e01f1bff70c033e0d0028fd02e502/Qwen3.8-27B-UD-Q4_K_M.gguf",
+      "context": 32768,
+      "kv": "q8_0",
+      "supported": true,
+      "reason": ""
+    },
+    {
+      "id": "unsupported",
+      "label": "Großes 70B-Modell",
+      "quality": "sehr_gruendlich",
+      "supported": false,
+      "min_ram_gib": 64,
+      "bytes": 42000000000,
+      "reason": "mindestens 64 GB RAM"
+    }
+  ],
+  "fields": [
+    {
+      "id": "anamnese",
+      "label": "Anamnese",
+      "default": true
+    },
+    {
+      "id": "befund",
+      "label": "Befund",
+      "default": true
+    },
+    {
+      "id": "ekg",
+      "label": "EKG",
+      "default": false
+    },
+    {
+      "id": "sonografie",
+      "label": "Sonografie",
+      "default": false
+    },
+    {
+      "id": "therapie",
+      "label": "Therapie",
+      "default": true
+    },
+    {
+      "id": "prozedere",
+      "label": "Prozedere",
+      "default": true
+    },
+    {
+      "id": "notiz",
+      "label": "Notiz",
+      "default": false
+    }
+  ],
+  "defaults": {
+    "mode": "combined",
+    "server_role": "full",
+    "connection_mode": "connect",
+    "t2med_url": "https://127.0.0.1:16567/aps/fhir/api/r4",
+    "t2med_insecure": false,
+    "commander_url": "http://10.0.83.140:8185",
+    "commander_token": "",
+    "network": "local",
+    "listen_host": "0.0.0.0",
+    "auth_enabled": false,
+    "server_token": "",
+    "remote_llm_url": "",
+    "remote_llm_token": "",
+    "selected_models": [
+      "qwen4-q4",
+      "gemma12-q8",
+      "27b-q4"
+    ],
+    "quality_models": {
+      "basis": "qwen4-q4",
+      "gruendlich": "gemma12-q8",
+      "sehr_gruendlich": "27b-q4"
+    },
+    "memory_mode": "serial",
+    "asr_on_demand": true,
+    "diarization": true,
+    "hf_token": "",
+    "fields": [
+      "anamnese",
+      "befund",
+      "therapie",
+      "prozedere"
+    ],
+    "prompt": "Du bist ein medizinischer Dokumentationsassistent.\n\nRegeln:\n- Dokumentiere ausschließlich Tatsachen, die tatsächlich diktiert oder im Transkript genannt wurden.\n- Erfinde oder ergänze keine Diagnosen, Befunde, Therapien, Empfehlungen oder Briefaktionen.\n- Bereinige offensichtliche ASR-Wiederholungen nur sprachlich; verändere den Inhalt nicht.\n- Kennzeichne unklare oder widersprüchliche Angaben knapp als unklar oder lasse sie weg.\n- Verwende einen knappen, sachlichen medizinischen Dokumentationsstil.\n- EKG und Sonografie bleiben leer, wenn kein entsprechender Befund diktiert wurde.\n- Notiz enthält nur ausdrücklich als Notiz genannte Inhalte. Eine Notiz über einen Brief ist keine tatsächlich ausgeführte Briefaktion.\n- Fortsetzungsmarker und technische Hinweise zur Fortsetzung einer Aufnahme werden nicht dokumentiert.\n- Sprecher-IDs der automatischen Diarisierung gelten nur innerhalb des jeweiligen Abschnitts und sind keine sichere Personenidentifikation.\n- Ordne Arzt, Patient oder Begleitperson nur bei eindeutigem Gesprächskontext zu.\n",
+    "diarization_mode": "serial"
+  },
+  "default_prompt": "Du bist ein medizinischer Dokumentationsassistent.\n\nRegeln:\n- Dokumentiere ausschließlich Tatsachen, die tatsächlich diktiert oder im Transkript genannt wurden.\n- Erfinde oder ergänze keine Diagnosen, Befunde, Therapien, Empfehlungen oder Briefaktionen.\n- Bereinige offensichtliche ASR-Wiederholungen nur sprachlich; verändere den Inhalt nicht.\n- Kennzeichne unklare oder widersprüchliche Angaben knapp als unklar oder lasse sie weg.\n- Verwende einen knappen, sachlichen medizinischen Dokumentationsstil.\n- EKG und Sonografie bleiben leer, wenn kein entsprechender Befund diktiert wurde.\n- Notiz enthält nur ausdrücklich als Notiz genannte Inhalte. Eine Notiz über einen Brief ist keine tatsächlich ausgeführte Briefaktion.\n- Fortsetzungsmarker und technische Hinweise zur Fortsetzung einer Aufnahme werden nicht dokumentiert.\n- Sprecher-IDs der automatischen Diarisierung gelten nur innerhalb des jeweiligen Abschnitts und sind keine sichere Personenidentifikation.\n- Ordne Arzt, Patient oder Begleitperson nur bei eindeutigem Gesprächskontext zu.\n",
+  "docs_url": "https://github.com/thomaskien/kienzledoku/blob/main/README.md#t2med-einrichten-und-verwenden",
+  "csrf": "fixture-csrf-token",
+  "production_key": true
+}

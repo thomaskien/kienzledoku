@@ -7,24 +7,20 @@ import secrets
 import shutil
 import threading
 import time
-import urllib.request
 import webbrowser
 from pathlib import Path
 
 import kienzledoku_config as config
 from kienzledoku_commander_client import configured_client
 from kienzledoku_http import SecureLocalHandler, configure_server
+from kienzledoku_product_key import production_build
 
 FIELDS = [
  ('connection', 'mode', 'FHIR-Verbindung', 'mode'),
  ('connection', 'target', 'T2med-FHIR-Basis (genaues HTTPS-Ziel)', 'text'),
  ('connection', 'ca_file', 'CA-Zertifikat (PEM-Dateipfad, optional)', 'text'),
  ('connection', 'allow_insecure_tls', 'Lokales T2med-Zertifikat ohne Prüfung akzeptieren', 'checkbox'),
- ('commander', 'enabled', 'Commander für alle KI-Dienste verwenden', 'checkbox'),
  ('commander', 'url', 'Commander-Adresse', 'text'),
- ('services', 'asr', 'ASR-Adresse', 'text'),
- ('services', 'diarization', 'Sprechertrennung-Adresse', 'text'),
- ('services', 'llm', 'LLM-Adresse', 'text'),
  ('record', 'diarization', 'Sprechertrennung verwenden', 'checkbox'),
  ('record', 'microphone', 'Mikrofon (leer = Standard; Auswahl auch in der Aufnahme)', 'text'),
  ('record', 'output_mode', 'Dokumentationsformat', 'output'),
@@ -38,7 +34,7 @@ def run_settings(no_browser=False, window_opener=None, setup=False):
     except (ValueError, OSError) as exc:
         initial, message = config.defaults(), 'Einstellungen konnten nicht gelesen werden: %s. Angezeigt werden Standardwerte; die vorhandene Datei wird erst beim Speichern ersetzt.' % exc
     state = {'config': initial, 'message': message, 'last': time.monotonic(), 'devices': []}
-    fields_to_show = [field for field in FIELDS if not setup or field[0] in ('connection', 'commander', 'services')]
+    fields_to_show = [field for field in FIELDS if not setup or field[0] in ('connection', 'commander')]
     saved = False
     csrf = secrets.token_urlsafe(32)
     stopped = threading.Event()
@@ -51,21 +47,20 @@ def run_settings(no_browser=False, window_opener=None, setup=False):
                 value = state['config'][section][key]
                 name = section + '.' + key
                 if kind == 'checkbox':
-                    marker = '<input type="hidden" name="%s-present" value="1">' % name if section == 'commander' else ''
-                    control = marker + '<input type="checkbox" name="%s" %s>' % (name, 'checked' if value else '')
+                    control = '<input type="checkbox" name="%s" %s>' % (name, 'checked' if value else '')
                 elif key == 'microphone' and state['devices']:
                     values = [('', 'System-Standardgerät')] + [(d['index'], d['name']) for d in state['devices']]
                     if value and value not in [k for k, _ in values]:
                         values.append((value, 'Gespeichertes Gerät (derzeit nicht verfügbar)'))
                     control = '<select name="%s">%s</select>' % (name, ''.join('<option value="%s" %s>%s</option>' % (html.escape(k,quote=True), 'selected' if value == k else '', html.escape(v)) for k, v in values))
                 elif kind in ('mode', 'output'):
-                    values = [('direct', 'Direktbetrieb'), ('connect', 'Über Connect')] if kind == 'mode' else [('structured', 'Vier Einträge'), ('single', 'Ein Freitext')]
+                    values = [('direct', 'Direktbetrieb'), ('connect', 'Über Connect')] if kind == 'mode' else [('structured', 'Strukturierte Einträge'), ('single', 'Ein Freitext')]
                     control = '<select name="%s">%s</select>' % (name, ''.join('<option value="%s" %s>%s</option>' % (k, 'selected' if value == k else '', v) for k, v in values))
                 else:
                     control = '<input name="%s" value="%s">' % (name, html.escape(value, quote=True))
                 fields.append('<label>%s%s</label>' % (label, control))
             heading = 'Server für die Installation einrichten' if setup else 'Einstellungen'
-            explanation = ('Bitte T2med und Commander eintragen. Die bisherigen einzelnen KI-Dienstadressen bleiben für deaktivierten Commander erhalten. '
+            explanation = ('Bitte T2med und Commander eintragen. Alle KI-Dienste werden über den Commander angesprochen. '
                            'Mit „Speichern und Installation abschließen“ werden diese Werte übernommen. '
                            'Spätere Änderungen sind über kienzledoku record im Startmenü möglich.') if setup else ''
             buttons = ('<button name="action" value="save">Speichern und Installation abschließen</button>'
@@ -77,21 +72,23 @@ def run_settings(no_browser=False, window_opener=None, setup=False):
                        '<button name="action" value="audio_test">Mikrofon 3 Sekunden testen</button>'
                        '<button name="action" value="close">Schließen</button>')
             key_field = '<label>Commander-Zugang (leer = unverändert)<input type="password" name="commander_token" autocomplete="new-password"></label>'
-            if not setup:
+            if not setup and not production_build():
                 key_field += '<label>Eigener API-Key für Direktbetrieb (leer = unverändert)<input type="password" name="direct_key" autocomplete="new-password"></label>'
+            key_note = ('Diese Version verwendet den eingebetteten KienzleDoku-Hersteller-Key für Direktbetrieb und Connect.'
+                        if production_build() else 'Ohne eigenen Key wird der öffentliche Demo-Key verwendet. Connect ersetzt jeden mitgesendeten Key durch seinen eingebetteten Key.')
             data = ('''<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>kienzledoku record 1.3.3 – %s</title><style>
+<title>kienzledoku record 1.7.6 – %s</title><style>
 body{font:16px system-ui;margin:32px auto;padding:0 24px;max-width:760px;background:#f2f3f5;color:#172536}
-header{display:flex;gap:20px;align-items:center}img{width:96px}h1{font-size:26px}form{background:white;padding:24px;border-radius:16px}
+header{display:flex;gap:20px;align-items:center}.logo-slot{width:96px;height:96px;display:flex;align-items:center;justify-content:center;flex:none}.logo-slot img{width:66%%;height:66%%;object-fit:contain}h1{font-size:26px}form{background:white;padding:24px;border-radius:16px}
 label{display:block;margin:15px 0}input:not([type=checkbox]),select{display:block;width:100%%;box-sizing:border-box;padding:10px;margin-top:6px}
 button{padding:12px 16px;margin:8px 4px 0 0}p{line-height:1.5}.notice{white-space:pre-wrap}</style>
-<header><img src="/logo.svg" alt=""><div><h1>kienzledoku record 1.3.3</h1><p>%s</p></div></header>
+<header><span class="logo-slot"><img src="/logo.svg" alt=""></span><div><h1>kienzledoku record 1.7.6</h1><p>%s</p></div></header>
 <p>%s</p><p class="notice">%s</p><form method="post"><input type="hidden" name="csrf" value="%s">%s%s
-<p>Ohne eigenen Key wird der öffentliche Demo-Key verwendet. Connect ersetzt jeden mitgesendeten Key durch seinen eingebetteten Key.
+<p>%s
 Die Zertifikatsausnahme betrifft ausschließlich das eingetragene T2med-Ziel. Änderungen gelten für den nächsten Patientenvorgang.</p>
 %s</form>
 <script>window.addEventListener('kienzledoku-close-request',()=>{window.close();});</script></html>'''
-                    % (heading, heading, explanation, html.escape(state['message']), csrf, ''.join(fields), key_field, buttons)).encode('utf-8')
+                    % (heading, heading, explanation, html.escape(state['message']), csrf, ''.join(fields), key_field, key_note, buttons)).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'text/html; charset=utf-8')
             self.send_header('Content-Length', str(len(data)))
@@ -127,8 +124,6 @@ Die Zertifikatsausnahme betrifft ausschließlich das eingetragene T2med-Ziel. Ä
                     self.page(); stopped.set(); return
                 candidate = copy.deepcopy(state['config'])
                 for section, key, _label, kind in fields_to_show:
-                    if section == 'commander' and key == 'enabled' and section + '.' + key + '-present' not in form:
-                        continue
                     if section + '.' + key not in form and kind != 'checkbox':
                         continue
                     raw = form.get(section + '.' + key, [''])[0]
@@ -152,23 +147,14 @@ Die Zertifikatsausnahme betrifft ausschließlich das eingetragene T2med-Ziel. Ä
                     lines = []
                     commander = configured_client(candidate['commander'],
                         token_override=form.get('commander_token', [''])[0] or None)
-                    if commander:
-                        try:
-                            profiles = commander.profiles()
-                            commander.request('/health', timeout=3)
-                            lines.append('Commander: OK (%d Qualitätsprofile)' % len(profiles))
-                        except Exception as exc:
-                            lines.append('Commander: ' + str(exc))
-                        if form.get('commander_token', [''])[0]:
-                            lines.append('Der eingegebene Zugang wurde nur geprüft. Zum Speichern erneut eingeben.')
-                    else:
-                        for name, base in candidate['services'].items():
-                            suffix = '/v1/models' if name == 'llm' and not base.rstrip('/').endswith('/v1') else ('/models' if name == 'llm' else '/health')
-                            try:
-                                with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(base.rstrip('/') + suffix, timeout=3) as response:
-                                    lines.append(name + ': ' + ('OK' if response.status == 200 else 'nicht bereit'))
-                            except Exception:
-                                lines.append(name + ': nicht erreichbar')
+                    try:
+                        profiles = commander.profiles()
+                        commander.request('/health', timeout=3)
+                        lines.append('Commander: OK (%d Qualitätsprofile)' % len(profiles))
+                    except Exception as exc:
+                        lines.append('Commander: ' + str(exc))
+                    if form.get('commander_token', [''])[0]:
+                        lines.append('Der eingegebene Zugang wurde nur geprüft. Zum Speichern erneut eingeben.')
                     state['message'] = '\n'.join(lines)
                 elif not setup and action in ('devices', 'audio_test'):
                     import sounddevice as sd

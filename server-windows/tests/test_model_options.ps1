@@ -1,4 +1,5 @@
 ﻿$ErrorActionPreference='Stop'
+$script:CommanderOptions=$null
 Set-StrictMode -Version 2
 $root=Split-Path -Parent $PSScriptRoot
 $module=Import-Module (Join-Path $root 'windows/Core.psm1') -Force -PassThru -DisableNameChecking

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""kienzledoku record 1.3.3 <-> T2med FHIR client.
+"""kienzledoku record 1.7.6 <-> T2med FHIR client.
 
 Target: Python 3.9+ (macOS, Ubuntu 24.04 LTS) and bundled Python 3.12 (Windows).
 Platform-independent FHIR/UI core with optional compiled Connect transport.
@@ -37,10 +37,14 @@ from pathlib import Path
 import kienzledoku_config as record_config
 from kienzledoku_connect import ConnectProxy
 from kienzledoku_http import SecureLocalHandler, configure_server
-from kienzledoku_session import Recovery, acquire as acquire_record_session, session_dir, register_window, unregister_window
+from kienzledoku_session import (ActiveSessionError, acquire as acquire_record_session,
+    cleanup_legacy_patient_data, session_dir, register_window, start_active_broker,
+    unregister_window)
 
 from kienzledoku_document import (
     DOCUMENT_FIELDS,
+    DOCUMENT_CODES,
+    DEFAULT_DOCUMENT_FIELDS,
     DOCUMENT_LABELS,
     OUTPUT_MODE_SINGLE,
     OUTPUT_MODE_STRUCTURED,
@@ -51,6 +55,7 @@ from kienzledoku_document import (
     normalize_entry_code,
     normalize_output_mode,
     parse_documentation_json,
+    validate_fields,
 )
 from kienzledoku_speech import (
     ACTIVE_STATUSES,
@@ -62,7 +67,7 @@ from kienzledoku_speech import (
 )
 
 APP_NAME = "kienzledoku record"
-VERSION = "1.3.3"
+VERSION = "1.7.6"
 LINUX_NATIVE_WINDOW_PATH = "/usr/local/libexec/kienzledoku/kienzledoku_window_linux"
 
 # Public test/demo key from T2med's reference application (not a secret).
@@ -167,8 +172,25 @@ def read_deep_link_stdin(stream=None):
     return value
 
 
-def notify_start_failure():
-    """Show a generic Linux desktop notification without sensitive details."""
+def notify_start_failure(error=None):
+    """Show startup failures even when the launcher discards stderr.
+
+    Only an allowlisted category reaches the native dialog, never exception
+    text, a deep link, a token or a patient identity.
+    """
+    if sys.platform == 'darwin':
+        from kienzledoku_commander_client import CommanderRequestError
+        category = 'generic'
+        if isinstance(error, CommanderRequestError):
+            category = 'commander-auth' if error.status == 401 else 'commander'
+        try:
+            subprocess.run([str(Path(__file__).with_name('kienzledoku_window')),
+                            '--startup-error', category], stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           check=False)
+        except OSError:
+            safe_log('Startup error dialog unavailable')
+        return
     if not sys.platform.startswith("linux") or not shutil.which("notify-send"):
         return
     try:
@@ -249,7 +271,11 @@ def mask(value, keep=5):
 
 
 def get_api_key():
-    """Priority: environment -> OS credential store -> public demo key."""
+    """Private production build, otherwise environment/store/public demo key."""
+    from kienzledoku_product_key import embedded_api_key
+    embedded = embedded_api_key()
+    if embedded is not None:
+        return embedded
     for env_name in ("KIENZLEDOKU_T2MED_API_KEY", "WHISPERDOKU_T2MED_API_KEY"):
         env_key = os.environ.get(env_name, "").strip()
         if env_key:
@@ -595,29 +621,33 @@ class T2medFhirClient(object):
             "valueString": text,
         }
 
-    def build_documentation_resources(self, documentation, output_mode, single_code):
-        document = normalize_documentation(documentation)
+    def build_documentation_resources(self, documentation, output_mode, single_code, fields=None):
+        fields = validate_fields(fields)
+        document = normalize_documentation(documentation, fields)
         mode = normalize_output_mode(output_mode)
         timestamp = datetime.now().astimezone().isoformat(timespec="seconds")
 
         if mode == OUTPUT_MODE_SINGLE:
-            combined = compose_single_block(document)
+            combined = compose_single_block(document, fields)
             if not combined:
-                raise ValueError("Alle vier Dokumentationsfelder sind leer")
+                raise ValueError("Alle aktiven Dokumentationsfelder sind leer")
             return [
                 ("Einzelblock %s" % normalize_entry_code(single_code),
                  self.build_freetext_observation(combined, single_code, timestamp))
             ]
 
         resources = []
-        for kind, text in nonempty_fields(document):
+        for kind, text in nonempty_fields(document, fields):
             if kind in ("anamnese", "befund"):
                 resource = self.build_observation(kind, text, timestamp)
-            else:
+            elif kind in ("therapie", "prozedere"):
                 resource = self.build_procedure(kind, text, timestamp)
+            else:
+                resource = self.build_freetext_observation(
+                    text, DOCUMENT_CODES[kind], timestamp)
             resources.append((DOCUMENT_LABELS[kind], resource))
         if not resources:
-            raise ValueError("Alle vier Dokumentationsfelder sind leer")
+            raise ValueError("Alle aktiven Dokumentationsfelder sind leer")
         return resources
 
     def build_transaction_bundle(self, resources):
@@ -634,8 +664,8 @@ class T2medFhirClient(object):
             raise ValueError("Transaction Bundle enthält keine Einträge")
         return {"resourceType": "Bundle", "type": "transaction", "entry": entries}
 
-    def write_documentation(self, documentation, output_mode, single_code):
-        labeled = self.build_documentation_resources(documentation, output_mode, single_code)
+    def write_documentation(self, documentation, output_mode, single_code, fields=None):
+        labeled = self.build_documentation_resources(documentation, output_mode, single_code, fields)
         labels = [label for label, _resource in labeled]
         bundle = self.build_transaction_bundle([resource for _label, resource in labeled])
         status, response = self._request("POST", "", body=bundle)
@@ -779,8 +809,6 @@ class SessionState(object):
         self.key_source = key_source
         self.csrf = secrets.token_urlsafe(24)
         self.write_uncertain = False
-        self.recovery = None
-        self.recovery_pending = False
         self.closing = False
         self.patient = None
         self.patient_error = ""
@@ -789,7 +817,8 @@ class SessionState(object):
         self.encounter = None
         self.message = ""
         self.error = ""
-        self.documentation = empty_documentation()
+        self.active_fields = DEFAULT_DOCUMENT_FIELDS
+        self.documentation = empty_documentation(self.active_fields)
         self.output_mode = DEFAULT_OUTPUT_MODE
         self.single_code = DEFAULT_SINGLE_CODE
         self.speech = None
@@ -850,15 +879,52 @@ def start_initial_work(state):
         if state.initial_work_started or state.closing:
             return
         state.initial_work_started = True
-        if not state.recovery_pending:
-            try:
-                state.speech.start()
-                safe_log("Automatic speech recording started")
-            except Exception as exc:
-                state.error = "Spracherkennung konnte nicht automatisch starten: %s" % exc
-                safe_log("Automatic speech recording failed", error=type(exc).__name__)
+        try:
+            state.speech.start()
+            safe_log("Automatic speech recording started")
+        except Exception as exc:
+            state.error = "Spracherkennung konnte nicht automatisch starten: %s" % exc
+            safe_log("Automatic speech recording failed", error=type(exc).__name__)
     return start_patient_load(state)
 
+
+WINDOWS_STATUS_LAYOUT = sys.platform == 'win32'
+
+# Use the Mac/Linux pill styling on Windows too. Reclaim the byline's space
+# before shortening any status text; the service row must never wrap.
+WINDOWS_STATUS_CSS = """
+.topbar { align-items:center; flex-direction:row; gap:18px; }
+.topbar h1 { flex:0 0 auto; }
+.topbar.compact-brand h1 { gap:0; }
+.topbar.compact-brand .brand-byline { display:none; }
+.server-row { flex:0 1 auto; min-width:0; flex-wrap:nowrap; justify-content:flex-end; }
+.server-badge { min-width:0; }
+.server-dot, .server-label { flex-shrink:0; }
+.server-name { display:flex; gap:4px; min-width:3.5em; overflow:hidden; }
+.server-host { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.server-state { min-width:1ch; overflow:hidden; text-overflow:ellipsis; }
+.topbar.measure-status .server-row, .topbar.measure-status .server-badge,
+.topbar.measure-status .server-name, .topbar.measure-status .server-host,
+.topbar.measure-status .server-state { flex-shrink:0; }
+"""
+
+WINDOWS_STATUS_JS = """
+  const statusHeader = document.querySelector('.topbar');
+  function fitStatusHeader() {
+    // Measure natural pill widths, without painting the temporary layout.
+    statusHeader.classList.remove('compact-brand');
+    statusHeader.classList.add('measure-status');
+    const title = statusHeader.querySelector('h1');
+    const row = statusHeader.querySelector('.server-row');
+    const gap = parseFloat(getComputedStyle(statusHeader).columnGap) || 0;
+    const needed = title.getBoundingClientRect().width + row.scrollWidth + gap;
+    statusHeader.classList.toggle('compact-brand', needed > statusHeader.clientWidth);
+    statusHeader.classList.remove('measure-status');
+  }
+  new ResizeObserver(fitStatusHeader).observe(statusHeader);
+  document.fonts.ready.then(fitStatusHeader);
+  fitStatusHeader();
+"""
 
 CSS = """
 * { box-sizing:border-box; }
@@ -866,7 +932,7 @@ html, body { min-height:100%; }
 body { font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin:0; background:#f2f3f5; color:#1d1d1f; }
 main { max-width:1440px; margin:0 auto; padding:12px 18px 42px; }
 .primary-screen { min-height:calc(100vh - 24px); display:flex; flex-direction:column; gap:10px; }
-.record-heading { display:flex; gap:18px; align-items:center; } .record-heading>img { width:100px; height:100px; object-fit:contain; flex-shrink:0; } .record-heading>div { flex:1; min-width:0; }
+.record-heading { display:flex; gap:18px; align-items:center; } .logo-slot { width:100px; height:100px; display:flex; align-items:center; justify-content:center; flex-shrink:0; } .logo-slot>img { width:66%; height:66%; object-fit:contain; } .record-heading>div:not(.logo-slot) { flex:1; min-width:0; }
 .topbar { display:flex; align-items:center; justify-content:space-between; gap:18px; min-height:38px; }
 h1 { display:flex; align-items:baseline; gap:9px; margin:0; white-space:nowrap; } h2 { font-size:17px; margin:0; }
 .brand-link { color:#1d1d1f; font-size:22px; font-weight:760; letter-spacing:-.025em; text-decoration:none; }
@@ -876,7 +942,8 @@ h1 { display:flex; align-items:baseline; gap:9px; margin:0; white-space:nowrap; 
 .server-badge { display:inline-flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #d8d8dc; background:white; border-radius:999px; font-size:12px; white-space:nowrap; }
 .server-dot { width:8px; height:8px; border-radius:50%; background:#8e8e93; }
 .server-badge.ok .server-dot { background:#248a3d; } .server-badge.error .server-dot { background:#d70015; }
-.server-badge.checking .server-dot { background:#ff9f0a; }
+.server-badge.checking .server-dot, .server-badge.loading .server-dot, .server-badge.standby .server-dot { background:#ff9f0a; }
+.server-badge.ready .server-dot, .server-badge.busy .server-dot { background:#248a3d; }
 .patient-row { display:flex; align-items:baseline; justify-content:space-between; gap:24px; background:white; border-radius:14px; padding:15px 20px; box-shadow:0 1px 5px rgba(0,0,0,.08); }
 .patient-name { font-size:30px; line-height:1.1; font-weight:750; letter-spacing:-.02em; }
 .patient-birth { color:#4c4c50; font-size:17px; white-space:nowrap; }
@@ -895,7 +962,7 @@ h1 { display:flex; align-items:baseline; gap:9px; margin:0; white-space:nowrap; 
 .panel form { display:flex; flex-direction:column; flex:1; min-height:0; }
 textarea { width:100%; padding:9px 10px; border:1px solid #c7c7cc; border-radius:8px; font:14px/1.35 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; resize:none; color:inherit; background:white; }
 .live-text, .diarization { flex:1; min-height:0; background:#fafafc; }
-.documentation-grid { display:grid; grid-template-rows:repeat(4,minmax(68px,1fr)); gap:6px; flex:1; min-height:0; }
+.documentation-grid { display:grid; grid-auto-rows:minmax(68px,1fr); gap:6px; flex:1; min-height:0; }
 .doc-field { display:flex; flex-direction:column; min-height:0; }
 label.block { display:block; margin:0 0 3px; font-size:11px; font-weight:750; letter-spacing:.045em; color:#55555a; }
 .doc-field textarea { flex:1; min-height:0; }
@@ -918,6 +985,7 @@ button:disabled { cursor:default; opacity:.45; }
 .technical { margin-top:72px; background:white; border-radius:14px; padding:16px 18px; box-shadow:0 1px 6px rgba(0,0,0,.07); }
 .technical summary { cursor:pointer; font-weight:700; }
 .technical-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:14px; }
+.prompt-tooltip summary { cursor:pointer; font-weight:600; } .prompt-tooltip pre { white-space:pre-wrap; max-height:260px; overflow:auto; padding:10px; background:#f5f5f7; border-radius:8px; }
 dt { color:#6e6e73; font-size:11px; margin-top:7px; } dd { margin:2px 0 0; font-weight:600; overflow-wrap:anywhere; }
 code { font-size:11px; }
 @media (max-width:900px) {
@@ -931,15 +999,49 @@ code { font-size:11px; }
 }
 """
 
+CSS += """
+.audio-settings{margin-top:72px;background:white;border-radius:14px;padding:16px 18px;box-shadow:0 1px 6px rgba(0,0,0,.07)}
+.audio-settings summary{cursor:pointer;font-weight:700}
+.audio-settings + .technical{margin-top:12px}
+.audio-controls{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;background:#fff;padding:12px 16px;border-radius:14px;margin:10px 0;border:1px solid #d9e1ea}
+.audio-controls label{display:inline-flex;align-items:center;gap:8px;margin:0}
+.audio-controls input[type=checkbox]{width:18px;height:18px;margin:0;accent-color:#326cae}
+.level-control{flex:1 1 360px;min-width:0;max-width:640px}
+.level-labels{display:flex;justify-content:space-between;gap:8px 18px;flex-wrap:wrap;font-size:13px}
+.level-meter{position:relative;height:36px;margin-top:4px}
+.input-meter{position:absolute;inset:10px 0;height:16px;border-radius:8px;background:#e9edf2;overflow:hidden;box-shadow:inset 0 0 0 1px #d3dbe3}
+.input-meter-fill{display:block;width:var(--level);height:100%;background:#2d9954;transition:width .1s linear}
+.level-meter input[type=range]{position:absolute;top:0;left:calc(16.666667% - 10px);width:calc(62.5% + 20px);height:36px;margin:0;padding:0;border:0;border-radius:0;background:transparent;appearance:none;-webkit-appearance:none;cursor:ew-resize}
+.level-meter input[type=range]::-webkit-slider-runnable-track{height:36px;border:0;background:transparent}
+.level-meter input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;box-sizing:border-box;width:20px;height:32px;margin-top:2px;border:2px solid #245f9c;border-radius:6px;background:transparent}
+.level-meter input[type=range]::-moz-range-track{height:36px;border:0;background:transparent}
+.level-meter input[type=range]::-moz-range-progress{background:transparent}
+.level-meter input[type=range]::-moz-range-thumb{box-sizing:border-box;width:20px;height:32px;border:2px solid #245f9c;border-radius:6px;background:transparent}
+.level-meter input[type=range]:focus-visible{outline:2px solid #245f9c;outline-offset:3px;border-radius:6px}
+.level-scale{position:relative;height:14px;color:#6e6e73;font-size:11px;font-variant-numeric:tabular-nums}
+.level-scale span{position:absolute;transform:translateX(-50%)}
+.level-scale span:first-child{left:0;transform:none}.level-scale span:nth-child(2){left:25%}.level-scale span:nth-child(3){left:50%}.level-scale span:nth-child(4){left:75%}.level-scale span:last-child{right:0;transform:none}
+.audio-controls output{font-variant-numeric:tabular-nums;white-space:nowrap}
+#audio-controls-hint{flex-basis:100%}
+"""
+
 
 def _server_badge(element_id, label, host, status, message):
-    normalized = status if status in ("ok", "error", "checking") else "checking"
-    status_text = {"ok": "OK", "error": "FEHLER", "checking": "PRÜFUNG"}[normalized]
-    return (
+    normalized = status if status in ("ok", "error", "checking", "loading", "standby", "ready", "busy", "disabled") else "checking"
+    status_text = {"ok": "OK", "error": "FEHLER", "checking": "PRÜFUNG",
+                   "loading": "WIRD GELADEN", "standby": "STANDBY", "ready": "BEREIT",
+                   "busy": "AKTIV", "disabled": "DEAKTIVIERT"}[normalized]
+    markup = (
+        '<span id="{element_id}" class="server-badge {status}" data-label="{label}" title="{message}">'
+        '<span class="server-dot"></span><span class="server-name" title="{label} {host}">'
+        '<span class="server-label">{label}</span><span class="server-host">{host}</span></span>'
+        '<strong class="server-state" title="{status_text}">{status_text}</strong></span>'
+    ) if WINDOWS_STATUS_LAYOUT else (
         '<span id="{element_id}" class="server-badge {status}" title="{message}">'
         '<span class="server-dot"></span><span>{label} {host}</span> '
         '<strong class="server-state">{status_text}</strong></span>'
-    ).format(
+    )
+    return markup.format(
         element_id=html.escape(element_id),
         status=normalized,
         message=html.escape(message or ""),
@@ -950,10 +1052,6 @@ def _server_badge(element_id, label, host, status, message):
 
 
 def page_html(state):
-    if state.recovery_pending:
-        same = state.recovery.previous.get('context_hash') == state.recovery.identity
-        restore = '<button name="do" value="recovery_restore">Offene Arbeit wiederherstellen</button>' if same else '<p>Ein anderer Patient war zuvor geöffnet. Zum Wiederherstellen bitte diesen Patienten erneut aus T2med aufrufen.</p>'
-        return '<!doctype html><html lang="de"><meta charset="utf-8"><title>kienzledoku record 1.3.3</title><style>%s</style><main><h1>Offene Arbeit vorhanden</h1><p>Vor einem neuen Vorgang muss die alte Arbeit wiederhergestellt oder ausdrücklich verworfen werden. Ein unklarer Schreibausgang ist zuvor in T2med zu prüfen.</p><form method="post" action="/action"><input type="hidden" name="csrf" value="%s">%s<button name="do" value="recovery_discard">Alte Arbeit ausdrücklich verwerfen</button></form></main></html>' % (CSS, html.escape(state.csrf), restore)
     patient = patient_summary(state.patient) if state.patient else None
     encounter = encounter_summary(state.encounter) if state.encounter else None
     speech = state.speech.snapshot() if state.speech is not None else {
@@ -989,18 +1087,23 @@ def page_html(state):
         selected_quality = speech.get('selected_quality') or 'auto'
         default_profile = next((profile for profile in profiles if profile.get('default')), profiles[0] if profiles else None)
         default_label = default_profile['label'] if default_profile else 'wird geprüft'
-        options = ['<option value="auto"%s>Standard (%s)</option>' % (
-            ' selected' if selected_quality == 'auto' else '', html.escape(default_label))]
-        for profile in profiles:
-            options.append('<option value="%s"%s>%s</option>' % (
-                html.escape(profile['id'], quote=True),
-                ' selected' if selected_quality == profile['id'] else '',
-                html.escape(profile['label'])))
-        quality_control = (
-            '<div class="quality-control"><label for="processing-quality">Verarbeitung</label>'
-            '<select id="processing-quality" name="quality" aria-label="Verarbeitungsqualität"%s>%s</select>'
-            '<span class="small">Wird erst nach dem Ende der Aufnahme angewendet.</span></div>'
-        ) % (' disabled' if not profiles else '', ''.join(options))
+        if len(profiles) == 1:
+            quality_control = ('<div class="quality-control" id="processing-quality-control"><strong>Verarbeitung: %s</strong>'
+                               '<input type="hidden" name="quality" value="%s"></div>' %
+                               (html.escape(profiles[0]['label']), html.escape(profiles[0]['id'], quote=True)))
+        else:
+            options = ['<option value="auto"%s>Standard (%s)</option>' % (
+                ' selected' if selected_quality == 'auto' else '', html.escape(default_label))]
+            for profile in profiles:
+                options.append('<option value="%s"%s>%s</option>' % (
+                    html.escape(profile['id'], quote=True),
+                    ' selected' if selected_quality == profile['id'] else '',
+                    html.escape(profile['label'])))
+            quality_control = (
+                '<div class="quality-control" id="processing-quality-control"><label for="processing-quality">Verarbeitung</label>'
+                '<select id="processing-quality" name="quality" aria-label="Verarbeitungsqualität"%s>%s</select>'
+                '<span class="small">Wird erst nach dem Ende der Aufnahme angewendet.</span></div>'
+            ) % (' disabled' if not profiles else '', ''.join(options))
 
     status_notices = []
     if state.error:
@@ -1080,7 +1183,7 @@ def page_html(state):
             </div>
             {action}
           </div>
-          <div class="small">Mikrofon: <span id="speech-device">{device}</span> · Pegel: <span id="audio-level">0</span></div>
+          <div class="small">Mikrofon: <span id="speech-device">{device}</span></div>
           <textarea id="live-transcript" class="live-text" readonly aria-label="Live-Transkript">{live_transcript}</textarea>
         </section>
         """.format(
@@ -1094,7 +1197,7 @@ def page_html(state):
         )
     else:
         documentation_fields = []
-        for field in DOCUMENT_FIELDS:
+        for field in state.active_fields:
             documentation_fields.append(
                 '<div class="doc-field"><label class="block" for="{field}">{label}</label>'
                 '<textarea id="{field}" name="{field}" autocomplete="off">{value}</textarea></div>'.format(
@@ -1144,7 +1247,7 @@ def page_html(state):
                   <summary>T2med-Ausgabe konfigurieren</summary>
                   <div class="mode-grid">
                     <div><label for="output_mode">Ausgabeform</label><select id="output_mode" name="output_mode">
-                      <option value="structured"{structured_selected}>Vier strukturierte Einträge</option>
+                      <option value="structured"{structured_selected}>Strukturierte Einträge</option>
                       <option value="single"{single_selected}>Ein gemeinsamer Freitext-Eintrag</option>
                     </select></div>
                     <div><label for="single_code">Kürzel des Einzelblocks</label><input id="single_code" name="single_code" maxlength="20" value="{single_code}" list="single-code-options" autocomplete="off">
@@ -1171,6 +1274,30 @@ def page_html(state):
             single_selected=single_selected,
             single_code=html.escape(state.single_code),
         )
+
+    audio_controls = """
+    <details class="audio-settings" id="audio-settings">
+    <summary>Aufnahme-Einstellungen</summary>
+    <div class="audio-controls" aria-label="Aufnahme-Einstellungen">
+      <label class="vad-switch"><input id="vad-enabled" type="checkbox" {checked}> Sprache erkennen (VAD)</label>
+      <div class="level-control">
+        <div class="level-labels">
+          <label for="silence-threshold">Stilleschwelle <output id="threshold-value">{threshold} dBFS</output></label>
+          <span>Eingangspegel <output id="input-dbfs">{level} dBFS</output></span>
+        </div>
+        <div class="level-meter">
+          <div id="input-meter" class="input-meter" role="meter" aria-label="Eingangspegel" aria-valuemin="-96" aria-valuemax="0" aria-valuenow="{level}" aria-valuetext="{level} dBFS" style="--level:{level_percent}%"><span class="input-meter-fill"></span></div>
+          <input id="silence-threshold" type="range" min="-80" max="-20" step="1" value="{threshold}" aria-valuetext="{threshold} dBFS" aria-describedby="audio-controls-hint">
+        </div>
+        <div class="level-scale" aria-hidden="true"><span>−96</span><span>−72</span><span>−48</span><span>−24</span><span>0 dBFS</span></div>
+      </div>
+      <div id="audio-controls-hint" class="small">Griff im Pegelbalken verschieben, um die Stilleschwelle einzustellen. Unterhalb der Schwelle wird stummgeschaltet; Pausen bleiben erhalten. Für diesen Client gespeichert. Änderungen gelten für kommende Verarbeitung.</div>
+      <div id="audio-controls-message" class="small" role="status" aria-live="polite"></div>
+    </div></details>""".format(checked='checked' if speech.get('vad_enabled', True) else '',
+                  threshold=int(speech.get('silence_threshold_dbfs', -50)), level=speech.get('audio_dbfs', -96),
+                  level_percent=max(0, min(100, (float(speech.get('audio_dbfs', -96)) + 96) / 96 * 100)))
+    if speech['status'] != STATUS_RECORDING:
+        audio_controls = ''
 
     if encounter:
         encounter_details = """
@@ -1214,6 +1341,9 @@ def page_html(state):
           <form method="post" action="/action"><input type="hidden" name="csrf" value="{csrf}">
           <button class="subtle" type="submit" name="do" value="encounter">Behandlungsfall laden</button></form></section>
       </div>
+      <details class="prompt-tooltip"><summary title="{active_prompt}&#10;&#10;Dieser Prompt kann im Installer angepasst werden.">Aktiver Dokumentations-Prompt</summary>
+        <pre>{active_prompt}</pre><p class="small">Dieser Prompt kann im Installer angepasst werden.</p>
+      </details>
       <p class="small">OAuth-Token wird nur im Arbeitsspeicher gehalten. Die Zertifikatsprüfung folgt den T2med-Einstellungen.</p>
     </details>
     """.format(
@@ -1229,6 +1359,7 @@ def page_html(state):
         gender=patient_gender,
         csrf=html.escape(state.csrf),
         encounter_details=encounter_details,
+        active_prompt=html.escape(speech.get('active_prompt') or 'Für diese Legacy-Konfiguration wird kein Prompttext bereitgestellt.'),
     )
 
     t2med_badge = _server_badge(
@@ -1257,7 +1388,7 @@ def page_html(state):
 <title>kienzledoku record {version}</title><style>{css}</style></head>
 <body><main>
   <div class="primary-screen">
-    <div class="record-heading"><img src="/logo.svg" alt="kienzledoku record"><div><header class="topbar"><h1><a class="brand-link" href="https://kienzledoku.de" rel="noopener noreferrer">kienzledoku record</a>
+    <div class="record-heading"><div class="logo-slot"><img src="/logo.svg" alt="kienzledoku record"></div><div><header class="topbar"><h1><a class="brand-link" href="https://kienzledoku.de" rel="noopener noreferrer">kienzledoku record</a>
       <span class="brand-byline">v{version} · von Dr. Thomas Kienzle</span></h1>
       <div class="server-row">{t2med_badge}{asr_badge}{diarization_badge}{llm_badge}</div></header>
     <section class="patient-row"><div class="patient-name" id="patient-name">{patient_name}</div>
@@ -1265,18 +1396,60 @@ def page_html(state):
     <div class="notice err" id="patient-error" {patient_error_hidden}>{patient_error}</div>
     {status_notices}
     {workspace}
-    <form method="post" action="/action"><input type="hidden" name="csrf" value="{csrf}"><button class="subtle" name="do" value="close">Sichern und schließen</button> <button class="subtle" name="do" value="discard" onclick="return confirm('Aufnahme und Entwurf wirklich verwerfen? Unklare Übernahme zuvor in T2med prüfen.')">Vorgang verwerfen</button></form>
+    <form method="post" action="/action"><input type="hidden" name="csrf" value="{csrf}"><button class="subtle" name="do" value="discard" onclick="return confirm('Aufnahme und Entwurf wirklich verwerfen? Unklare Übernahme zuvor in T2med prüfen.')">Fenster schließen und verwerfen</button></form>
   </div>
+  {audio_controls}
   {technical}
 </main>
 <script>
 (function() {{
   const initialStatus = {initial_status};
   const csrf = {csrf_json};
+  const vadToggle = document.getElementById('vad-enabled');
+  const thresholdSlider = document.getElementById('silence-threshold');
+  const controlsMessage = document.getElementById('audio-controls-message');
+  let controlsPending = false, controlsSending = false, controlsTimer;
+  let acknowledgedControls = vadToggle ? {{vad_enabled:vadToggle.checked, silence_threshold_dbfs:Number(thresholdSlider.value)}} : null;
+  async function saveAudioControls() {{
+    if (controlsSending) return;
+    controlsSending = true;
+    try {{
+      while (controlsPending) {{
+        controlsPending = false;
+        const body = new URLSearchParams({{csrf, do:'speech_audio_controls',
+          vad_enabled:vadToggle.checked ? 'true':'false', threshold:thresholdSlider.value}});
+        const response = await fetch('/action', {{method:'POST', body}});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Audio-Einstellungen konnten nicht gespeichert werden.');
+        acknowledgedControls = result;
+        controlsMessage.textContent = 'Für diesen Client gespeichert. Gilt ab dem nächsten Audioblock.';
+      }}
+    }} catch(error) {{
+      controlsPending = false;
+      vadToggle.checked = acknowledgedControls.vad_enabled;
+      thresholdSlider.value = acknowledgedControls.silence_threshold_dbfs;
+      thresholdSlider.setAttribute('aria-valuetext', thresholdSlider.value + ' dBFS');
+      document.getElementById('threshold-value').textContent = thresholdSlider.value + ' dBFS';
+      controlsMessage.textContent = error.message;
+    }} finally {{ controlsSending = false; }}
+  }}
+  function audioControlsChanged() {{
+    document.getElementById('threshold-value').textContent = thresholdSlider.value + ' dBFS';
+    thresholdSlider.setAttribute('aria-valuetext', thresholdSlider.value + ' dBFS');
+    controlsMessage.textContent = 'Wird gespeichert …';
+    controlsPending = true;
+    clearTimeout(controlsTimer);
+    controlsTimer = setTimeout(saveAudioControls, 100);
+  }}
+  if (vadToggle && thresholdSlider) {{
+    vadToggle.addEventListener('change', audioControlsChanged);
+    thresholdSlider.addEventListener('input', audioControlsChanged);
+    thresholdSlider.addEventListener('change', audioControlsChanged);
+  }}
   let draftTimer;
   async function saveDraft() {{
     const body = new URLSearchParams({{csrf:csrf, do:'draft'}});
-    for (const name of ['anamnese','befund','therapie','prozedere','diarized_text','output_mode','single_code']) {{
+    for (const name of {field_names}) {{
       const field = document.querySelector('[name="'+name+'"]');
       if (field) body.set(name, field.value);
     }}
@@ -1285,28 +1458,34 @@ def page_html(state):
   document.addEventListener('input', () => {{clearTimeout(draftTimer); draftTimer=setTimeout(()=>saveDraft().catch(()=>{{}}),400);}});
   document.addEventListener('submit', async event => {{
     const action = event.submitter && event.submitter.value;
-    if (!['close','discard'].includes(action)) return;
+    if (action !== 'discard') return;
     event.preventDefault(); clearTimeout(draftTimer);
-    await saveDraft();
     const response = await fetch('/action', {{method:'POST',body:new URLSearchParams({{csrf,do:action}})}});
     if (response.ok) {{ if(window.chrome && window.chrome.webview) window.chrome.webview.postMessage('record-close'); else window.close(); }}
   }});
   async function closeRequested() {{
-    if (!confirm('Offene Arbeit sichern und Fenster schließen? Die Aufnahme wird beendet.')) return;
-    await saveDraft();
-    const response = await fetch('/action', {{method:'POST', body:new URLSearchParams({{csrf, do:'close'}})}});
+    const response = await fetch('/action', {{method:'POST', body:new URLSearchParams({{csrf, do:'discard'}})}});
     if(response.ok) {{ if(window.chrome && window.chrome.webview) window.chrome.webview.postMessage('record-close'); else window.close(); }}
   }}
   window.addEventListener('kienzledoku-close-request', closeRequested);
   window.addEventListener('kienzledoku-audio-interrupted', () => fetch('/action', {{method:'POST', body:new URLSearchParams({{csrf, do:'speech_stop'}})}}));
   const initialRevision = {initial_revision};
+  {status_layout_script}
   function setServer(id, status, host) {{
     const badge = document.getElementById(id);
     if (!badge) return;
-    const normalized = ['ok','error','checking'].includes(status) ? status : 'checking';
+    const normalized = ['ok','error','checking','loading','standby','ready','busy','disabled'].includes(status) ? status : 'checking';
     badge.className = 'server-badge ' + normalized;
     const state = badge.querySelector('.server-state');
-    if (state) state.textContent = normalized === 'ok' ? 'OK' : (normalized === 'error' ? 'FEHLER' : 'PRÜFUNG');
+    if (state) {{
+      state.textContent = ({{ok:'OK',error:'FEHLER',checking:'PRÜFUNG',loading:'WIRD GELADEN',standby:'STANDBY',ready:'BEREIT',busy:'AKTIV',disabled:'DEAKTIVIERT'}})[normalized];
+      state.title = state.textContent;
+    }}
+    const name = badge.querySelector('.server-name');
+    if (name && host) {{
+      name.querySelector('.server-host').textContent = host;
+      name.title = badge.dataset.label + ' ' + host;
+    }}
   }}
   async function updateStatus() {{
     try {{
@@ -1325,25 +1504,44 @@ def page_html(state):
       if (live) live.value = data.live_transcript || '';
       const device = document.getElementById('speech-device');
       if (device) device.textContent = data.selected_device_name || 'System-Standardgerät';
-      const level = document.getElementById('audio-level'); if(level) level.textContent = String(data.audio_rms || 0);
+      const meter = document.getElementById('input-meter');
+      if (meter) {{
+        const level = Math.max(-96, Math.min(0, Number(data.audio_dbfs ?? -96)));
+        meter.style.setProperty('--level', ((level + 96) / 96 * 100) + '%');
+        meter.setAttribute('aria-valuenow', String(level));
+        meter.setAttribute('aria-valuetext', level.toFixed(1) + ' dBFS');
+        document.getElementById('input-dbfs').textContent = level.toFixed(1) + ' dBFS';
+      }}
       const services = data.services || {{}};
       const quality = document.getElementById('processing-quality');
+      const control = document.getElementById('processing-quality-control');
       const profiles = data.quality_profiles || [];
       const signature = JSON.stringify(profiles);
-      if (quality && profiles.length && quality.dataset.profiles !== signature && document.activeElement !== quality) {{
-        const chosen = quality.disabled ? (data.selected_quality || 'auto') : quality.value;
-        const defaultProfile = profiles.find(p => p.default) || profiles[0];
-        quality.textContent = '';
-        quality.add(new Option('Standard (' + defaultProfile.label + ')', 'auto'));
-        profiles.forEach(p => quality.add(new Option(p.label, p.id)));
-        quality.value = [...quality.options].some(option => option.value === chosen) ? chosen : 'auto';
-        quality.disabled = false;
-        quality.dataset.profiles = signature;
+      if (control && profiles.length && control.dataset.profiles !== signature && (!quality || document.activeElement !== quality)) {{
+        const chosen = quality && !quality.disabled ? quality.value : (data.selected_quality || 'auto');
+        control.replaceChildren();
+        if (profiles.length === 1) {{
+          const label = document.createElement('strong'); label.textContent = 'Verarbeitung: ' + profiles[0].label;
+          const value = document.createElement('input'); value.type = 'hidden'; value.name = 'quality'; value.value = profiles[0].id;
+          control.append(label, value);
+        }} else {{
+          const label = document.createElement('label'); label.htmlFor = 'processing-quality'; label.textContent = 'Verarbeitung';
+          const select = document.createElement('select'); select.id = 'processing-quality'; select.name = 'quality'; select.setAttribute('aria-label', 'Verarbeitungsqualität');
+          const defaultProfile = profiles.find(p => p.default) || profiles[0];
+          select.add(new Option('Standard (' + defaultProfile.label + ')', 'auto'));
+          profiles.forEach(p => select.add(new Option(p.label, p.id)));
+          select.value = [...select.options].some(option => option.value === chosen) ? chosen : 'auto';
+          select.dataset.profiles = signature;
+          const hint = document.createElement('span'); hint.className = 'small'; hint.textContent = 'Wird erst nach dem Ende der Aufnahme angewendet.';
+          control.append(label, select, hint);
+        }}
+        control.dataset.profiles = signature;
       }}
       setServer('asr-server', (services.asr || {{}}).status || 'checking', (services.asr || {{}}).host || '');
       setServer('diarization-server', (services.diarization || {{}}).status || 'checking', (services.diarization || {{}}).host || '');
       setServer('llm-server', (services.llm || {{}}).status || 'checking', (services.llm || {{}}).host || '');
       setServer('t2med-server', data.t2med_status || 'checking', data.t2med_host || '');
+      {status_layout_update}
       const patient = data.patient || {{}};
       for (const [id, value] of Object.entries({{
         'patient-name': patient.name || 'Patient wird geladen …',
@@ -1361,7 +1559,9 @@ def page_html(state):
 }})();
 </script></body></html>""".format(
         version=VERSION,
-        css=CSS,
+        css=CSS + (WINDOWS_STATUS_CSS if WINDOWS_STATUS_LAYOUT else ''),
+        status_layout_script=WINDOWS_STATUS_JS if WINDOWS_STATUS_LAYOUT else '',
+        status_layout_update='fitStatusHeader();' if WINDOWS_STATUS_LAYOUT else '',
         t2med_badge=t2med_badge,
         asr_badge=asr_badge,
         diarization_badge=diarization_badge,
@@ -1370,6 +1570,7 @@ def page_html(state):
         birth_date=html.escape(birth_date),
         status_notices=status_notices,
         workspace=workspace,
+        audio_controls=audio_controls,
         technical=technical,
         csrf=html.escape(state.csrf),
         csrf_json=json.dumps(state.csrf),
@@ -1377,6 +1578,7 @@ def page_html(state):
         initial_revision=int(state.document_revision),
         patient_error=html.escape(state.patient_error),
         patient_error_hidden='' if state.patient_error else 'hidden',
+        field_names=json.dumps(list(state.active_fields) + ['diarized_text','output_mode','single_code']),
     )
 
 
@@ -1391,6 +1593,78 @@ def close_page_html():
         css=CSS,
         version=VERSION,
     )
+
+
+def patient_conflict_html(open_patient=None, new_patient=None, open_error='', new_error='', csrf=''):
+    def line(patient, error, loading):
+        if patient:
+            return '%s * %s' % (html.escape(patient.get('name') or 'Name unbekannt'),
+                                html.escape(display_birth_date(patient.get('birth_date') or '')))
+        if error:
+            return 'Nicht ermittelbar: ' + html.escape(error)
+        return loading
+    return """<!doctype html><html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>ACHTUNG Gefahr der Patientenverwechslung!</title>
+<style>{css}.danger{{color:#b00020;font-size:28px;white-space:normal}}.warning-card{{max-width:760px;margin:8vh auto;background:white;padding:28px;border-radius:16px;box-shadow:0 4px 24px #0002}}.patient-warning{{font-size:20px;padding:12px;background:#fff4f4;margin:12px 0}}</style></head>
+<body><main><section class="warning-card" role="alertdialog" aria-labelledby="danger-title">
+<h1 id="danger-title" class="danger">ACHTUNG Gefahr der Patientenverwechslung!</h1>
+<p class="patient-warning"><strong>Offene Aufnahme:</strong> {open_line}</p>
+<p class="patient-warning"><strong>Neue Aufnahme:</strong> {new_line}</p>
+<p>Bitte schließen Sie zuerst das alte Fenster. Der neue Aufruf startet keine Aufnahme und ersetzt keinen Patientenkontext.</p>
+<form method="post" action="/action"><input type="hidden" name="csrf" value="{csrf}">
+<button name="do" value="show">Offenes Fenster anzeigen</button>
+<button class="subtle" name="do" value="close">Hinweis schließen</button></form>
+</section></main></body></html>""".format(
+        css=CSS, open_line=line(open_patient, open_error, 'Patient wird im offenen Fenster noch geladen …'),
+        new_line=line(new_patient, new_error, 'Neue Person wird noch geladen …'),
+        csrf=html.escape(csrf))
+
+
+def show_patient_conflict(active, new_patient=None, new_error='', no_browser=False):
+    """Show a separate, non-recording warning window for a rejected second call."""
+    try:
+        current = active.request()
+        open_patient = current.get('patient') if isinstance(current, dict) else None
+        open_error = current.get('error', '') if isinstance(current, dict) else ''
+    except Exception as exc:
+        open_patient, open_error = None, str(exc)
+    csrf = secrets.token_urlsafe(24)
+    completed = threading.Event()
+    class WarningHandler(SecureLocalHandler, BaseHTTPRequestHandler):
+        def log_message(self, *_args): return
+        def send_page(self):
+            data = patient_conflict_html(open_patient, new_patient, open_error, new_error, csrf).encode('utf-8')
+            self.send_response(200); self.send_header('Content-Type', 'text/html; charset=utf-8')
+            self.send_header('Content-Length', str(len(data))); self.send_header('Cache-Control', 'no-store')
+            self.end_headers(); self.wfile.write(data)
+        def do_GET(self):
+            if not self.authorize(): return
+            self.send_page()
+        def do_POST(self):
+            if not self.authorize(): return
+            try: form = self.read_form()
+            except Exception: self.send_error(400); return
+            if not secrets.compare_digest((form.get('csrf') or [''])[0], csrf):
+                self.send_error(403); return
+            if (form.get('do') or [''])[0] == 'show':
+                try: active.request(show=True)
+                except Exception: pass
+            completed.set(); self.send_page()
+    server = ThreadingHTTPServer(('127.0.0.1', 0), WarningHandler)
+    url = configure_server(server)
+    thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+    process = None
+    try:
+        if no_browser:
+            print('ACHTUNG Gefahr der Patientenverwechslung!')
+            return
+        process, _kind = open_ui_window(url, os.path.dirname(os.path.abspath(__file__)))
+        while not completed.wait(.25):
+            if process is not None and process.poll() is not None: break
+    finally:
+        if process is not None and process.poll() is None:
+            process.terminate()
+        server.shutdown(); server.server_close()
 
 
 def open_ui_window(url, script_dir):
@@ -1508,6 +1782,8 @@ def make_handler(state):
                 self._send_html("OK")
                 return
             if parsed.path == "/status":
+                if getattr(state.speech, 'commander', None):
+                    state.speech.start_service_check(background=True)
                 with state.lock:
                     snapshot = state.speech.snapshot()
                     snapshot["document_revision"] = state.document_revision
@@ -1544,31 +1820,21 @@ def make_handler(state):
                 try:
                     if state.completed_event.is_set() or state.closing:
                         raise ValueError('Dieser Vorgang wird geschlossen')
-                    if state.recovery_pending:
-                        if action not in ('recovery_restore', 'recovery_discard'):
-                            raise ValueError('Zuerst offene Arbeit klären')
-                        old = state.recovery.previous
-                        if action == 'recovery_restore':
-                            if old.get('context_hash') != state.recovery.identity:
-                                raise ValueError('Wiederherstellung nur mit dem ursprünglichen T2med-Kontext')
-                            state.documentation = normalize_documentation(old['documentation'])
-                            state.speech.set_diarized_text(old.get('transcript',''))
-                            audio_path = Path(old.get('audio') or '/nonexistent')
-                            if audio_path.is_file() and session_dir().resolve() in audio_path.resolve().parents:
-                                state.speech.interrupted_audio = str(audio_path)
-                                state.speech.run_base_transcript = old.get('audio_base_transcript', '')
-                                state.speech.run_base_diarized = old.get('audio_base_diarized', '')
-                                state.message = 'Aufzeichnung war unterbrochen. Mit Aufnahme fortsetzen wird das gesicherte Audio erneut verarbeitet.'
-                            state.write_uncertain = old.get('write_uncertain', False)
-                            state.output_mode = old.get('output_mode', OUTPUT_MODE_STRUCTURED)
-                            state.single_code = old.get('single_code', DEFAULT_SINGLE_CODE)
-                        else:
-                            state.recovery.clear()
-                        state.recovery_pending = False
-                        state.recovery.save(state)
-                    elif action in ('draft', 'close', 'discard'):
+                    if action == 'speech_audio_controls':
+                        try:
+                            raw = form.get('vad_enabled') or []
+                            thresholds = form.get('threshold') or []
+                            if len(raw) != 1 or raw[0] not in ('true', 'false') or len(thresholds) != 1:
+                                raise ValueError('Ungültige Audio-Einstellungen')
+                            controls = state.speech.set_audio_controls(raw[0] == 'true', int(thresholds[0]))
+                        except (ValueError, OSError):
+                            self._send_json({'error': 'Audio-Einstellungen konnten nicht gespeichert werden. Schwelle und Schreibrechte prüfen.'}, 400)
+                            return
+                        self._send_json({'ok': True, **controls})
+                        return
+                    if action in ('draft', 'discard'):
                         if action == 'draft':
-                            for field in DOCUMENT_FIELDS:
+                            for field in state.active_fields:
                                 if field in form:
                                     state.documentation[field] = form[field][0]
                             if 'diarized_text' in form and state.speech.status not in ACTIVE_STATUSES:
@@ -1579,18 +1845,12 @@ def make_handler(state):
                                 state.single_code = normalize_entry_code(form['single_code'][0])
                         else:
                             state.closing = True
-                            if state.speech.status == STATUS_RECORDING:
-                                state.speech.stop()
-                            state.close_discard = action == 'discard'
+                            state.speech.cancel()
                             state.completed_event.set()
-                        if state.recovery:
-                            state.recovery.save(state)
                         self._send_json({'ok': True})
                         return
                     elif action == 'write_resolved':
                         state.write_uncertain = False
-                        if state.recovery:
-                            state.recovery.save(state)
                         state.message = 'Erneute Übertragung ist nach Ihrer Prüfung wieder möglich.'
                     elif action == "patient":
                         start_patient_load(state)
@@ -1625,9 +1885,9 @@ def make_handler(state):
                             raise ValueError("Bitte zuerst den Patienten laden/prüfen.")
                         incoming = {
                             field: (form.get(field) or [""])[0]
-                            for field in DOCUMENT_FIELDS
+                            for field in state.active_fields
                         }
-                        state.documentation = normalize_documentation(incoming)
+                        state.documentation = normalize_documentation(incoming, state.active_fields)
                         state.output_mode = normalize_output_mode(
                             (form.get("output_mode") or [OUTPUT_MODE_STRUCTURED])[0]
                         )
@@ -1638,10 +1898,9 @@ def make_handler(state):
                             requested_code
                         )
                         state.write_uncertain = True
-                        if state.recovery:
-                            state.recovery.save(state) # durable before sending anything
                         status, _obj, labels = state.client.write_documentation(
-                            state.documentation, state.output_mode, state.single_code
+                            state.documentation, state.output_mode, state.single_code,
+                            state.active_fields,
                         )
                         safe_log(
                             "Documentation transaction OK",
@@ -1655,8 +1914,6 @@ def make_handler(state):
                         )
                         state.write_uncertain = False
                         state.write_succeeded = True
-                        if state.recovery:
-                            state.recovery.clear()
                         self._send_html(close_page_html())
                         close_ui_window(state)
                         state.completed_event.set()
@@ -1667,11 +1924,6 @@ def make_handler(state):
                     if action == "write" and isinstance(exc, FhirTransactionRejected):
                         state.write_uncertain = False
                         safe_log("Documentation transaction rejected", rollback="confirmed")
-                        if state.recovery:
-                            try:
-                                state.recovery.save(state)
-                            except Exception as save_error:
-                                safe_log("Rejected transaction recovery save failed", error=type(save_error).__name__)
                     if action == "patient":
                         state.t2med_status = "error"
                         state.t2med_message = "T2med-FHIR nicht erreichbar."
@@ -1687,8 +1939,29 @@ def make_handler(state):
 def run_session(deep_link, no_browser=False):
     safe_log("Python session start", **deep_link_metadata(deep_link))
     link = parse_deep_link(deep_link)
-    if not acquire_record_session(link):
+    try:
+        acquire_record_session(link)
+    except ActiveSessionError as active:
+        new_patient = None
+        new_error = ''
+        conflict_client = None
+        try:
+            cfg = record_config.load()
+            record_config.validate_target(link['fhir_base_url'], cfg)
+            api_key, _source = ((DEMO_API_KEY, 'Connect') if cfg['connection']['mode'] == 'connect'
+                                else get_api_key())
+            conflict_client = T2medFhirClient(
+                link['fhir_base_url'], link['context_id'], link['oauth_token'], api_key,
+                connection=cfg['connection'])
+            new_patient = patient_summary(conflict_client.get_patient_by_context())
+        except Exception as exc:
+            new_error = str(exc)
+        finally:
+            if conflict_client is not None:
+                conflict_client.close()
+        show_patient_conflict(active, new_patient, new_error, no_browser=no_browser)
         return
+    cleanup_legacy_patient_data()
     safe_log(
         "Deep link parsed",
         scheme=link.get("scheme", ""),
@@ -1704,18 +1977,17 @@ def run_session(deep_link, no_browser=False):
         link["fhir_base_url"], link["context_id"], link["oauth_token"], api_key, connection=cfg["connection"]
     )
     if client.proxy:
-        key_source = 'In Connect eingebetteter Key (Demo-Build)'
+        from kienzledoku_product_key import production_build
+        key_source = ('In Connect eingebetteter KienzleDoku-Hersteller-Key' if production_build()
+                      else 'In Connect eingebetteter Key (Demo-Build)')
     state = SessionState(link, client, key_source)
     state.output_mode = cfg['record']['output_mode']
     state.single_code = cfg['record']['single_code']
-    state.recovery = Recovery(link)
-    state.recovery_pending = state.recovery.previous is not None
-
     def accept_speech_document(document):
         with state.lock:
             if state.closing:
                 return
-            state.documentation = normalize_documentation(document)
+            state.documentation = normalize_documentation(document, state.active_fields)
             state.document_revision += 1
             state.message = "Spracherkennung abgeschlossen; Dokumentation zur Prüfung übernommen."
 
@@ -1724,6 +1996,15 @@ def run_session(deep_link, no_browser=False):
         on_document=accept_speech_document,
         config_path=SERVICE_CONFIG_PATH,
     )
+    if state.speech.commander:
+        try:
+            state.speech.load_documentation_settings()
+        except Exception:
+            client.close()
+            unregister_window()
+            raise
+    state.active_fields = tuple(state.speech.active_fields)
+    state.documentation = empty_documentation(state.active_fields)
     safe_log(
         "Speech configuration loaded",
         source=state.speech.config_source,
@@ -1732,6 +2013,16 @@ def run_session(deep_link, no_browser=False):
         llm_host=state.speech.services["llm"]["host"],
     )
     state.speech.start_service_check()
+
+    def active_snapshot():
+        with state.lock:
+            return {
+                'patient': patient_summary(state.patient) if state.patient else None,
+                'error': state.patient_error,
+                'loading': state.patient_loading,
+                'open': not state.closing,
+            }
+    start_active_broker(active_snapshot)
 
     server = ThreadingHTTPServer(("127.0.0.1", 0), make_handler(state))
     port = server.server_address[1]
@@ -1752,10 +2043,9 @@ def run_session(deep_link, no_browser=False):
             safe_log("UI window open failed", error=type(exc).__name__, ui_port=port)
             state.closing = True
             state.speech.cancel()
-            if not state.recovery_pending:
-                state.recovery.save(state)
             client.close()
             server.shutdown(); server.server_close()
+            unregister_window()
             raise
     else:
         safe_log("Browser suppressed", ui_port=port)
@@ -1763,38 +2053,20 @@ def run_session(deep_link, no_browser=False):
 
     start_initial_work(state)
 
-    # Keep one isolated session alive. Exit after 60 min absolute or 30 min idle.
-    started = time.time()
+    # The open window owns the RAM-only work. There is deliberately no timeout.
     try:
         while not state.completed_event.wait(2):
-            with state.lock:
-                if not state.recovery_pending:
-                    state.recovery.save(state)
             if state.ui_process is not None:
                 window_status = state.ui_process.poll()
                 if window_status is not None:
                     safe_log("UI window exited", exit_code=window_status)
                     break
-            if time.time() - started > 3600:
-                break
-            if time.time() - state.last_activity > 1800:
-                break
     except KeyboardInterrupt:
         pass
     finally:
         if state.speech is not None:
             state.closing = True
-            if state.speech.status == STATUS_RECORDING:
-                state.speech.stop()
-            if state.speech.thread and state.speech.thread.is_alive():
-                state.speech.thread.join(timeout=5)
-            if not state.recovery_pending and not getattr(state, 'write_succeeded', False):
-                state.recovery.save(state)
             state.speech.cancel()
-            if not state.recovery_pending and not getattr(state, "write_succeeded", False):
-                state.recovery.save(state)
-            if getattr(state, 'close_discard', False):
-                state.recovery.clear()
         client.close()
         close_ui_window(state)
         server.shutdown()
@@ -1882,6 +2154,16 @@ def self_test():
     assert single_resource["valueString"].startswith("ANAMNESE\nA")
     assert "\n\nPROZEDERE\nP" in single_resource["valueString"]
 
+    extended = {field: field.upper() for field in DOCUMENT_FIELDS}
+    extended_resources = client.build_documentation_resources(
+        extended, OUTPUT_MODE_STRUCTURED, "KI", DOCUMENT_FIELDS)
+    assert [label for label, _resource in extended_resources] == [
+        "Anamnese", "Befund", "EKG", "Sonografie", "Therapie", "Prozedere", "Notiz"
+    ]
+    assert [resource["extension"][0]["valueString"]
+            for label, resource in extended_resources
+            if label in ("EKG", "Sonografie", "Notiz")] == ["EKG", "SON", "NOT"]
+
     response = {
         "resourceType": "Bundle",
         "type": "transaction-response",
@@ -1952,7 +2234,9 @@ def main():
         return 0
     if args.setup or args.settings or not (args.deep_link or args.deep_link_stdin):
         from kienzledoku_settings import run_settings
-        saved = run_settings(no_browser=args.no_browser, window_opener=open_ui_window, setup=args.setup)
+        from kienzledoku_update import Lease
+        with Lease(record_config.config_dir() / 'update.lock'):
+            saved = run_settings(no_browser=args.no_browser, window_opener=open_ui_window, setup=args.setup)
         return 1 if args.setup and not saved else 0
     deep_link = args.deep_link
     if args.deep_link_stdin:
@@ -1961,7 +2245,8 @@ def main():
         except Exception as exc:
             safe_log("Deep-link pipe read failed", error=type(exc).__name__)
             print("kienzledoku record: Startfehler: %s" % exc, file=sys.stderr)
-            notify_start_failure()
+            if not args.no_browser:
+                notify_start_failure(exc)
             return 1
     if not deep_link:
         parser.error("--deep-link fehlt (normalerweise startet T2med die App über T2demo:// bzw. kienzledoku://)")
@@ -1975,8 +2260,9 @@ def main():
         print("kienzledoku record: %s" % exc, file=sys.stderr)
         if sys.platform == 'win32':
             import ctypes
-            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.3.3', 0x10)
-        notify_start_failure()
+            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.7.6', 0x10)
+        if not args.no_browser:
+            notify_start_failure(exc)
         return 1
 
 

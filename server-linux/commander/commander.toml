@@ -2,7 +2,8 @@
 [server]
 host = "127.0.0.1"
 port = 8185
-# Für LAN-Bind zwingend setzen, z.B. über /etc/kienzledoku-commander/token.env.
+auth_enabled = false
+# Nur bei auth_enabled=true wird der Inhalt zwingend geprüft (auch auf Loopback).
 token_env = "KIENZLEDOKU_COMMANDER_TOKEN"
 
 [gpu]
@@ -12,6 +13,12 @@ diar_allocator_mib = 2048
 
 [policy]
 default_quality = "auto" # basis | gruendlich | sehr_gruendlich (profilabhängig)
+memory_mode = "parallel" # serial | parallel; ohne Eintrag gilt das Legacy-Profil
+asr_on_demand = false
+# Nächste Ausgabe: unabhängig von memory_mode; ohne Eintrag bisheriges Verhalten.
+# diarization_mode = "serial" # resident | with_asr | serial
+enabled_roles = ["asr", "diar", "llm"]
+enabled_fields = ["anamnese", "befund", "therapie", "prozedere"]
 max_pending = 128
 max_remembered = 256
 max_payload_mib = 256
@@ -24,6 +31,7 @@ asr_parallel = 1
 diar_parallel = 1
 
 [backends]
+platform = "linux"
 asr_url = "http://127.0.0.1:8179"
 diar_url = "http://127.0.0.1:8183"
 llm_url = "http://127.0.0.1:8086"
@@ -34,8 +42,21 @@ prompt_path = "/opt/kienzledoku-commander/prompt_documentation.txt"
 
 [models.basis]
 path = "/opt/kienzlefon-ai/models/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+model_id = "qwen4-q4"
+label = "Qwen3.5 4B Q4"
+context = 32768
+slots = 1
+kv = "q8_0"
 [models.gruendlich]
 path = "/opt/kienzlefon-ai/models/Qwen_Qwen3.5-9B-Q6_K.gguf"
+model_id = "qwen9-q6"
+label = "Qwen3.5 9B Q6"
 [models.sehr_gruendlich]
 # Benchmark-Datei aus /tmp vor produktiver Verwendung dauerhaft bereitstellen.
 path = "/opt/kienzlefon-ai/models/Qwen3.8-27B-UD-Q4_K_M.gguf"
+model_id = "qwen27-q4"
+label = "Qwen3.8 27B Q4"
+
+[remote_llm]
+url = ""
+token_env = "KIENZLEDOKU_REMOTE_LLM_TOKEN"

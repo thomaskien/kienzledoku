@@ -35,27 +35,39 @@ const root = path.resolve(__dirname, '..');
     await page.goto(url);
     await page.getByRole('heading', { name: 'Aufnahme läuft', exact: true }).waitFor();
     const quality = page.getByLabel('Verarbeitungsqualität');
-    await quality.selectOption('gemma12_q8');
+    const labels = ['Standard (Basis)', 'Basis', 'Gründlich', 'Sehr gründlich'];
+    assert.deepEqual(await quality.locator('option').allTextContents(), labels);
+    await quality.selectOption('gruendlich');
     await page.getByRole('heading', { name: 'Aufnahme läuft', exact: true }).click();
     // At least one status refresh must preserve the user's local selection.
     await page.waitForFunction(() => document.querySelector('#processing-quality').dataset.profiles);
-    assert.equal(await quality.inputValue(), 'gemma12_q8');
+    assert.equal(await quality.inputValue(), 'gruendlich');
+    assert.deepEqual(await quality.locator('option').allTextContents(), labels);
     await page.getByRole('button', { name: 'Aufnahme stoppen', exact: true }).click();
     await page.getByRole('button', { name: 'Aufnahme fortsetzen', exact: true }).waitFor();
-    assert.equal(await page.getByLabel('Verarbeitungsqualität').inputValue(), 'gemma12_q8');
-    await page.getByText('Angefordert: Gemma 4 12B Q8_0 · Erstellt mit: Basis', { exact: true }).waitFor();
+    assert.equal(await page.getByLabel('Verarbeitungsqualität').inputValue(), 'gruendlich');
+    assert.equal(await page.locator('#audio-settings').count(), 0);
+    await page.waitForFunction(() => document.querySelector('#processing-quality').dataset.profiles);
+    assert.deepEqual(await page.getByLabel('Verarbeitungsqualität').locator('option').allTextContents(), labels);
+    await page.getByText('Angefordert: Gründlich · Erstellt mit: Basis', { exact: true }).waitFor();
     await page.getByRole('status').filter({ hasText: 'Die Dokumentation wurde mit „Basis“ erstellt.' }).waitFor();
+    assert.deepEqual(await page.locator('.doc-field textarea').evaluateAll(nodes => nodes.map(n => n.name)), ['anamnese','befund','ekg','sonografie','therapie','prozedere','notiz']);
+    await page.getByText('Technische Informationen', { exact: true }).click();
+    assert.match(await page.locator('.prompt-tooltip summary').getAttribute('title'), /Synthetischer aktiver Prompt/);
+    assert.match(await page.locator('#asr-server').getAttribute('class'), /loading/);
+    assert.match(await page.locator('#llm-server').getAttribute('class'), /standby/);
     assert.equal(errors.length, 0);
     if (process.argv[4]) {
       fs.mkdirSync(path.dirname(path.resolve(process.argv[4])), { recursive: true });
       await page.screenshot({ path: process.argv[4], fullPage: true });
     }
-    await page.getByRole('button', { name: 'Sichern und schließen', exact: true }).click();
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'Fenster schließen und verwerfen', exact: true }).click();
     const timeout = setTimeout(() => child.kill(), 10000);
     const exitCode = await exited;
     clearTimeout(timeout);
     assert.equal(exitCode, 0);
-    console.log('Commander UI: server model label, selection across polling, stop, actual quality and fallback notice OK');
+    console.log('Commander UI: grade labels with older model-name responses, selection across polling, stop, actual quality and fallback notice OK');
   } finally {
     if (browser) await browser.close();
     if (child.exitCode === null) { child.kill(); await exited; }

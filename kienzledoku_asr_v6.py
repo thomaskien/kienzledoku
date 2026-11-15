@@ -10,7 +10,8 @@ Logik wird für Kienzledoku nicht verwendet.
 
 Prinzip:
 - Mikrofon bzw. WAV läuft lückenlos in einen Gesamtpuffer / eine Gesamt-WAV.
-- Eine lokale, rein schnittentscheidende RMS-Pausenerkennung verwirft KEIN Audio.
+- Pausen werden am Nullsignal nach der benutzergesteuerten Stilleschwelle erkannt.
+- Jeder Kernblock wird spätestens nach 20 Sekunden (plus Segmentframe) begrenzt.
 - Nach natürlicher Pause wird ein fertiger logischer Kernblock erzeugt.
 - Jeder ASR-Auftrag enthält zusätzlich kleinen Vor-/Nachkontext.
 - Der Server-Endpunkt /v1/asr/final-block nutzt das bereits residente
@@ -38,7 +39,6 @@ import time
 import uuid
 import wave
 from array import array
-from collections import deque
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode, urlsplit, urlunsplit
@@ -63,6 +63,21 @@ def emit_event(event_type, **fields):
     event = {'type': event_type}
     event.update(fields)
     print(EVENT_PREFIX + json.dumps(event, ensure_ascii=False, separators=(',', ':')), flush=True)
+
+
+def emit_for(args, event_type, **fields):
+    callback = getattr(args, 'event_callback', None)
+    if callback is not None:
+        event = {'type': event_type}
+        event.update(fields)
+        callback(event)
+    else:
+        emit_event(event_type, **fields)
+
+
+def diagnostic_print(args, *values, **kwargs):
+    if not getattr(args, 'quiet', False):
+        print(*values, **kwargs)
 SAMPLE_WIDTH = 2
 BYTES_PER_SEC = SR * CHANNELS * SAMPLE_WIDTH
 
@@ -124,14 +139,28 @@ def aligned_byte(seconds):
     return max(0, value)
 
 
+MAX_SECTION_SECONDS = 2 * 60 * 60
+
+
 class AudioState:
-    def __init__(self):
+    def __init__(self, max_seconds=MAX_SECTION_SECONDS, controls=None):
+        self.max_bytes = aligned_byte(max_seconds)
+        self.limit_reached = False
         self._pcm = bytearray()
+        self._working = bytearray()
+        from kienzledoku_vad import SilenceGate
+        self._gate = SilenceGate(controls) if controls is not None else None
         self._lock = threading.Lock()
 
     def append(self, chunk):
         with self._lock:
-            self._pcm.extend(chunk)
+            remaining = self.max_bytes - len(self._pcm)
+            accepted = chunk[:remaining]
+            self._pcm.extend(accepted)
+            if self._gate:
+                self._working.extend(self._gate.feed(accepted))
+            if len(self._pcm) >= self.max_bytes:
+                self.limit_reached = True
 
     def length_bytes(self):
         with self._lock:
@@ -148,9 +177,29 @@ class AudioState:
             end_byte = max(start_byte, min(end_byte, len(self._pcm)))
             return bytes(self._pcm[start_byte:end_byte])
 
+    def working_length(self):
+        with self._lock:
+            return len(self._working if self._gate else self._pcm)
+
+    def working_bytes(self, start, end=None):
+        with self._lock:
+            return bytes((self._working if self._gate else self._pcm)[start:end])
+
+    def finish_gate(self):
+        with self._lock:
+            if self._gate:
+                self._working.extend(self._gate.finish())
+                assert len(self._working) == len(self._pcm)
+
     def all_pcm(self):
         with self._lock:
             return bytes(self._pcm)
+
+    def clear(self):
+        with self._lock:
+            self._pcm.clear()
+            self._working.clear()
+            if self._gate: self._gate.clear()
 
 
 def load_replay_wav(path):
@@ -210,26 +259,6 @@ class PauseSegmenter:
         self.speech_seen = False
         self.silence_start_s = None
         self.last_rms = 0
-        self.current_threshold = float(args.silence_rms or args.auto_rms_min)
-        self.rms_history = deque(maxlen=max(30, int(round(8.0 * 1000.0 / args.segment_frame_ms))))
-        self.frame_counter = 0
-
-    def _auto_threshold(self):
-        if self.args.silence_rms is not None:
-            return float(self.args.silence_rms)
-        if not self.rms_history:
-            return float(self.args.auto_rms_min)
-
-        # Niedriges Quantil der letzten Sekunden als robuster Raumpegel-Schätzer.
-        # Die Obergrenze ist absichtlich konservativ: Bei starkem Dauergeräusch
-        # entstehen lieber 20-s-Failsafe-Blöcke als dass Sprache weggefiltert wird.
-        values = sorted(self.rms_history)
-        idx = int(round((len(values) - 1) * 0.20))
-        noise = float(values[max(0, min(idx, len(values) - 1))])
-        value = noise * float(self.args.auto_rms_factor)
-        value = max(float(self.args.auto_rms_min), value)
-        value = min(float(self.args.auto_rms_max), value)
-        return value
 
     def _reset_after_cut(self, cut_s, currently_silent):
         self.core_start_s = float(cut_s)
@@ -239,16 +268,10 @@ class PauseSegmenter:
     def feed(self, frame, frame_start_s, frame_end_s):
         """Return list of logical cut events for one PCM frame."""
         events = []
-        rms = pcm16_rms(frame)
-        self.last_rms = rms
-        self.rms_history.append(rms)
-        self.frame_counter += 1
-
-        # Schwelle nicht für jedes 30-ms-Frame neu sortieren.
-        if self.frame_counter % 8 == 1 or self.args.silence_rms is not None:
-            self.current_threshold = self._auto_threshold()
-
-        silent = rms <= self.current_threshold
+        self.last_rms = pcm16_rms(frame)  # diagnostic only, never a second gate
+        # Frames already passed the user's SilenceGate. Even very quiet
+        # surviving audio must reach VAD; only actual digital zero is a pause.
+        silent = not any(frame)
 
         if silent:
             if self.speech_seen and self.silence_start_s is None:
@@ -278,10 +301,9 @@ class PauseSegmenter:
                     self._reset_after_cut(cut, currently_silent=True)
                     return events
 
-        # Harte Obergrenze nur für einen Block, in dem tatsächlich Sprache gesehen
-        # wurde. Der Schnitt liegt auf dem aktuellen Frame-Ende; Kontext beidseits
-        # schützt Randwörter auch bei kontinuierlicher Sprache.
-        if self.speech_seen and (frame_end_s - self.core_start_s) >= self.args.max_block_seconds:
+        # Bound every core, including silence. VAD skips non-speech afterwards;
+        # it must not depend on an earlier amplitude-based speech decision.
+        if (frame_end_s - self.core_start_s) >= self.args.max_block_seconds:
             cut = frame_end_s
             events.append({
                 'core_start': self.core_start_s,
@@ -332,7 +354,7 @@ def transcribe_final_block_http(url, wav_bytes, language, api_key=None, timeout=
     headers = {
         'Accept': 'application/json',
         'Content-Type': content_type,
-        'User-Agent': 'Kienzledoku-ASR/1.3.3',
+        'User-Agent': 'Kienzledoku-ASR/1.7.6',
     }
     if api_key:
         headers['Authorization'] = 'Bearer ' + api_key
@@ -437,6 +459,15 @@ def http_json(url, method='GET', payload=None, api_key=None, timeout=120):
 
 def diarize_wav(base_url, wav_path, min_speakers, max_speakers, num_speakers,
                 timeout, api_key=None, recording_finalized=False, commander=False):
+    body = Path(wav_path).read_bytes()
+    return diarize_audio(base_url, body, min_speakers, max_speakers, num_speakers,
+                         timeout, api_key=api_key,
+                         recording_finalized=recording_finalized, commander=commander)
+
+
+def diarize_audio(base_url, wav_body, min_speakers, max_speakers, num_speakers,
+                  timeout, api_key=None, recording_finalized=False, commander=False):
+    """Diarize WAV bytes directly, without creating a patient-data file."""
     params = {}
     if num_speakers is not None:
         params['num_speakers'] = int(num_speakers)
@@ -445,12 +476,9 @@ def diarize_wav(base_url, wav_path, min_speakers, max_speakers, num_speakers,
             params['min_speakers'] = int(min_speakers)
         if max_speakers is not None:
             params['max_speakers'] = int(max_speakers)
-
     url = base_url.rstrip('/') + '/v1/diarize'
     if params:
         url += '?' + urlencode(params)
-
-    body = Path(wav_path).read_bytes()
     headers = {'Content-Type': 'audio/wav', 'Accept': 'application/json'}
     if api_key:
         headers['Authorization'] = 'Bearer ' + api_key
@@ -458,13 +486,17 @@ def diarize_wav(base_url, wav_path, min_speakers, max_speakers, num_speakers,
         headers[FINALIZED_HEADER] = 'true'
     req = Request(
         url,
-        data=body,
+        data=wav_body,
         headers=headers,
         method='POST',
     )
     opener = direct_open if commander else urlopen
-    with opener(req, timeout=timeout) as response:
-        return json.loads(response.read().decode('utf-8'))
+    try:
+        with opener(req, timeout=timeout) as response:
+            return json.loads(response.read().decode('utf-8'))
+    except HTTPError as exc:
+        # Error responses may echo patient input. Show only stage and status.
+        raise RuntimeError('Sprecherzuordnung fehlgeschlagen (HTTP %d).' % exc.code) from None
 
 
 def nearest_speaker(mid, diar_segments):
@@ -600,10 +632,14 @@ def call_llm(args, transcript):
     root = llm_root(args.llm)
     model = choose_model(root, args.llm_api_key, args.llm_model)
     prompt = Path(args.prompt_file).read_text(encoding='utf-8').strip()
+    from kienzledoku_document import validate_fields
+    fields = validate_fields(getattr(args, 'active_fields', None))
+    prompt += '\n\nGib ausschließlich ein JSON-Objekt mit exakt diesen Textfeldern aus. Nicht belegte Felder bleiben leer:\n' + json.dumps({field: '' for field in fields}, ensure_ascii=False)
     payload = {
         'model': model,
         'temperature': args.temperature,
         'max_tokens': args.max_tokens,
+        'response_format': {'type': 'json_object'},
         'messages': [
             {'role': 'system', 'content': prompt},
             {'role': 'user', 'content': 'TRANSKRIPT:\n\n' + transcript},
@@ -648,6 +684,93 @@ async def replay_pcm(audio, pcm, chunk_ms, speed):
     return sent / float(BYTES_PER_SEC)
 
 
+class RecordingCancelled(Exception):
+    pass
+
+
+def cancellation_requested(args):
+    event = getattr(args, 'cancel_event', None)
+    return event is not None and event.is_set()
+
+
+async def daemon_http_call(args, function, *call_args):
+    """Await blocking HTTP without registering work in asyncio's exit-joined pool."""
+    if cancellation_requested(args):
+        raise RecordingCancelled()
+    loop = asyncio.get_running_loop()
+    future = loop.create_future()
+
+    def deliver_result(value=None, error=None):
+        if future.done():
+            return
+        if error is not None:
+            future.set_exception(error)
+        else:
+            future.set_result(value)
+
+    def request_worker():
+        try:
+            value = function(*call_args)
+        except BaseException as exc:
+            try:
+                loop.call_soon_threadsafe(deliver_result, None, exc)
+            except RuntimeError:
+                pass
+        else:
+            try:
+                loop.call_soon_threadsafe(deliver_result, value, None)
+            except RuntimeError:
+                pass
+
+    thread = threading.Thread(target=request_worker, name='Kienzledoku-ASR-HTTP')
+    thread.daemon = True
+    thread.start()
+    try:
+        while True:
+            if cancellation_requested(args):
+                future.cancel()
+                raise RecordingCancelled()
+            try:
+                return await asyncio.wait_for(asyncio.shield(future), timeout=.05)
+            except asyncio.TimeoutError:
+                continue
+    except asyncio.CancelledError:
+        future.cancel()
+        raise
+
+
+async def transcribe_vad_block(args, url, pcm, job, physical_start):
+    from kienzledoku_vad import speech_spans
+    controls = getattr(args, 'audio_controls', None)
+    enabled = controls.snapshot()['vad_enabled'] if controls else False
+    # Snapshot before the asynchronous work: toggles apply to the next block.
+    spans = await asyncio.to_thread(speech_spans, pcm, enabled)
+    combined = {'words': [], 'segments': [], 'text': '', 'processing_seconds': 0.0,
+                'decoder': 'silero-v6+whisper' if enabled else 'whisper'}
+    texts = []
+    for span in spans:
+        offset, end = span['start'] / SR, span['end'] / SR
+        if physical_start + end <= job['core_start'] or physical_start + offset >= job['core_end']:
+            continue
+        if cancellation_requested(args):
+            raise RecordingCancelled()
+        tail = float(job.get('pad_tail', 0)) if span['end'] * 2 == len(pcm) else 0
+        result = await daemon_http_call(args, transcribe_final_block_http, url,
+            wav_bytes_from_pcm(pcm[span['start']*2:span['end']*2], pad_tail_seconds=tail),
+            args.language, args.asr_api_key, args.asr_timeout, bool(getattr(args, 'commander', None)))
+        for key in ('words', 'segments'):
+            for item in result.get(key) or []:
+                shifted = dict(item)
+                shifted['start'] = float(item['start']) + offset
+                shifted['end'] = float(item['end']) + offset
+                combined[key].append(shifted)
+        texts.append(str(result.get('text') or ''))
+        if isinstance(result.get('processing_seconds'), (float, int)):
+            combined['processing_seconds'] += result['processing_seconds']
+    combined['text'] = ' '.join(texts).strip()
+    return combined
+
+
 async def asr_worker(args, audio, queue, block_results, stats):
     url = normalize_final_asr_url(args.asr)
     while True:
@@ -655,25 +778,19 @@ async def asr_worker(args, audio, queue, block_results, stats):
         try:
             if job is None:
                 return
+            if cancellation_requested(args):
+                raise RecordingCancelled()
 
             start_byte = aligned_byte(job['physical_start'])
             end_byte = aligned_byte(job['physical_end'])
-            pcm = audio.bytes_between(start_byte, end_byte)
+            pcm = audio.working_bytes(start_byte, end_byte)
             actual_physical_start = start_byte / float(BYTES_PER_SEC)
-            pad_tail = float(job.get('pad_tail', 0.0))
-            payload = wav_bytes_from_pcm(pcm, pad_tail_seconds=pad_tail)
-
             t0 = time.monotonic()
-            result = await asyncio.to_thread(
-                transcribe_final_block_http,
-                url,
-                payload,
-                args.language,
-                args.asr_api_key,
-                args.asr_timeout,
-                bool(getattr(args, 'commander', None)),
-            )
+            result = await transcribe_vad_block(args, url, pcm, job, actual_physical_start)
             client_elapsed = time.monotonic() - t0
+
+            if cancellation_requested(args):
+                raise RecordingCancelled()
 
             text, words, segments, ownership_mode = _select_result_for_core(
                 result,
@@ -702,7 +819,7 @@ async def asr_worker(args, audio, queue, block_results, stats):
             if isinstance(result.get('processing_seconds'), (int, float)):
                 stats['asr_server_seconds_sum'] += float(result['processing_seconds'])
 
-            print(
+            diagnostic_print(args,
                 '\n[FINAL %03d] %.2f..%.2fs | %s | Wörter=%d | ASR=%.3fs'
                 % (
                     job['id'],
@@ -713,8 +830,8 @@ async def asr_worker(args, audio, queue, block_results, stats):
                     client_elapsed,
                 )
             )
-            print(text or '(kein Text)')
-            emit_event(
+            diagnostic_print(args, text or '(kein Text)')
+            emit_for(args,
                 'final_block',
                 block_id=job['id'],
                 start=job['core_start'],
@@ -722,6 +839,8 @@ async def asr_worker(args, audio, queue, block_results, stats):
                 text=text or '',
             )
 
+        except RecordingCancelled:
+            return
         except Exception as exc:
             stats['failed'] += 1
             item = dict(job or {})
@@ -733,8 +852,8 @@ async def asr_worker(args, audio, queue, block_results, stats):
             })
             if job is not None:
                 block_results.append(item)
-                print('\n[FINAL %03d FEHLER] %s' % (job['id'], exc), file=sys.stderr)
-                emit_event('asr_error', block_id=job['id'])
+                diagnostic_print(args, '\n[FINAL %03d FEHLER] %s' % (job['id'], exc), file=sys.stderr)
+                emit_for(args, 'asr_error', block_id=job['id'])
         finally:
             queue.task_done()
 
@@ -767,10 +886,7 @@ def _run_payload(block_results, duration, final_wav_path, args, stats, diarizati
             'max_block_seconds': args.max_block_seconds,
             'context_seconds': args.context_seconds,
             'segment_frame_ms': args.segment_frame_ms,
-            'silence_rms': args.silence_rms,
-            'auto_rms_min': args.auto_rms_min,
-            'auto_rms_max': args.auto_rms_max,
-            'auto_rms_factor': args.auto_rms_factor,
+            'pause_detection': 'silence-gate-zero',
         },
         'metrics': dict(stats),
         'blocks': ordered,
@@ -790,6 +906,39 @@ def save_json(path, payload):
 
 
 async def run_recording(args):
+    from kienzledoku_vad import AudioControls
+    if not hasattr(args, "audio_controls"):
+        args.audio_controls = AudioControls()
+    audio = AudioState(controls=args.audio_controls)
+    args._recording_tasks = []
+    args._recording_stream = None
+    try:
+        return await _run_recording(args, audio)
+    finally:
+        event = getattr(args, 'stop_event', None)
+        if event is not None:
+            event.set()
+        stream = args._recording_stream
+        if stream is not None:
+            try:
+                stream.stop()
+            except Exception:
+                pass
+            try:
+                stream.close()
+            except Exception:
+                pass
+        tasks = args._recording_tasks
+        for task in tasks:
+            if not task.done(): task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        audio.clear()
+        args._recording_tasks = []
+        args._recording_stream = None
+
+
+async def _run_recording(args, audio):
     if args.pause_seconds <= 0:
         raise ValueError('--pause-seconds muss > 0 sein.')
     if args.context_seconds < 0:
@@ -804,7 +953,6 @@ async def run_recording(args):
         raise ValueError('--segment-frame-ms muss > 0 sein.')
 
     loop = asyncio.get_running_loop()
-    audio = AudioState()
     segmenter = PauseSegmenter(args)
     asr_queue = asyncio.Queue()
     block_results = []
@@ -821,6 +969,7 @@ async def run_recording(args):
         'asr_server_seconds_sum': 0.0,
     }
     worker = asyncio.create_task(asr_worker(args, audio, asr_queue, block_results, stats))
+    args._recording_tasks.append(worker)
 
     pending = []
     next_block_id = 1
@@ -852,14 +1001,14 @@ async def run_recording(args):
             stats['short_block_cuts'] += 1
         elif ev['reason'] == 'failsafe_max':
             stats['failsafe_cuts'] += 1
-        print(
+        diagnostic_print(args,
             '\n[SCHNITT %03d] %.2f..%.2fs | %s | ASR-Kontext ±%.2fs'
             % (job['id'], core_start, core_end, ev['reason'], args.context_seconds)
         )
 
     async def enqueue_ready(force=False):
         nonlocal pending
-        total = audio.duration()
+        total = audio.working_length() / float(BYTES_PER_SEC)
         keep = []
         for job in pending:
             required = float(job['physical_end_required'])
@@ -878,9 +1027,9 @@ async def run_recording(args):
 
     def process_available_frames():
         nonlocal detect_cursor
-        end = audio.length_bytes()
+        end = audio.working_length()
         while detect_cursor + frame_bytes <= end:
-            frame = audio.bytes_between(detect_cursor, detect_cursor + frame_bytes)
+            frame = audio.working_bytes(detect_cursor, detect_cursor + frame_bytes)
             frame_start = detect_cursor / float(BYTES_PER_SEC)
             detect_cursor += frame_bytes
             frame_end = detect_cursor / float(BYTES_PER_SEC)
@@ -901,6 +1050,7 @@ async def run_recording(args):
         replay_task = asyncio.create_task(
             replay_pcm(audio, replay_data, args.audio_chunk_ms, args.replay_speed)
         )
+        args._recording_tasks.append(replay_task)
     else:
         try:
             import sounddevice as sd
@@ -908,47 +1058,59 @@ async def run_recording(args):
             raise RuntimeError('sounddevice fehlt für Mikrofonbetrieb: %s' % exc)
 
         from kienzledoku_audio import create_input
-        stream, audio_failure = create_input(sd, device, audio.append, emit_event, args.audio_chunk_ms)
+        stream, audio_failure = create_input(
+            sd, device, audio.append,
+            lambda kind, **data: emit_for(args, kind, **data), args.audio_chunk_ms)
         waiter = loop.create_future()
         def wait_for_stop():
-            sys.stdin.readline()
+            stop_event = getattr(args, 'stop_event', None)
+            if stop_event is None:
+                sys.stdin.readline()
+            else:
+                stop_event.wait()
             try:
                 loop.call_soon_threadsafe(lambda: None if waiter.done() else waiter.set_result(None))
             except RuntimeError:
                 pass
         threading.Thread(target=wait_for_stop, daemon=True).start()
+        args._recording_stream = stream
         stream.start()
 
-    print('\n=== kienzledoku record 1.3.3 Final-Block-ASR ===')
-    print('Final-ASR:         %s' % normalize_final_asr_url(args.asr))
-    print('Pausenschnitt:     %.2f s bestätigt' % args.pause_seconds)
-    print('Kurze Äußerung:    Schnitt spätestens nach %.2f s Stille' % args.short_block_pause_seconds)
-    print('Min. Normalblock:  %.2f s' % args.min_block_seconds)
-    print('Max. Kernblock:    %.2f s (Failsafe)' % args.max_block_seconds)
-    print('ASR-Kontext:       ±%.2f s' % args.context_seconds)
-    print('RMS-Schwelle:      %s' % ('fix %.0f' % args.silence_rms if args.silence_rms is not None else 'adaptiv'))
-    print('Audiochunk:        %d ms' % args.audio_chunk_ms)
+    diagnostic_print(args, '\n=== kienzledoku record 1.7.6 Final-Block-ASR ===')
+    diagnostic_print(args, 'Final-ASR:         %s' % normalize_final_asr_url(args.asr))
+    diagnostic_print(args, 'Pausenschnitt:     %.2f s bestätigt' % args.pause_seconds)
+    diagnostic_print(args, 'Kurze Äußerung:    Schnitt spätestens nach %.2f s Stille' % args.short_block_pause_seconds)
+    diagnostic_print(args, 'Min. Normalblock:  %.2f s' % args.min_block_seconds)
+    diagnostic_print(args, 'Max. Kernblock:    %.2f s (Failsafe)' % args.max_block_seconds)
+    diagnostic_print(args, 'ASR-Kontext:       ±%.2f s' % args.context_seconds)
+    diagnostic_print(args, 'Pausenerkennung:   Nullsignal nach Client-Stilleschwelle; keine zweite Pegelschwelle')
+    diagnostic_print(args, 'Audiochunk:        %d ms' % args.audio_chunk_ms)
     if args.input_wav:
         dur = len(replay_data) / float(BYTES_PER_SEC)
-        print('Quelle:            WAV-Replay')
-        print('Input-WAV:         %s' % args.input_wav)
-        print('Replay-Dauer:      %.2f s' % dur)
-        print('Replay-Speed:      %s' % ('maximal' if args.replay_speed == 0 else '%.2fx' % args.replay_speed))
-        print('Ende:              automatisch am WAV-Ende')
+        diagnostic_print(args, 'Quelle:            WAV-Replay')
+        diagnostic_print(args, 'Input-WAV:         %s' % args.input_wav)
+        diagnostic_print(args, 'Replay-Dauer:      %.2f s' % dur)
+        diagnostic_print(args, 'Replay-Speed:      %s' % ('maximal' if args.replay_speed == 0 else '%.2fx' % args.replay_speed))
+        diagnostic_print(args, 'Ende:              automatisch am WAV-Ende')
     else:
-        print('Quelle:            Mikrofon')
-        print('ENTER:             Aufnahme stoppen')
+        diagnostic_print(args, 'Quelle:            Mikrofon')
+        diagnostic_print(args, 'ENTER:             Aufnahme stoppen')
 
-    journal_path = str(args.wav) + '.partial.wav'
-    journal = wave.open(journal_path, 'wb')
-    journal.setnchannels(CHANNELS); journal.setsampwidth(SAMPLE_WIDTH); journal.setframerate(SR)
+    ram_only = bool(getattr(args, 'ram_only', False))
+    journal = None
+    if not ram_only:
+        journal_path = str(args.wav) + '.partial.wav'
+        journal = wave.open(journal_path, 'wb')
+        journal.setnchannels(CHANNELS); journal.setsampwidth(SAMPLE_WIDTH); journal.setframerate(SR)
     journal_cursor = 0
     last_journal = 0.0
     try:
         while True:
+            if cancellation_requested(args):
+                raise RecordingCancelled()
             if stream is not None and (audio_failure or not stream.active):
                 raise RuntimeError(audio_failure[0] if audio_failure else 'Mikrofonverbindung unterbrochen')
-            if time.monotonic()-last_journal > .5:
+            if journal is not None and time.monotonic()-last_journal > .5:
                 chunk = audio.bytes_between(journal_cursor)
                 journal.writeframes(chunk); journal_cursor += len(chunk)
                 last_journal = time.monotonic()
@@ -956,38 +1118,53 @@ async def run_recording(args):
             await enqueue_ready(force=False)
 
             now = audio.duration()
+            if audio.limit_reached:
+                emit_for(args, 'recording_limit', seconds=MAX_SECTION_SECONDS)
+                if replay_task is not None and not replay_task.done():
+                    replay_task.cancel()
+                    await asyncio.gather(replay_task, return_exceptions=True)
+                if waiter is not None and not waiter.done():
+                    waiter.set_result(None)
+                stop_event = getattr(args, 'stop_event', None)
+                if stop_event is not None: stop_event.set()
             source_done = replay_task.done() if replay_task is not None else waiter.done()
 
             if now - last_status_audio_s >= args.status_seconds:
                 last_status_audio_s = now
-                print(
-                    '[STATUS] Aufnahme=%s | Blöcke=%d/%d fertig | Queue=%d | RMS=%d Schwelle=%.0f'
+                diagnostic_print(args,
+                    '[STATUS] Aufnahme=%s | Blöcke=%d/%d fertig | Queue=%d | RMS=%d'
                     % (
                         fmt_clock(now),
                         stats['completed'],
                         stats['blocks_enqueued'],
                         asr_queue.qsize(),
                         segmenter.last_rms,
-                        segmenter.current_threshold,
                     )
                 )
 
             # Erst beenden, wenn alle vollständigen Detektorframes abgearbeitet sind.
-            if source_done and detect_cursor + frame_bytes > audio.length_bytes():
+            if source_done and detect_cursor + frame_bytes > audio.working_length():
                 break
             await asyncio.sleep(0.02)
     finally:
-        journal.writeframes(audio.bytes_between(journal_cursor))
-        journal.close()
+        if journal is not None:
+            journal.writeframes(audio.bytes_between(journal_cursor))
+            journal.close()
         if stream is not None:
             stream.stop()
             stream.close()
+            args._recording_stream = None
 
-    if replay_task is not None:
+    if cancellation_requested(args):
+        raise RecordingCancelled()
+
+    if replay_task is not None and not replay_task.cancelled():
         await replay_task
 
-    emit_event('phase', phase='audio_stopped')
+    emit_for(args, 'phase', phase='audio_stopped')
 
+    # Flush delayed gate frames without shortening the recording.
+    audio.finish_gate()
     # Eventuelle letzte Frames noch verarbeiten.
     process_available_frames()
 
@@ -1015,34 +1192,48 @@ async def run_recording(args):
         stats['blocks_enqueued'] += 1
         stats['final_cuts'] += 1
         stats['max_queue'] = max(stats['max_queue'], asr_queue.qsize())
-        print(
+        diagnostic_print(args,
             '\n[SCHNITT %03d] %.2f..%.2fs | final | +%.2fs Nullstille'
             % (next_block_id, segmenter.core_start_s, total, args.context_seconds)
         )
 
-    await asr_queue.join()
+    joined = asyncio.create_task(asr_queue.join())
+    args._recording_tasks.append(joined)
+    while not joined.done():
+        if cancellation_requested(args):
+            raise RecordingCancelled()
+        await asyncio.sleep(.02)
+    await joined
+    if cancellation_requested(args):
+        raise RecordingCancelled()
     await asr_queue.put(None)
     await worker
 
     # The input source is closed and every queued final block has completed.
     # Only now may later stages attest finalization to Commander.
     args.recording_finalized = not bool(stats['failed'])
-    emit_event('phase', phase='recording_finalized')
+    emit_for(args, 'phase', phase='recording_finalized')
 
     block_results.sort(key=lambda x: x.get('id', 0))
 
     pcm = audio.all_pcm()
-    output_wav = Path(args.wav)
-    input_wav = Path(args.input_wav).resolve() if args.input_wav else None
-    if input_wav is not None and output_wav.resolve() == input_wav:
-        print('[WAV] Replay-Quelldatei bleibt unverändert: %s' % input_wav)
-        final_wav_path = str(input_wav)
+    if ram_only:
+        final_wav_path = None
     else:
-        save_wav(output_wav, pcm)
-        final_wav_path = str(output_wav)
+        output_wav = Path(args.wav)
+        input_wav = Path(args.input_wav).resolve() if args.input_wav else None
+        if input_wav is not None and output_wav.resolve() == input_wav:
+            diagnostic_print(args, '[WAV] Replay-Quelldatei bleibt unverändert: %s' % input_wav)
+            final_wav_path = str(input_wav)
+        else:
+            save_wav(output_wav, pcm)
+            final_wav_path = str(output_wav)
 
     payload = _run_payload(block_results, total, final_wav_path, args, stats)
-    save_json(args.json, payload)
+    if ram_only:
+        payload['_audio_wav'] = wav_bytes_from_pcm(pcm)
+    else:
+        save_json(args.json, payload)
 
     return payload
 
@@ -1053,7 +1244,7 @@ async def run_recording(args):
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description='kienzledoku record 1.3.3: natürliche Pausen + residenter Final-Block-ASR + pyannote + LLM'
+        description='kienzledoku record 1.7.6: natürliche Pausen + residenter Final-Block-ASR + pyannote + LLM'
     )
     p.add_argument('--asr', '--final-asr', dest='asr', default='http://127.0.0.1:8179')
     p.add_argument(
@@ -1070,11 +1261,9 @@ def parse_args():
     p.add_argument('--context-seconds', type=float, default=0.7)
     p.add_argument('--segment-frame-ms', type=int, default=30)
 
-    p.add_argument('--silence-rms', type=float, default=None,
-                   help='Feste RMS-Stilleschwelle; Standard ist adaptive Schwelle.')
-    p.add_argument('--auto-rms-min', type=float, default=160.0)
-    p.add_argument('--auto-rms-max', type=float, default=1200.0)
-    p.add_argument('--auto-rms-factor', type=float, default=2.0)
+    # Accept old replay scripts without restoring their removed second gate.
+    for obsolete in ('--silence-rms', '--auto-rms-min', '--auto-rms-max', '--auto-rms-factor'):
+        p.add_argument(obsolete, type=float, default=None, help=argparse.SUPPRESS)
 
     p.add_argument('--audio-chunk-ms', type=int, default=100)
     p.add_argument('--status-seconds', type=float, default=5.0)
@@ -1105,7 +1294,7 @@ def parse_args():
     p.add_argument('--commander', default=None,
                    help='Commander-Basisadresse; übernimmt alle drei KI-Dienste.')
     p.add_argument('--commander-token-env', default='KIENZLEDOKU_COMMANDER_TOKEN')
-    p.add_argument('--commander-timeout', type=float, default=2400)
+    p.add_argument('--commander-timeout', type=float, default=14400)
     p.add_argument('--quality', default='auto')
     p.add_argument('--allow-partial-asr', action='store_true',
                    help='Trotz fehlgeschlagener ASR-Blöcke Diarisierung/LLM fortsetzen.')
@@ -1184,6 +1373,10 @@ def main():
             file=sys.stderr,
         )
         return 3
+
+    if not transcript.strip():
+        print('Keine Sprache erkannt. Keine Diarisierung oder LLM-Dokumentation erstellt.')
+        return 0
 
     llm_transcript = transcript
     diarization_result = None

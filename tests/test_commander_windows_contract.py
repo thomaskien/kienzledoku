@@ -1,4 +1,4 @@
-"""Record transport against the unmodified Windows/WSL API and model catalogue."""
+"""Record transport against the Windows/WSL API and model catalogue."""
 from pathlib import Path
 import subprocess
 import sys
@@ -20,7 +20,14 @@ sys.path[:0] = [str(server_root/'linux/runtime'), str(server_root/'tests'), str(
 from serial_server import SerialSettings, SerialCommander
 from kienzledoku_commander.api import API
 from test_commander import RuntimeDouble, eventually
-from kienzledoku_commander_client import CommanderClient
+# Keep the client document contract separate from the unchanged server module.
+# The production client and server run in different interpreters.
+import importlib.util
+spec = importlib.util.spec_from_file_location('record_document_contract', root/'kienzledoku_document.py')
+client_document = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(client_document)
+sys.modules['kienzledoku_document'] = client_document
+from kienzledoku_commander_client import CommanderClient, LABELS
 
 catalogue = json.loads((server_root/'models.json').read_text())
 profiles = {}
@@ -28,6 +35,7 @@ for item in catalogue.values():
     profiles[item['quality']] = dict(item['profile'],
         path='/synthetic-models/'+item['files'][0]['filename'],
         label=item['label'], mode='serial', fallbacks=item.get('fallbacks', []))
+os.environ['KIENZLEDOKU_COMMANDER_TOKEN'] = 'windows-contract-token'
 settings = SerialSettings(tier=24, default_quality='gemma12_q8',
     resident_quality='', profiles=profiles,
     prompt_path=str(root/'prompt_documentation.txt')).validate()
@@ -43,10 +51,14 @@ try:
     thread.start()
     client = CommanderClient('http://127.0.0.1:%d' % api.server_port)
     offered = client.profiles()
+    raw_profiles = client.request('/v1/runtime/profiles')['data']
+    for item in raw_profiles:
+        assert item['label'] == LABELS.get(item['id'], profiles[item['id']]['label'])
+        assert item['model_label'] == profiles[item['id']]['label']
     assert offered[0]['id'] == 'gemma12_q8', offered
     assert {p['id'] for p in offered} == set(profiles), offered
     for item in offered:
-        assert item['label'] == profiles[item['id']]['label']
+        assert item['label'] == LABELS.get(item['id'], profiles[item['id']]['label'])
         result, meta = client.extract('Synthetisches Testgespräch.', item['id'], offered,
                                       recording_finalized=True)
         assert set(result) == {'anamnese', 'befund', 'therapie', 'prozedere'}
@@ -55,7 +67,7 @@ try:
     result, meta = client.extract('Synthetischer Standardauftrag.', 'auto', offered,
                                   recording_finalized=True)
     assert meta['requested_quality'] == 'gemma12_q8'
-    print('Unchanged Windows API: all six catalogue models and server default accepted.')
+    print('Windows API: grade labels, catalogue models and server default accepted.')
 finally:
     if api:
         api.shutdown()

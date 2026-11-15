@@ -86,3 +86,18 @@ func TestUnixRecordRuntimeSelectionRemainsCompatible(t *testing.T) {
 		})
 	}
 }
+
+func TestLaunchURLPipePreservesURLWithOptionalLineEnding(t *testing.T) {
+	expected := "kienzledoku://record?kontextId=synthetic&fhirBasisUrl=https%3A%2F%2Fexample.invalid%3A16567%2Faps%2Ffhir%2Fapi%2Fr4&oAuthToken=synthetic%2Btoken"
+	for _, suffix := range []string{"", "\n", "\r\n"} {
+		actual, err := readLaunchURL(strings.NewReader(expected + suffix))
+		if err != nil || actual != expected {
+			t.Fatalf("URL pipe with suffix %q failed: %v", suffix, err)
+		}
+	}
+	for _, invalid := range []string{"", "\n", expected + "\n\n", expected + "\nsecond", "\x00" + expected, strings.Repeat("x", 65537)} {
+		if _, err := readLaunchURL(strings.NewReader(invalid)); err == nil {
+			t.Fatal("accepted empty, multiline or oversized URL pipe")
+		}
+	}
+}

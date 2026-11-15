@@ -10,18 +10,17 @@ bearbeiten den Entwurf und übernehmen ihn anschließend bewusst in die Patiente
 
 ## Download und Installation
 
-Die gemeinsame Installer-Version für **Windows, macOS und Linux** wird nach
-Freigabe hier bereitgestellt. **Aktuell sind noch keine gemeinsamen Installer
-als GitHub-Release veröffentlicht.** Diese Anleitung und die Videos beschreiben
-den neuen Installerstand; der bisherige Quellcode auf `main` ist noch älter.
+Die gemeinsame Installer-Version **1.7.6 für Windows, macOS und Linux** ist
+[als GitHub-Release verfügbar](https://github.com/thomaskien/kienzledoku/releases/tag/v1.7.6).
+Der zugehörige Quellcode ist unter demselben Tag veröffentlicht.
 
 **Vor der Serverinstallation:** [Hugging-Face-Token einrichten](docs/installation.md#hugging-face-token-einrichten) – Konto, Modellfreigabe, Lesetoken und Eingabe im Installer.
 
 | Betriebssystem | Download und Anleitung | Installationsvideo |
 | --- | --- | --- |
-| Windows x64 | [Windows installieren](docs/installation.md#windows) | [Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
-| macOS / Apple Silicon | [Mac installieren](docs/installation.md#macos) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
-| Ubuntu 24.04 / x86_64 | [Linux installieren](docs/installation.md#linux) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
+| Windows x64 | [Installer 1.7.6](https://github.com/thomaskien/kienzledoku/releases/download/v1.7.6/kienzledoku-1.7.6-windows-x64-setup.exe) · [Anleitung](docs/installation.md#windows) | [Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
+| macOS / Apple Silicon | [Installer 1.7.6](https://github.com/thomaskien/kienzledoku/releases/download/v1.7.6/kienzledoku-1.7.6-macOS-arm64.dmg) · [Anleitung](docs/installation.md#macos) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
+| Ubuntu 24.04 / x86_64 | [Archiv 1.7.6](https://github.com/thomaskien/kienzledoku/releases/download/v1.7.6/kienzledoku-1.7.6-linux-x86_64.tar.gz) · [Anleitung](docs/installation.md#linux) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
 
 [Veröffentlichte Pakete auf GitHub](https://github.com/thomaskien/kienzledoku/releases)
 · [Homepage](https://kienzledoku.de/)
@@ -30,7 +29,7 @@ Die Installer bieten **Client, Server oder beides**. Der Client braucht ein
 Mikrofon sowie Zugang zu T2med und zum Commander. Für den KI-Server ist passende
 Hardware erforderlich; er kann auf einem anderen Rechner im Praxisnetz laufen.
 
-Der vorbereitete Linux-Kurzaufruf für einen Server lautet:
+Der Linux-Kurzaufruf für einen Server lautet:
 
 ```bash
 wget -O install_linux.sh https://kienzledoku.de/install_linux.sh && \
@@ -38,8 +37,7 @@ bash install_linux.sh --components server
 ```
 
 Der Starter lädt ein freigegebenes Linux-Paket und dessen SHA-256-Prüfsumme,
-prüft und entpackt es und startet den enthaltenen Installer. Solange kein
-passendes Release vorliegt, beendet er sich mit einer Erklärung ohne Installation.
+prüft und entpackt es und startet den enthaltenen Installer. Bei fehlendem Paket oder abweichender Prüfsumme endet er vor der Installation.
 [Linux-Voraussetzungen und weitere Optionen](docs/installation.md#linux).
 
 ## Videos
@@ -96,8 +94,8 @@ wirkt auch ohne VAD. Einstellungen werden für diesen Client gespeichert.
 
 ## T2med einrichten und verwenden
 
-Diese Anleitung gehört zum gemeinsamen Installerstand. Die öffentlichen Pakete
-werden nach Freigabe ergänzt; die älteren Quellcode-Installer sind separat im
+Diese Anleitung gehört zum gemeinsamen Installerstand 1.7.6.
+Die älteren Quellcode-Installer sind separat im
 [Archiv](docs/archiv/direktbetrieb.md) beschrieben.
 
 

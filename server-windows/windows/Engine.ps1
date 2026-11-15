@@ -1,8 +1,9 @@
-﻿param(
+param(
     [ValidateSet('Install','Download','Start','Stop','Status','Verify','Uninstall','Features','Network')]
     [string]$Action='Install',
     [Parameter(Mandatory=$true)][string]$ConfigPath,
-    [switch]$RemoveModels
+    [switch]$RemoveModels,
+    [switch]$RemoveSettings
 )
 Set-StrictMode -Version 2
 $ErrorActionPreference='Stop'
@@ -10,6 +11,9 @@ Import-Module (Join-Path $PSScriptRoot 'Core.psm1') -Force
 $script:InstallerVersion=Get-InstallerVersion
 $script:Cfg=Read-Json $ConfigPath
 $script:Root=Split-Path -Parent $PSScriptRoot
+# Keep update helpers available after Install-App returns, including final cleanup.
+. (Join-Path $script:Root 'windows/Update.ps1')
+$script:CodeUpdate=$null
 $script:Token=''
 if ($script:Cfg.TokenFile -and (Test-Path -LiteralPath $script:Cfg.TokenFile)) {
     $script:Token=(Get-Content -LiteralPath $script:Cfg.TokenFile -Raw -Encoding UTF8).Trim()
@@ -22,7 +26,11 @@ $script:Cfg | Add-Member -NotePropertyName VerifyModelFiles -NotePropertyValue $
 $script:Cfg | Add-Member -NotePropertyName CleanupModelStaging -NotePropertyValue $script:ModelOptions.CleanupModelStaging -Force
 $forceModels=$Action -in @('Install','Download') -and $script:ModelOptions.VerifyModelFiles -and $script:Cfg.PSObject.Properties['ForceModelVerification'] -and $script:Cfg.ForceModelVerification
 Initialize-ModelVerificationCache (Join-Path $script:Cfg.StateDirectory 'model-verifications.json') -Force:$forceModels
-$script:CurrentCommand='';$script:CurrentPhase='initializing'
+$script:CurrentCommand='';$script:CurrentPhase='initializing';$script:CurrentPercent=0
+Set-DownloadProgressHandler {param($name,$current,$total)
+    $details=('{0:N1} MiB' -f ($current/1MB));if($total -gt 0){$details+=(' / {0:N1} MiB ({1:N0} %)' -f ($total/1MB),(100*$current/$total))}
+    Progress 'download' ('Lade '+$name+': '+$details) $script:CurrentPercent
+}
 Set-ModelVerificationMode $script:ModelOptions.VerifyModelFiles {param($message) Progress 'models' $message 12}
 
 function Log([string]$Message) {
@@ -31,7 +39,7 @@ function Log([string]$Message) {
     Add-Content -LiteralPath $script:LogPath -Value $line -Encoding UTF8
 }
 function Progress([string]$Phase,[string]$Message,[int]$Percent) {
-    $script:CurrentPhase=$Phase
+    $script:CurrentPhase=$Phase;$script:CurrentPercent=$Percent
     Log $Message
     Write-Json $script:ProgressPath @{ Phase=$Phase; Message=$Message; Percent=$Percent; Action=$Action; Finished=$false }
 }
@@ -367,12 +375,9 @@ function Ensure-ModelFiles {
 }
 function Install-App {
     $app=Join-Path $script:Cfg.InstallDirectory 'app'
-    [IO.Directory]::CreateDirectory($app) | Out-Null
     if([IO.Path]::GetFullPath($app) -ne [IO.Path]::GetFullPath($script:Root)){
-        foreach($name in @('windows','VERSION','models.json','audio-files.json','ubuntu.json','linux-payload.tar','README.txt')){
-            Copy-Item -LiteralPath (Join-Path $script:Root $name) -Destination $app -Recurse -Force
-        }
-    }
+        $script:CodeUpdate=Start-CodeUpdate $script:Root $app 'VERSION' @('windows','VERSION','models.json','audio-files.json','ubuntu.json','linux-payload.tar','README.txt')
+    } else {Assert-CodeInventory $app}
     $installedConfig=Join-Path $script:Cfg.InstallDirectory 'config.json'
     Write-Json $installedConfig $script:Cfg
     Set-PrivateFile $installedConfig
@@ -465,7 +470,7 @@ function Assert-WindowsEndpoint([string]$Address,[string]$Token) {
     try{
         $reader=New-Object IO.StreamReader($response.GetResponseStream())
         try{$status=$reader.ReadToEnd()|ConvertFrom-Json}finally{$reader.Dispose()}
-        if($status.name -ne 'kienzledoku-commander' -or -not $status.asr_ready -or $status.last_error){throw 'Server-Endpunkt meldet keine fehlerfreie ASR-Bereitschaft.'}
+        if($status.name -ne 'kienzledoku-commander' -or (-not $status.asr_ready -and -not ($status.PSObject.Properties['asr_on_demand'] -and $status.asr_on_demand)) -or $status.last_error){throw 'Server-Endpunkt meldet keine fehlerfreie ASR-Bereitschaft.'}
     }finally{$response.Dispose()}
     Log ('Windows-Endpunkt lokal geprüft: '+$Address+':8185 (Aufruf vom Serverrechner).')
 }
@@ -512,10 +517,16 @@ try {
             Ensure-Wsl
             Set-LinuxModelSources
             $linuxConfig=Join-Path $script:Cfg.StateDirectory 'linux-install.json'
+            if($script:Cfg.PSObject.Properties['RemoteLlmTokenFile'] -and $script:Cfg.RemoteLlmTokenFile){$script:Cfg | Add-Member -Force -NotePropertyName LinuxRemoteTokenFile -NotePropertyValue (Wsl-Path $script:Cfg.RemoteLlmTokenFile)}
+            if($script:Cfg.PSObject.Properties['CommanderTokenFile'] -and $script:Cfg.CommanderTokenFile){$script:Cfg | Add-Member -Force -NotePropertyName LinuxCommanderTokenFile -NotePropertyValue (Wsl-Path $script:Cfg.CommanderTokenFile)}
             Write-Json $linuxConfig $script:Cfg
             Progress 'server' 'Serverlaufzeiten und Modelle in der eigenen WSL-Umgebung installieren. Dieser Schritt kann länger dauern.' 58
-            Wsl @('mkdir','-p','/opt/kienzledoku-server/installer')
-            Wsl @('tar','-xf',(Wsl-Path (Join-Path $script:Root 'linux-payload.tar')),'-C','/opt/kienzledoku-server/installer')
+            Wsl @('mkdir','-p','/opt/kienzledoku-server')
+            $linuxStage=(Wsl @('mktemp','-d','/tmp/kienzledoku-installer-XXXXXXXX') -Capture).Trim()
+            try {
+                Wsl @('tar','-xf',(Wsl-Path (Join-Path $script:Root 'linux-payload.tar')),'-C',$linuxStage)
+                Wsl @('python3',($linuxStage+'/managed_update.py'),$linuxStage,'/opt/kienzledoku-server/installer','install_server.py')
+            } finally {if($linuxStage -match '^/tmp/kienzledoku-installer-[A-Za-z0-9]+$'){Wsl @('rm','-rf','--',$linuxStage)}}
             Wsl @('python3','/opt/kienzledoku-server/installer/install_server.py','--config',(Wsl-Path $linuxConfig))
             Progress 'start' 'Server starten und Bereitschaft prüfen.' 87
             Wsl @('python3','/opt/kienzledoku-server/installer/control.py','start')
@@ -536,6 +547,7 @@ try {
             Write-Json (Join-Path $script:Cfg.InstallDirectory 'config.json') $script:Cfg
             Set-PrivateFile (Join-Path $script:Cfg.InstallDirectory 'config.json')
             Complete-ModelStaging
+            Complete-CodeUpdate $script:CodeUpdate
             if(-not $script:Cfg.StartAfterInstall){Invoke-WslManagement @('--terminate','kienzledoku-server')}
         }
     }elseif($Action -eq 'Uninstall'){
@@ -546,9 +558,24 @@ try {
         Configure-Network
         Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'kienzledoku Server' -ErrorAction SilentlyContinue
         Invoke-WslManagement @('--terminate','kienzledoku-server')
+        if($RemoveSettings -and -not $RemoveModels){
+            Wsl @('python3','-c','from pathlib import Path; import shutil; shutil.rmtree("/etc/kienzledoku-server",ignore_errors=True); Path("/var/lib/kienzledoku-server/windows-config.json").unlink(missing_ok=True)')
+            Invoke-WslManagement @('--terminate','kienzledoku-server')
+        }
         if($RemoveModels){Invoke-WslManagement @('--unregister','kienzledoku-server')}
         Remove-Item -LiteralPath (Join-Path ([Environment]::GetFolderPath('Programs')) 'kienzledoku Server') -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\kienzledoku-server' -Recurse -Force -ErrorAction SilentlyContinue
+        if($RemoveSettings){
+            foreach($name in @('config.json','client.token')){
+                $folder=if($name -eq 'config.json'){$script:Cfg.InstallDirectory}else{$script:Cfg.StateDirectory}
+                Remove-Item -LiteralPath (Join-Path $folder $name) -Force -ErrorAction SilentlyContinue
+            }
+            foreach($name in @('TokenFile','HuggingFaceTokenFile','RemoteLlmTokenFile','CommanderTokenFile')){
+                # Only remove known token files inside this installer's own state directory.
+                $property=$script:Cfg.PSObject.Properties[$name]
+                if($property -and $property.Value -and ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($property.Value)) -eq [IO.Path]::GetFullPath($script:Cfg.StateDirectory))){Remove-Item -LiteralPath $property.Value -Force -ErrorAction SilentlyContinue}
+            }
+        }
         Log 'Server deaktiviert. WSL/Modelle bleiben bei gewähltem Behalten erhalten; Downloadquellen wurden nicht gelöscht.'
     }else{
         if($Action -eq 'Status'){

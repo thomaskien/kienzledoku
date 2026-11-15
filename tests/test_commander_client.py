@@ -53,6 +53,20 @@ class CommanderClientTests(unittest.TestCase):
         self.assertIn('Gemma 4 12B Q8_0', metadata['notice'])
         self.assertNotIn('Authorization', dict(self.requests[0].headers))
 
+    def test_public_grades_remain_visible_when_older_server_labels_are_model_names(self):
+        self.profiles = [
+            {'id':'basis','label':'Qwen3.5 4B Q4','default':True},
+            {'id':'gruendlich','label':'Gemma 4 12B Q8','model_label':'Gemma 4 12B Q8'},
+            {'id':'sehr_gruendlich','label':'Qwen3.8 27B Q4'},
+        ]
+        client = commander.CommanderClient('http://127.0.0.1:8185')
+        with mock.patch.object(commander,'direct_open',self.opener):
+            profiles = client.profiles()
+        self.assertEqual(['Basis','Gründlich','Sehr gründlich'],[p['label'] for p in profiles])
+        self.assertEqual([p['label'] for p in self.profiles],[p['model_label'] for p in profiles])
+        for item in self.profiles:
+            self.assertEqual(commander.LABELS[item['id']],commander.profile_label(item['id'],self.profiles))
+
     def test_rejects_undeclared_fallback_and_invalid_profile_metadata(self):
         client = commander.CommanderClient('http://127.0.0.1:8185')
         bad = [dict(self.profiles[0], fallback=None), self.profiles[1]]
@@ -109,7 +123,30 @@ class CommanderClientTests(unittest.TestCase):
 
 class CommanderConfigTests(unittest.TestCase):
     @unittest.skipIf(os.name == 'nt', 'Der POSIX-Zugangsspeicher benötigt Unix-Dateimodi.')
-    def test_empty_file_uses_private_store_and_fresh_loopback_needs_no_token(self):
+    def test_installer_empty_token_disables_auth_without_breaking_requests(self):
+        with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
+                os.environ, {'KIENZLEDOKU_CONFIG_DIR': directory}), \
+                mock.patch.object(config.sys, 'platform', 'darwin'):
+            path = Path(directory) / 'commander.token'
+            path.write_text('', encoding='utf-8')
+            path.chmod(0o600)
+            block = config.defaults()['commander']
+            block['token_env'] = 'UNSET_COMMANDER_EMPTY_TOKEN_TEST'
+            client = commander.configured_client(block)
+            with mock.patch.object(commander, 'direct_open', return_value=Response({'status': 'ok'})) as opened:
+                self.assertEqual({'status': 'ok'}, client.request('/health'))
+            self.assertNotIn('Authorization', opened.call_args.args[0].headers)
+            self.assertEqual('', path.read_text())
+            path.write_text('invalid token', encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'ungültig'):
+                _ = client.token
+            path.write_text('', encoding='utf-8')
+            path.chmod(0o644)
+            with self.assertRaisesRegex(ValueError, 'privat'):
+                _ = client.token
+
+    @unittest.skipIf(os.name == 'nt', 'Der POSIX-Zugangsspeicher benötigt Unix-Dateimodi.')
+    def test_empty_file_uses_private_store_and_fresh_commander_needs_no_token(self):
         with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
                 os.environ, {'KIENZLEDOKU_CONFIG_DIR': directory}), \
                 mock.patch.object(config.sys, 'platform', 'linux'):
@@ -125,6 +162,7 @@ class CommanderConfigTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
                 os.environ, {'KIENZLEDOKU_CONFIG_DIR': directory}):
             self.assertTrue(config.load()['commander']['enabled'])
+            self.assertEqual('http://10.0.83.140:8185', config.load()['commander']['url'])
             legacy_toml = Path(directory) / 'legacy.toml'
             legacy_toml.write_text('''
 [connection]
@@ -143,7 +181,8 @@ output_mode="structured"
 single_code="KI"
 ''', encoding='utf-8')
             legacy = config.load(legacy_toml)
-            self.assertFalse(legacy['commander']['enabled'])
+            self.assertTrue(legacy['commander']['enabled'])
+            self.assertEqual(config.DEFAULT_COMMANDER_URL, legacy['commander']['url'])
             self.assertEqual('http://old.local:8179', legacy['services']['asr'])
 
             legacy_json = Path(directory) / 'legacy.json'
@@ -157,6 +196,30 @@ single_code="KI"
             migrated = config.load(legacy_json)
             self.assertTrue(migrated['commander']['enabled'])
             self.assertEqual('gemma12_q8', migrated['commander']['default_quality'])
+
+    def test_disabled_old_config_uses_commander_and_preserves_explicit_endpoint(self):
+        from kienzledoku_speech import SpeechRecognitionManager
+        with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
+                os.environ, {'KIENZLEDOKU_CONFIG_DIR': directory}):
+            path = Path(directory) / 'config.toml'
+            initial = config.defaults()
+            initial['commander'].update(enabled=False, url='http://existing.local:8185')
+            initial['record']['silence_threshold_dbfs'] = -42
+            initial['services']['asr'] = 'http://obsolete.invalid:8179'
+            config.save(initial, path)
+            self.assertFalse(initial['commander']['enabled'], 'Saving must not mutate the caller')
+            self.assertIn('enabled = true', path.read_text())
+            path.write_text(path.read_text().replace('enabled = true', 'enabled = false'))
+            before = path.read_bytes()
+            migrated = config.load(path)
+            self.assertTrue(migrated['commander']['enabled'])
+            self.assertEqual(-42, migrated['record']['silence_threshold_dbfs'])
+            self.assertEqual(before, path.read_bytes(), 'Loading must not rewrite a config')
+            manager = SpeechRecognitionManager(directory, config_path=str(path))
+            self.assertFalse(manager.config_error)
+            self.assertIsNotNone(manager.commander)
+            self.assertEqual({'http://existing.local:8185'}, set(manager.service_urls.values()))
+            self.assertEqual(before, path.read_bytes())
 
     @unittest.skipIf(os.name == 'nt', 'Der POSIX-Zugangsspeicher benötigt Unix-Dateimodi.')
     def test_posix_token_store_is_private_and_not_in_toml(self):

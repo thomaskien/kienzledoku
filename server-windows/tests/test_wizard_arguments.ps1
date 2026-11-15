@@ -40,6 +40,7 @@ $p=[pscustomobject]@{Role='page'};$header=[pscustomobject]@{Role='header'};$foot
 $script:InstallerVersion=Get-InstallerVersion
 $cacheDefault='Z:\Modellarchiv\models';$installDefault='C:\Users\Test\kienzledoku Server'
 $m=$catalog.PSObject.Properties['9b-q4'].Value;$checked=$true;$y=59
+$ResultFile=''
 $savedModelOptions=Get-ModelOptions $null
 Case 'All actual wizard control calls bind their original typed parameters without extra arguments' {
     Assert ($calls.Count -ge 60) 'Wizard control calls were not discovered.'

@@ -1,4 +1,4 @@
-﻿param([string]$SourceDirectory='', [string]$ResumeConfig='')
+﻿param([string]$SourceDirectory='', [string]$ResumeConfig='', [string]$ResultFile='')
 Set-StrictMode -Version 2
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
@@ -8,6 +8,9 @@ trap {
     exit 1
 }
 Import-Module (Join-Path $PSScriptRoot 'Core.psm1') -Force
+if($ResultFile){Write-Json $ResultFile @{completed=$false};Set-PrivateFile $ResultFile}
+. (Join-Path $PSScriptRoot 'CommanderOptions.ps1')
+$script:CommanderOptions=$null
 $script:InstallerVersion=Get-InstallerVersion
 [Windows.Forms.Application]::EnableVisualStyles()
 $script:WizardMutex=New-Object Threading.Mutex($false,'Local\kienzledoku-server-installer')
@@ -111,9 +114,11 @@ foreach($id in $script:ModelOrder){
 $null=Label $p 'Whisper large-v3 und pyannote Community-1 werden zusätzlich vorbereitet (ca. 5,8 GiB).' 24 ($y+2) 860 30
 $null=Label $p 'Standardmodell für Anfragen' 24 ($y+42) 350 28
 $script:Default=Combo $p 390 ($y+39) 494
-$null=Label $p 'Hugging-Face-Read-Token (wie gewünscht sichtbar)' 24 ($y+86) 850 26
+$null=Label $p 'Hugging-Face-Read-Token (vorhandener Token ist vorbelegt)' 24 ($y+86) 850 26
 $script:HfToken=TextBox $p '' 24 ($y+116) 860
-$script:HfToken.UseSystemPasswordChar=$false
+$script:HfToken.UseSystemPasswordChar=$true
+if($env:HF_TOKEN){$script:HfToken.Text=$env:HF_TOKEN}
+elseif(Test-Path (Join-Path $env:USERPROFILE '.cache/huggingface/token')){$script:HfToken.Text=([string](Get-Content (Join-Path $env:USERPROFILE '.cache/huggingface/token') -Raw)).Trim()}
 if($script:Previous -and $script:Previous.TokenFile -and (Test-Path -LiteralPath $script:Previous.TokenFile)){$script:HfToken.Text=(Get-Content -LiteralPath $script:Previous.TokenFile -Raw).Trim()}
 $null=Label $p 'Der Zugriff wird geprüft. Die Bedingungen für pyannote Community-1 müssen im HF-Konto akzeptiert sein.' 24 ($y+157) 850 40
 $link=New-Object Windows.Forms.LinkLabel;$link.Text='pyannote-Modellseite öffnen';$link.Location=New-Object Drawing.Point(24,($y+202));$link.Size=New-Object Drawing.Size(400,26);$p.Controls.Add($link)
@@ -161,7 +166,7 @@ if($script:Hardware){foreach($a in $script:Hardware.Addresses){$null=$script:Add
 $script:Address.Enabled=$false;$script:Lan.Add_CheckedChanged({$script:Address.Enabled=$script:Lan.Checked})
 $null=Label $p 'Netzwerkfreigabe: TCP 8185, ausgewählte IP und lokales Subnetz, unabhängig vom Windows-Netzwerkprofil. Interne KI-Dienste bleiben an localhost. Administratorrechte werden für die Netzwerkfreigabe angefordert.' 44 197 820 74
 $script:Autostart=Check $p 'Server nach meiner Windows-Anmeldung automatisch starten' 304
-$script:StartAfter=Check $p 'Server nach Installation und Prüfung eingeschaltet lassen' 346
+$script:StartAfter=Check $p 'Server nach Installation und Prüfung eingeschaltet lassen' 346 ([bool]$ResultFile)
 $script:Verify=Check $p 'Abschließende Prüfung: synthetisches Audio, alle gewählten Modelle und Modellwechsel' 388 $true
 $script:CleanupStages=Check $p 'Nach Erfolg zusätzliche lokale Modell-Zwischenkopien bereinigen?' 438 $savedModelOptions.CleanupModelStaging
 $null=Label $p 'Abgewählt: für spätere Drüberinstallation behalten. Aktive WSL-Modelle und Ihr Modellarchiv bleiben erhalten. Bei Abbruch werden Zwischenkopien behalten.' 44 478 820 58
@@ -256,6 +261,7 @@ function Build-Config {
         if(Test-NetworkPath $cfg.InstallDirectory){throw 'Aktive WSL-Umgebung auf einem lokalen Laufwerk installieren. Netzlaufwerke sind als Modellquelle erlaubt.'}
         $cfg.Profiles=Get-ProfilePlan $script:Catalog $models $cfg.DefaultModel $cfg.Mode $g.VramMiB $cfg.WslRamGiB $audio $cfg.ParallelModel
     }
+    if($script:CommanderOptions){foreach($property in $script:CommanderOptions.PSObject.Properties){$cfg[$property.Name]=$property.Value}}
     return $cfg
 }
 function Show-Page([int]$Index){
@@ -272,7 +278,7 @@ $script:Next.Add_Click({
             0{Refresh-Inventory;Show-Page 1}
             1{if(-not @(Selected-Models).Count){throw 'Mindestens ein Modell auswählen.'};if($script:DownloadRadio.Checked){$script:Cfg=Build-Config;Prepare-Summary;Show-Page 4}else{Update-Reserve;Show-Page 2}}
             2{if($script:Gpu.SelectedIndex -lt 0){throw 'NVIDIA-Treiber/GPU fehlt.'};Show-Page 3}
-            3{$script:Cfg=Build-Config;Prepare-Summary;Show-Page 4}
+            3{$saved=$script:CommanderOptions;if(-not $saved){$saved=$script:Previous};$chosen=Show-CommanderOptions @(Selected-Models) $saved;if($null -ne $chosen){$script:CommanderOptions=$chosen;$script:Cfg=Build-Config;Prepare-Summary;Show-Page 4}}
             4{Start-Operation}
         }
     }catch{
@@ -360,11 +366,12 @@ $script:Timer.Add_Tick({
             if($result.RestartRequired){$script:ResultTitle.Text='Windows-Neustart erforderlich'}
             $text=$message+"`r`n`r`nModellarchiv: "+$script:Cfg.CacheDirectory+"`r`nProtokoll: "+$log
             if(-not $success){$text+="`r`nProzess-Fehlerausgabe: "+$script:StderrPath+"`r`nProzess-Standardausgabe: "+$script:StdoutPath}
-            if($success -and $script:InstallRadio.Checked){
+            if($success -and -not $result.RestartRequired -and $script:InstallRadio.Checked){
+                if($ResultFile){Write-Json $ResultFile @{completed=$true;commander_url='http://127.0.0.1:8185';token_file=(Join-Path $script:State 'client.token')};Set-PrivateFile $ResultFile}
                 $text+="`r`n`r`nLokale Serveradresse: http://localhost:8185"
                 if($script:Cfg.NetworkMode -eq 'lan'){$text+="`r`nNetzwerkadresse: http://$($script:Cfg.NetworkAddress):8185`r`nLAN-Freigabe eingerichtet; Endpunkt auf diesem Rechner geprüft. Zugriff vom Client separat prüfen."}
                 $clientFile=Join-Path $script:State 'client.token'
-                if(Test-Path -LiteralPath $clientFile){$text+="`r`n`r`nClient-Zugangstoken (für den separat installierten Client):`r`n"+(Get-Content -LiteralPath $clientFile -Raw)}
+                if((Test-Path -LiteralPath $clientFile) -and ([string](Get-Content -LiteralPath $clientFile -Raw)).Trim()){$text+="`r`n`r`nClient-Zugangstoken (für den separat installierten Client):`r`n"+(Get-Content -LiteralPath $clientFile -Raw)}
                 $text+="`r`n`r`nServer am Ende eingeschaltet: $($script:Cfg.StartAfterInstall)`r`nSynthetische Serverprüfung ausgeführt: $($script:Cfg.Verify)`r`nModell-Prüfsummenprüfung: $($script:Cfg.VerifyModelFiles)`r`nZwischenkopien bereinigen gewählt: $($script:Cfg.CleanupModelStaging)`r`nStart / Stopp / Status / Prüfung: Startmenü > kienzledoku Server"
             }
             if(-not $success){$text+="`r`n`r`nNach einem notwendigen Neustart: Startmenü > kienzledoku Server > Installation fortsetzen. Alternativ dieselbe Setup-EXE erneut öffnen. Modelle und fertige Phasen werden wiederverwendet."}

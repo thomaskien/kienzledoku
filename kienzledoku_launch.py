@@ -14,7 +14,7 @@ def main(args=None):
         record.safe_log('Direct protocol launch failed', error=type(exc).__name__)
         if sys.platform == 'win32':
             import ctypes
-            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.3.3', 0x10)
+            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record ' + record.VERSION, 0x10)
         return 1
 
 

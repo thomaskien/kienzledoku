@@ -74,6 +74,7 @@ def validate_config(cfg, vram_mib):
     if cfg['WslRamGiB'] not in (16,24,28,32): raise ValueError('Ungültiges RAM-Limit.')
     if cfg['DefaultModel'] not in cfg['Models']: raise ValueError('Standardmodell fehlt.')
     if cfg['AudioCache'] not in ('ram','disk'): raise ValueError('Ungültiger Audiocache.')
+    if cfg.get('DiarizationMode') not in (None,'resident','with_asr','serial'): raise ValueError('Ungültige Speichernutzung der Sprechertrennung.')
     if not cfg['Models'] or len(cfg['Models']) != len(set(cfg['Models'])): raise ValueError('Ungültige Modellauswahl.')
     if len({choices[key]['quality'] for key in cfg['Models']}) != len(cfg['Models']): raise ValueError('Modell-IDs müssen eindeutig sein.')
     if 'ParallelModel' in cfg:
@@ -112,7 +113,7 @@ def prepare_host():
     if not Path('/usr/local/cuda/bin/nvcc').exists():
         keyring=STATE/'cuda-keyring.deb'
         run(['curl','--fail','--location','--retry','4','--output',keyring,
-             'https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.1-1_all.deb'])
+             'https://developer.download.nvidia.com/compute/cuda/repos/'+('wsl-ubuntu' if os.environ.get('WSL_DISTRO_NAME') else 'ubuntu2404')+'/x86_64/cuda-keyring_1.1-1_all.deb'])
         run(['dpkg','-i',keyring])
         run(['apt-get','update'],env=env)
         # Toolkit only. Linux display drivers break CUDA's WSL driver bridge.
@@ -192,7 +193,8 @@ def install_audio():
                 run([py,'-m','pip','install','pyannote.audio==4.0.7'],env=env)
             run([py,'-c','import torch; assert torch.cuda.is_available(), "CUDA fehlt"; print(torch.cuda.get_device_name(0))'])
             save(stamp.name,{'version':'1.0','cuda':cuda,'time':time.time()})
-    shutil.copytree(ROOT/'runtime',APP,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__'))
+    from managed_update import replace_tree
+    replace_tree(ROOT/'runtime',APP,'serial_server.py')
     scripts=BASE/'scripts';scripts.mkdir(exist_ok=True)
     diar=scripts/'diarization_server.py'
     # Preserve an already verified worker hook on a repair run.
@@ -235,18 +237,42 @@ def runtime_settings(cfg,hw):
                                       {'basis':[],'gruendlich':['basis'],'sehr_gruendlich':['gruendlich','basis']}.get(item['quality'],[])))
     server=dict(tier=round(hw['vram_mib']/1024),host='127.0.0.1',port=8185,gpu_index=cfg['GpuIndex'],
                 default_quality=catalog()[cfg['DefaultModel']]['quality'],llama_binary=str(BASE/'bin/llama-server'),
-                profiles=profiles,prompt_path=str(APP/'prompt_documentation.txt'),control_dir='/run/kienzledoku-commander',
-                diar_control_dir='/run/kienzledoku-commander-diar',max_pending=4,max_remembered=8,max_payload_mib=64,
-                load_timeout=600,backend_timeout=1200,queue_timeout=1800)
+                profiles=profiles,prompt_path=str(CONFIG/'prompt_documentation.txt'),control_dir='/run/kienzledoku-commander',
+                diar_control_dir='/run/kienzledoku-commander-diar',max_pending=4,max_remembered=8,max_payload_mib=512,
+                load_timeout=600,backend_timeout=7200,queue_timeout=1800)
     if 'ParallelModel' in cfg:
         server['resident_quality']=catalog()[cfg['ParallelModel']]['quality'] if cfg['ParallelModel'] else ''
+    server.update(auth_enabled=cfg.get('AuthEnabled', True), asr_on_demand=cfg.get('AsrOnDemand', False),
+                  diarization_mode=cfg.get('DiarizationMode'),
+                  enabled_fields=cfg.get('EnabledFields', ['anamnese','befund','therapie','prozedere']),
+                  remote_llm_url=cfg.get('RemoteLlmUrl', ''))
+    if 'QualityModels' in cfg:
+        mapping={q:catalog()[key]['quality'] for q,key in cfg['QualityModels'].items() if key in cfg['Models']}
+        if not mapping: raise ValueError('Keine aktive Modellstufe gewählt.')
+        server['quality_models']=mapping
+        server['default_quality']=next((q for q,k in cfg['QualityModels'].items() if k==cfg['DefaultModel']),next(iter(mapping)))
+    if server['remote_llm_url']: server['default_quality']='auto'
     return server
 
 def configure(cfg,hw):
+    if 'NativeBind' in cfg:
+        from service_migration import migrate_legacy_commander
+        if migrate_legacy_commander(STATE):
+            print('Alte eigene Commander-Diensteinstellungen gesichert und migriert.',flush=True)
     CONFIG.mkdir(parents=True,exist_ok=True)
     token_file=CONFIG/'token.env'
     if not token_file.exists(): write(token_file,'KIENZLEDOKU_COMMANDER_TOKEN='+secrets.token_urlsafe(32)+'\n',0o600)
+    if cfg.get('LinuxCommanderTokenFile'):
+        secret=Path(cfg['LinuxCommanderTokenFile']).read_text().strip()
+        if len(secret)>4096 or any(c.isspace() for c in secret): raise ValueError('Ungültiger Commander-Token.')
+        if secret: write(token_file,'KIENZLEDOKU_COMMANDER_TOKEN='+secret+'\n',0o600)
+    if cfg.get('LinuxRemoteTokenFile'):
+        secret=Path(cfg['LinuxRemoteTokenFile']).read_text().strip()
+        if len(secret)>4096 or any(c.isspace() for c in secret): raise ValueError('Ungültiger Remote-Token.')
+        original=token_file.read_text().splitlines()[0]
+        write(token_file,original+'\n'+('KIENZLEDOKU_REMOTE_LLM_TOKEN='+secret+'\n' if secret else ''),0o600)
     server=runtime_settings(cfg,hw)
+    write(CONFIG/'prompt_documentation.txt',cfg.get('PromptText') or (APP/'prompt_documentation.txt').read_text())
     write(CONFIG/'installer.json',json.dumps(server,indent=2)+'\n')
     save('windows-config.json',cfg)
     # Reserve 3 GiB of the WSL limit for the Linux kernel and shared runtime code.
@@ -257,6 +283,7 @@ Group={USER}
 Slice=kienzledoku-ai.slice
 Environment=PYTHONPATH={APP}
 Environment=PYTHONUNBUFFERED=1
+Environment=DIARIZATION_MAX_BYTES=268435456
 Environment=CUDA_VISIBLE_DEVICES={cfg['GpuIndex']}
 Environment=HF_HOME={BASE}/models/huggingface
 Environment=HF_HUB_OFFLINE=1
@@ -310,10 +337,13 @@ Requires={UNITS[1]} {UNITS[2]}
 EnvironmentFile={token_file}
 ExecStart=/usr/bin/python3 {APP}/serial_server.py --config {CONFIG}/installer.json
 '''
-    for name,unit in zip(UNITS,[commander,asr,diar]): write('/etc/systemd/system/'+name,unit)
+    for name,unit in zip(UNITS,[commander,asr,diar]):
+        if 'NativeBind' in cfg:
+            unit+='\n[Install]\nWantedBy=multi-user.target\n'
+        write('/etc/systemd/system/'+name,unit)
     run(['systemctl','daemon-reload'])
     env=dict(os.environ,PYTHONPATH=str(APP))
-    env['KIENZLEDOKU_COMMANDER_TOKEN']=token_file.read_text().strip().split('=',1)[1]
+    env['KIENZLEDOKU_COMMANDER_TOKEN']=token_file.read_text().splitlines()[0].split('=',1)[1]
     run([sys.executable,APP/'serial_server.py','--config',CONFIG/'installer.json','--check-config'],env=env)
     save('installed.json',{'version':VERSION,'models':cfg['Models'],'default':cfg['DefaultModel'],'parallel_model':cfg.get('ParallelModel'),
                            'hardware':hw,'time':time.time(),'verified':False,'model_checksums_verified':cfg.get('VerifyModelFiles',True)})

@@ -2,10 +2,10 @@
 
 [Zur Übersicht](../README.md) · [T2med einrichten](../README.md#t2med-einrichten-und-verwenden)
 
-Diese Anleitung beschreibt die neue gemeinsame Installer-Ausgabe für Windows,
-macOS und Linux. **Die öffentlichen Pakete folgen nach Freigabe.** Der bisherige
-Quellcode auf `main` gehört noch zu einem älteren Entwicklungsstand. Ein
-Quellcode-ZIP ist kein Ersatz für die fertigen Installer mit eingebetteten Laufzeiten.
+Diese Anleitung beschreibt die gemeinsame Installer-Ausgabe **1.7.6** für Windows,
+macOS und Linux. [Pakete und Quellcode](https://github.com/thomaskien/kienzledoku/releases/tag/v1.7.6)
+sind veröffentlicht. Ein Quellcode-ZIP ist kein Ersatz für die fertigen Installer
+mit eingebetteten Laufzeiten.
 
 [Veröffentlichte Installer auf GitHub](https://github.com/thomaskien/kienzledoku/releases)
 
@@ -46,7 +46,7 @@ benötigte Linux-Komponenten werden eingerichtet. Für diesen Schritt sind
 Administratorrechte und gegebenenfalls ein Neustart erforderlich. RAM und
 freier Speicherplatz richten sich nach den gewählten Modellen.
 
-1. Nach Freigabe die Windows-x64-Setup-Datei aus den [Releases](https://github.com/thomaskien/kienzledoku/releases) laden und starten.
+1. Die Windows-x64-Setup-Datei aus den [Releases](https://github.com/thomaskien/kienzledoku/releases) laden und starten.
 2. Client, Server oder beides wählen. Den Assistenten bis zur Zusammenfassung durchgehen.
 3. Installation starten und bis zur abschließenden Prüfung warten.
 4. Bei Clientinstallation die angezeigte Adresse in [T2med einrichten](../README.md#t2med-einrichten-und-verwenden).
@@ -61,7 +61,7 @@ KI-Server benötigt mindestens 16 GB gemeinsamen Arbeitsspeicher; größere Mode
 brauchen mehr. Die Python-Laufzeit ist enthalten. Homebrew oder
 Entwicklungswerkzeuge werden für dieses Paket nicht benötigt.
 
-1. Nach Freigabe die macOS-arm64-DMG aus den [Releases](https://github.com/thomaskien/kienzledoku/releases) laden und öffnen.
+1. Die macOS-arm64-DMG aus den [Releases](https://github.com/thomaskien/kienzledoku/releases) laden und öffnen.
 2. **kienzledoku Installation** starten und Client, Server oder beides wählen.
 3. Verbindungen, Modelle und Dokumentationsfelder prüfen und die Zusammenfassung bestätigen.
 4. Bei Clientinstallation die angezeigte Adresse in [T2med einrichten](../README.md#t2med-einrichten-und-verwenden).
@@ -108,8 +108,6 @@ SHA-256-Datei, prüft beide, entpackt in ein eigenes temporäres Verzeichnis und
 startet den enthaltenen Installer. Bei fehlendem Paket, Downloadfehler oder
 abweichender Prüfsumme endet er vor der Installation.
 
-**Bis zur Veröffentlichung eines passenden Linux-Releases gibt es noch kein
-installierbares Paket.** Der Befehl weist darauf hin und installiert nichts.
 Die verwendeten Dateien stammen aus demselben Release; eine reine Windows-Ausgabe
 verändert die Auswahl des Linux-Pakets nicht.
 

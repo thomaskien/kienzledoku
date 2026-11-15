@@ -9,6 +9,7 @@ from .config import load_settings
 from .runtime import Runtime
 from .scheduler import Commander
 from .ownership import owner
+from .macos_processes import cleanup_orphans
 
 
 def main():
@@ -20,9 +21,15 @@ def main():
         settings = load_settings(args.config)
         if args.check_config:
             print(json.dumps({"vram_gib": settings.tier, "default_quality": settings.default,
-                "allowed_qualities": settings.allowed, "baseline_llm": settings.baseline_llm}, ensure_ascii=False))
+                "allowed_qualities": settings.allowed, "baseline_llm": settings.baseline_llm,
+                "auth_enabled": settings.auth_enabled, "platform": settings.platform,
+                "memory_mode": settings.memory_mode or "legacy", "asr_on_demand": settings.asr_on_demand,
+                "diarization_mode": settings.diarization_mode or "legacy",
+                "enabled_roles": settings.enabled_roles, "enabled_fields": settings.enabled_fields,
+                "remote_llm": bool(settings.remote_llm_url)}, ensure_ascii=False))
             return 0
         with owner(settings.control_dir):
+            cleanup_orphans(settings.control_dir)
             commander = Commander(settings, Runtime(settings))
             try:
                 server = API((settings.host, settings.port), commander)
@@ -36,7 +43,7 @@ def main():
                     server.server_close()
             finally:
                 commander.close()
-    except (ValueError, OSError):
+    except (ValueError, OSError, RuntimeError):
         # Configuration has no patient data; errors still never print tokens.
         print("Commander konnte nicht gestartet werden: Konfiguration, Pfade und Ports prüfen.", file=sys.stderr)
         return 1

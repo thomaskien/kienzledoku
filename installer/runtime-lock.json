@@ -1,0 +1,26 @@
+{
+  "python_arm64": {
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261026/cpython-3.12.16%2B20261026-aarch64-apple-darwin-install_only_stripped.tar.gz",
+    "sha256": "353d5f1b4fd2715e7053f12f068435d5bbad16b91e057006b5d01e0925709a7e",
+    "bytes": 25035343,
+    "release": "20261026"
+  },
+  "python_x86_64": {
+    "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261026/cpython-3.12.16%2B20261026-x86_64-apple-darwin-install_only_stripped.tar.gz",
+    "sha256": "37c38fda76fec1fbf310adcbafb7f0d96af13b5511bf8ea954c3aa8eec185734",
+    "bytes": 24757272,
+    "release": "20261026"
+  },
+  "llama_arm64": {
+    "url": "https://github.com/ggml-org/llama.cpp/releases/download/b9637/llama-b9637-bin-macos-arm64.tar.gz",
+    "sha256": "72a93f3e68c31de3e438d462669aad1fcdb423b995e9c41033cc7d27a9a3ac69",
+    "bytes": 10586927,
+    "release": "b9637"
+  },
+  "llama_x86_64": {
+    "url": "https://github.com/ggml-org/llama.cpp/releases/download/b9637/llama-b9637-bin-macos-x64.tar.gz",
+    "sha256": "71743f8db0958e7c266cceb7add7b16aa418a964667e471094aa6ae65b9c8298",
+    "bytes": 10877158,
+    "release": "b9637"
+  }
+}

@@ -1,4 +1,4 @@
-﻿Set-StrictMode -Version 2
+Set-StrictMode -Version 2
 $ErrorActionPreference = 'Stop'
 $script:Product = 'kienzledoku Server Installer'
 $script:Version = [IO.File]::ReadAllText((Join-Path (Split-Path -Parent $PSScriptRoot) 'VERSION')).Trim()
@@ -405,6 +405,20 @@ function Set-PrivateFile([string]$Path) {
         }
     }
 }
+function Set-DownloadProgressHandler([scriptblock]$Callback) {$script:DownloadReport=$Callback}
+function Copy-DownloadStream($InputStream,$OutputStream,[string]$Name,[long]$Offset,[long]$Total) {
+    $buffer=New-Object byte[] (4*1024*1024)
+    $copied=$Offset;$watch=[Diagnostics.Stopwatch]::StartNew()
+    while(($count=$InputStream.Read($buffer,0,$buffer.Length)) -gt 0){
+        $OutputStream.Write($buffer,0,$count);$copied+=$count
+        if($watch.ElapsedMilliseconds -ge 500){
+            if($script:DownloadReport){& $script:DownloadReport $Name $copied $Total}
+            $watch.Restart()
+        }
+    }
+    if($script:DownloadReport){& $script:DownloadReport $Name $copied $Total}
+}
+$script:DownloadReport=$null
 function Get-Download([string]$Url, [string]$Destination, [string]$Token='', [long]$ExpectedBytes=0) {
     Add-Type -AssemblyName System.Net.Http
     [IO.Directory]::CreateDirectory((Split-Path -Parent $Destination)) | Out-Null
@@ -439,7 +453,7 @@ function Get-Download([string]$Url, [string]$Destination, [string]$Token='', [lo
                 $mode = [IO.FileMode]::Create; if ($append) { $mode=[IO.FileMode]::Append }
                 $output = [IO.File]::Open($part,$mode,[IO.FileAccess]::Write,[IO.FileShare]::Read)
                 $input = $response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
-                try { $input.CopyTo($output, 4*1024*1024) } finally { $input.Dispose(); $output.Dispose() }
+                try { $startOffset=0;if($append){$startOffset=$offset};Copy-DownloadStream $input $output ([IO.Path]::GetFileName($Destination)) $startOffset $ExpectedBytes } finally { $input.Dispose(); $output.Dispose() }
                 if ($ExpectedBytes -and (Get-Item -LiteralPath $part).Length -ne $ExpectedBytes) { throw 'Download unvollständig.' }
                 Move-Item -LiteralPath $part -Destination $Destination -Force
                 return

@@ -72,7 +72,7 @@ class RuntimeDouble:
 
     def infer(self, job):
         if job.role == "llm":
-            assert self.loaded["llm"] == job.quality
+            assert self.loaded["llm"] == self.settings.runtime_quality(job.quality)
             if not self.settings.persistent(job.quality):
                 assert not self.loaded["asr"] and not self.loaded["diar"]
         else:

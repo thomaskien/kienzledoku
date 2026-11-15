@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
+	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"syscall"
 	"testing"
 )
 
@@ -106,6 +110,52 @@ func TestConfiguredTarget(t *testing.T) {
 	for _, raw := range []string{"http://host/aps/fhir/api/r4", "https://user:pass@host/aps/fhir/api/r4", "https://host/aps/fhir/api/r4?x=1", "https://host/aps/fhir/api/r4/../../private", "https://host/not-fhir", "https://host:99999/aps/fhir/api/r4"} {
 		if _, err := targetURL(raw); err == nil {
 			t.Fatalf("accepted %s", raw)
+		}
+	}
+}
+
+func TestTransportDiagnosticsAreReadWriteAwareAndContainNoPrivateDetails(t *testing.T) {
+	target, _ := targetURL("https://t2med.local/aps/fhir/api/r4")
+	for _, item := range []struct {
+		err    error
+		reason string
+	}{
+		{syscall.EPERM, "permission_denied"},
+		{syscall.ECONNREFUSED, "connection_refused"},
+		{syscall.EHOSTUNREACH, "network_unreachable"},
+		{context.DeadlineExceeded, "timeout"},
+		{context.Canceled, "cancelled"},
+		{io.EOF, "connection_closed"},
+		{&tls.CertificateVerificationError{Err: errors.New("private")}, "tls_certificate"},
+		{errors.New("net/http: invalid header field value for Authorization: private"), "invalid_request_header"},
+		{errors.New("net/http: HTTP/1.x transport connection broken: malformed MIME header: private"), "invalid_response"},
+		{errors.New("tls: private"), "tls_protocol"},
+		{errors.New("private"), "transport"},
+	} {
+		for _, method := range []string{"GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"} {
+			t.Run(item.reason+"/"+method, func(t *testing.T) {
+				calls := 0
+				handler := proxyHandler(target, "token", "127.0.0.1:9", transportFunc(func(r *http.Request) (*http.Response, error) {
+					calls++
+					return nil, item.err
+				}))
+				req := httptest.NewRequest(method, "/Patient?identifier=private", nil)
+				req.Host = "127.0.0.1:9"
+				req.Header.Set(capabilityHeader, "token")
+				res := httptest.NewRecorder()
+				handler.ServeHTTP(res, req)
+				var body map[string]string
+				if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+					t.Fatal(err)
+				}
+				if calls != 1 || res.Code != 502 || body["reason"] != item.reason || strings.Contains(res.Body.String(), "private") {
+					t.Fatal(calls, res.Code, body)
+				}
+				writing := method != "GET" && method != "HEAD" && method != "OPTIONS"
+				if strings.Contains(body["message"], "Schreibausgang") != writing {
+					t.Fatal(body)
+				}
+			})
 		}
 	}
 }

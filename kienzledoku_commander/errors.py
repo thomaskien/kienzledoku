@@ -48,3 +48,8 @@ class QueueExpired(CommanderError):
 class RecordingNotFinalized(CommanderError):
     code, status = "recording_not_finalized", 409
     message = "Die Aufnahme am beauftragenden Arbeitsplatz muss zuerst vollständig beendet und transkribiert sein."
+
+
+class PayloadTooLarge(CommanderError):
+    code, status = "payload_too_large", 413
+    message = "Die Anfrage überschreitet die zulässige Größe. Audio: höchstens 256 MiB und zwei Stunden je Aufnahmeabschnitt."

@@ -23,12 +23,11 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 	"time"
 )
 
-// Public T2med integration key; a private release key is supplied at build time
-// using -ldflags -X main.apiKey=... and never included in the source tree.
-var apiKey = "7QwA7931lJSQfMKuTH4MQXLn4YEiNhE5tggnYKlY4HE"
+var apiKey = embeddedAPIKey()
 
 const capabilityHeader = "X-Kienzledoku-Connect-Token"
 
@@ -81,6 +80,48 @@ func safePath(raw string) bool {
 	return false
 }
 
+// Only fixed categories leave the process. Raw errors may contain request URLs,
+// OAuth headers or upstream response content and must never be exposed/logged.
+func transportFailureReason(err error) string {
+	var certificate *tls.CertificateVerificationError
+	var dns *net.DNSError
+	var network net.Error
+	switch {
+	case errors.As(err, &certificate):
+		return "tls_certificate"
+	case errors.Is(err, syscall.EACCES), errors.Is(err, syscall.EPERM):
+		return "permission_denied"
+	case errors.Is(err, syscall.ECONNREFUSED):
+		return "connection_refused"
+	case errors.Is(err, syscall.ENETUNREACH), errors.Is(err, syscall.EHOSTUNREACH):
+		return "network_unreachable"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "timeout"
+	case errors.Is(err, context.Canceled):
+		return "cancelled"
+	case errors.As(err, &dns):
+		return "dns"
+	case errors.As(err, &network) && network.Timeout():
+		return "timeout"
+	case errors.Is(err, io.EOF), errors.Is(err, io.ErrUnexpectedEOF),
+		errors.Is(err, syscall.ECONNRESET), errors.Is(err, syscall.EPIPE):
+		return "connection_closed"
+	}
+	detail := err.Error()
+	if strings.Contains(detail, "http: invalid header") {
+		return "invalid_request_header"
+	}
+	for _, marker := range []string{"malformed HTTP", "malformed MIME", "multiple Content-Length", "unsupported transfer encoding", "invalid Content-Length"} {
+		if strings.Contains(detail, marker) {
+			return "invalid_response"
+		}
+	}
+	if strings.Contains(detail, "tls:") {
+		return "tls_protocol"
+	}
+	return "transport"
+}
+
 func proxyHandler(target *url.URL, token, localHost string, transport http.RoundTripper) http.Handler {
 	proxy := &httputil.ReverseProxy{
 		Rewrite: func(p *httputil.ProxyRequest) {
@@ -109,7 +150,13 @@ func proxyHandler(target *url.URL, token, localHost string, transport http.Round
 			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Cache-Control", "no-store")
 			w.WriteHeader(http.StatusBadGateway)
-			io.WriteString(w, `{"error":"connect_transport","message":"T2med-Antwort fehlt. Schreibausgang in T2med pruefen; nicht automatisch wiederholen."}`)
+			message := "T2med konnte nicht gelesen werden. Verbindung und TLS-Einstellungen pruefen."
+			if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions {
+				message = "T2med-Antwort fehlt. Schreibausgang in T2med pruefen; nicht automatisch wiederholen."
+			}
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "connect_transport", "reason": transportFailureReason(err), "message": message,
+			})
 		},
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -289,15 +336,31 @@ func launch(args []string) error {
 	}
 	return nil
 }
+
+// A one-shot URL pipe may end with LF or CRLF. Embedded control characters
+// remain invalid; they must never become a second launch or a CLI argument.
+func readLaunchURL(input io.Reader) (string, error) {
+	data, err := io.ReadAll(io.LimitReader(input, 65537))
+	if err != nil || len(data) > 65536 {
+		return "", errors.New("ungueltiger Aufruf")
+	}
+	link := strings.TrimSuffix(string(data), "\n")
+	link = strings.TrimSuffix(link, "\r")
+	if link == "" || strings.ContainsAny(link, "\r\n\x00") {
+		return "", errors.New("ungueltiger Aufruf")
+	}
+	return link, nil
+}
+
 func main() {
 	var err error
 	if len(os.Args) == 2 && os.Args[1] == "--deep-link-stdin" {
-		data, readErr := io.ReadAll(io.LimitReader(os.Stdin, 65537))
-		if readErr != nil || len(data) > 65536 {
+		link, readErr := readLaunchURL(os.Stdin)
+		if readErr != nil {
 			reportError("ungueltiger Aufruf")
 			os.Exit(1)
 		}
-		err = launch([]string{string(data)})
+		err = launch([]string{link})
 		if err != nil {
 			reportError(err.Error())
 			os.Exit(1)

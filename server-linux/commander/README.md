@@ -19,6 +19,64 @@ Sie ist mit kontrollierten lokalen Testdiensten einschließlich WAV-Replay
 getestet. Die Aktivierung auf der RTX 3090 ist ein eigener Integrationsschritt.
 Die Entwicklung verändert keine laufenden Serverdienste.
 
+## Konfigurationsvertrag 1.4.0
+
+`server.auth_enabled` ist standardmäßig `false`. Nur bei `true` muss
+`server.token_env` auf eine Umgebungsvariable mit Inhalt zeigen; dann benötigen
+alle Endpunkte auch auf Loopback ein korrektes Bearer-Token. Ein LAN-Bind führt
+bei deaktivierter Authentifizierung bewusst keine versteckte Tokenprüfung aus.
+TLS gehört nicht zum Commander.
+
+`policy.memory_mode` ist `serial` oder `parallel`; fehlt der Eintrag, bleibt das
+bisherige VRAM-Profil aktiv. `policy.asr_on_demand=true` lässt Whisper beim
+Kaltstart geparkt und lädt es mit dem ersten ASR-Auftrag. `enabled_roles` kann
+`asr`, `diar` und `llm` unabhängig aktivieren. `enabled_fields` wählt aus
+`anamnese`, `befund`, `ekg`, `sonografie`, `therapie`, `prozedere`, `notiz`.
+Die Ausgabe enthält exakt die gewählten Felder in kanonischer Reihenfolge.
+
+Für die nächste Ausgabe ist `policy.diarization_mode` unabhängig vom
+LLM-Modellbetrieb vorbereitet:
+
+- `resident`: Sprechertrennung bleibt geladen, auch neben dem LLM.
+- `with_asr`: Sprechertrennung wird zusammen mit Whisper geladen und entladen.
+- `serial`: Whisper abschließen und entladen, dann Sprechertrennung laden;
+  für das anschließende LLM wieder entladen.
+
+Ohne diesen Eintrag bleibt das bisherige Verhalten erhalten. Mit
+`asr_on_demand=true` bleibt Whisper nach dem Entladen aus, bis neue Audioblöcke
+eintreffen. Zwischen Sprechertrennung und LLM wird es nicht erneut vorgeladen.
+Die Mac-Installer nennen vorläufig 6 GB Arbeitsreserve für die Sprechertrennung;
+die zugrunde liegende [M4-Messung](../../docs/diarization-memory-m4.json) ist
+keine Obergrenze für lange Gespräche und kein NVIDIA-VRAM-Messwert.
+
+Unter `[backends]` wählt `platform="linux"` die vorhandenen Steuer-Sockets.
+`platform="macos"` verwendet `asr_command` und `diar_command` (je eine TOML-
+Stringliste mit absolutem Python- und Scriptpfad) sowie die absoluten
+`asr_model_path`/`diar_model_path`. Der Commander beendet ausschließlich die
+von ihm gestarteten Prozessgruppen. Auf macOS werden weder systemd noch
+`nvidia-smi` verwendet.
+
+Ein Modellabschnitt benötigt `path`; `model_id`, `label`, `context`, `slots`
+und `kv` sind optional. Sobald neue `model_id`-Zuordnungen verwendet werden,
+werden nur die tatsächlich aufgeführten Grade angeboten. Die Grade-IDs bleiben
+`basis`, `gruendlich`, `sehr_gruendlich`; `/v1/runtime/profiles` liefert dazu
+`model_id` und `model_label`.
+
+`[remote_llm] url="http(s)://host:port"` verlagert ausschließlich LLM-Arbeit an
+das explizite Ziel. Das optionale Token kommt aus `token_env`. Profile, Felder,
+Prompt und LLM-Status stammen dann vom Remote-Commander. Requests verwenden
+keine Umgebungs-Proxys, folgen keinen Redirects und tragen einen auf genau einen
+Schritt begrenzten `X-Kienzledoku-Commander-Hop`. Bei Remote-Fehlern gibt es
+keinen lokalen Fallback. Eine leere URL deaktiviert die Weiterleitung.
+
+`GET /v1/documentation/settings` liefert `fields`, den vollständigen aktiven
+`prompt` und den editierbaren klinischen `prompt_template`. Der technische
+JSON-Vertrag wird serverseitig für die gewählten Felder angefügt und kann durch
+den editierbaren Teil oder eingehende Chat-Systemnachrichten nicht aufgehoben
+werden. `/v1/runtime/status.services` meldet für ASR, Diarisierung und LLM je
+`loading`, `standby`, `ready`, `busy`, `error` oder `disabled` samt technischer
+Meldung.
+
 ## Profile und Standard
 
 | VRAM | Basis (`basis`) | Gründlich (`gruendlich`) | Sehr gründlich (`sehr_gruendlich`) |
@@ -98,8 +156,8 @@ muss der Client ausstehende Blöcke erneut senden.
 
 ## HTTP-Vertrag
 
-Standardadresse: `http://127.0.0.1:8185`. Bei gesetztem Token erfordern alle
-Endpunkte außer `/health` den Header `Authorization: Bearer <Token>`.
+Standardadresse: `http://127.0.0.1:8185`. Bei `server.auth_enabled=true`
+erfordern alle Endpunkte den Header `Authorization: Bearer <Token>`.
 
 | Methode / Pfad | Zweck |
 | --- | --- |
@@ -109,7 +167,7 @@ Endpunkte außer `/health` den Header `Authorization: Bearer <Token>`.
 | `GET /v1/models` | Gleiche Liste im OpenAI-kompatiblen Format. |
 | `POST /v1/documentation/extract` | Transkript und Qualitätswunsch; löst die Modellumschaltung aus. |
 | `POST /v1/chat/completions` | Kompatibler Text-Endpunkt für bestehende Kienzledoku-Clients, ohne Streaming/Tools. `model` ist die Qualitäts-ID. |
-| `POST /v1/asr/final-block` | Bestehender Multipart-Vertrag (`file`, optional `language`), bis 64 MiB. |
+| `POST /v1/asr/final-block` | Bestehender Multipart-Vertrag (`file`, optional `language`), bis 256 MiB. |
 | `POST /v1/diarize` | WAV-Body, optional numerische `num_speakers`, `min_speakers`, `max_speakers`. |
 
 Extraktionsanfrage (synthetisch):
@@ -159,7 +217,7 @@ Fehler: `400` ungültige/unerlaubte Anfrage, `401` Token fehlt, `409` ID-Konflik
 `429` volle Queue, `502` endgültiger Backendfehler, `503` nicht verfügbar oder
 Queue-Zeitgrenze. Fehler enthalten einen maschinenlesbaren `error.code` und eine
 deutsche Meldung, keine Rohantwort des Backends. Standardgrenzen: 128 wartende
-Aufträge, 256 MiB aktive/wartende Nutzdaten, 900 s bis zum Start bzw. Wiederantritt
+Aufträge, 512 MiB aktive/wartende Nutzdaten, 900 s bis zum Start bzw. Wiederantritt
 einer wartenden Anfrage, 600 s pro Backend-Aufruf. Wiederholen nach einem
 endgültigen Fehler benötigt eine **neue** Anfrage-ID; dieselbe ID liefert den
 bereits gespeicherten Fehler.
@@ -194,7 +252,8 @@ einer Anfrage zum dokumentierten Rückfall. `vram_gib` lässt sich explizit setz
 auf der 3090 erkennt `auto` 24 GiB. Genau eine GPU wird unterstützt; deren Index
 muss zu den bestehenden ASR-/pyannote-Workern passen.
 
-LAN-Zugriff erst nach Einrichtung des Tokens aktivieren. Beispielsweise ein
+Für authentifizierten LAN-Zugriff zuerst das Token einrichten und anschließend
+`server.auth_enabled=true` setzen. Beispielsweise ein
 Token erzeugen (wird ausschließlich in die root-lesbare Datei geschrieben):
 
 ```bash
@@ -210,8 +269,9 @@ PY
 Danach `server.host = "0.0.0.0"` setzen. `token.env` akzeptiert unquotierte
 `KEY=value`-Zeilen für `KIENZLEDOKU_COMMANDER_TOKEN` und optional
 `KIENZLEDOKU_COMMANDER_ASR_TOKEN` (falls der vorhandene Worker ein Token verlangt).
-Ohne Token verweigert der Commander einen LAN-Bind. HTTP nur im vertrauenswürdigen
-Praxisnetz/VPN verwenden, andernfalls TLS vorlagern. Die Firewall wird nicht
+Bei bewusst deaktivierter Authentifizierung ist auch ein LAN-Bind ohne Token
+zulässig. HTTP nur im vertrauenswürdigen Praxisnetz/VPN verwenden, andernfalls
+TLS vorlagern. Die Firewall wird nicht
 automatisch erweitert. Interne Backend-Adressen bleiben ausschließlich lokal.
 
 Bewusste Aktivierung:
@@ -251,7 +311,7 @@ und die bisherigen `services` behalten. Beispiel für die RTX 3090:
   "url": "http://10.0.83.140:8185",
   "token_file": "/home/thomas/.config/kienzledoku/commander.token",
   "default_quality": "auto",
-  "request_timeout": 2400
+  "request_timeout": 14400
 }
 ```
 

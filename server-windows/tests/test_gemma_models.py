@@ -22,7 +22,7 @@ GEMMA = ('gemma12-qat-q4', 'gemma12-q8', 'gemma26-qat-q4')
 def configuration(resident='', models=None, default='9b-q4'):
     models = list(CATALOG) if models is None else models
     return dict(Models=models, DefaultModel=default, ParallelModel=resident,
-                WslRamGiB=32, AudioCache='ram', GpuIndex=0,
+                WslRamGiB=32, AudioCache='ram', GpuIndex=0, AuthEnabled=False,
                 Profiles={key: {'Mode': 'parallel' if key == resident else 'serial'}
                           for key in models})
 
@@ -33,18 +33,32 @@ def runtime_config(cfg, vram=24576):
         return SerialSettings(**install_server.runtime_settings(cfg, dict(vram_mib=vram))).validate()
 
 
+class DiarizationRuntime(RuntimeDouble):
+    def infer(self, job):
+        with self.lock:
+            self.active.append(job.role)
+            self.started.add(job.id)
+        try:
+            if not self.holds[job.id].wait(5):
+                raise AssertionError('Test wartet zu lange')
+            return {'documentation': {}, 'completion': {}} if job.role == 'llm' else {'text': 'synthetic'}
+        finally:
+            with self.lock:
+                self.active.remove(job.role)
+
+
 class GemmaModels(unittest.TestCase):
-    def commander(self, cfg):
-        runtime = RuntimeDouble(cfg)
+    def commander(self, cfg, runtime_class=RuntimeDouble):
+        runtime = runtime_class(cfg)
         commander = SerialCommander(cfg, runtime)
         self.addCleanup(commander.close)
         eventually(lambda: commander.status()['loaded'] == commander._baseline() and
                    not commander.status()['transition_running'])
         return commander, runtime
 
-    def test_all_six_models_have_distinct_public_ids_and_verified_sources(self):
-        self.assertEqual(6, len(CATALOG))
-        self.assertEqual(6, len({x['quality'] for x in CATALOG.values()}))
+    def test_all_seven_models_have_distinct_public_ids_and_verified_sources(self):
+        self.assertEqual(7, len(CATALOG))
+        self.assertEqual(7, len({x['quality'] for x in CATALOG.values()}))
         proof = json.loads((ROOT/'evidence/gemma-publisher-verification-1.8.json').read_text())
         for row in proof['models']:
             item = CATALOG[row['key']]
@@ -77,7 +91,7 @@ class GemmaModels(unittest.TestCase):
         cfg = runtime_config(configuration())
         self.assertIsNone(cfg.baseline_llm)
         self.assertFalse(any(cfg.persistent(q) for q in cfg.allowed))
-        self.assertEqual(6, len(cfg.allowed))
+        self.assertEqual(7, len(cfg.allowed))
 
     def test_serial_gemma_request_restores_explicit_gemma_resident_and_status(self):
         cfg = runtime_config(configuration('gemma12-qat-q4'))
@@ -125,6 +139,44 @@ class GemmaModels(unittest.TestCase):
             self.assertIn('--jinja', argv)
             self.assertEqual({'enable_thinking': False},
                              json.loads(argv[argv.index('--chat-template-kwargs')+1]))
+
+    def test_separate_diarization_policy_reaches_linux_and_wsl_scheduler(self):
+        for mode in ('resident', 'with_asr', 'serial'):
+            with self.subTest(mode=mode):
+                source = configuration(models=['9b-q4'])
+                source.update(DiarizationMode=mode, AsrOnDemand=True)
+                cfg = runtime_config(source)
+                self.assertEqual(mode, cfg.diarization_mode)
+                commander, runtime = self.commander(cfg, DiarizationRuntime)
+                self.assertEqual(mode == 'resident', runtime.loaded['diar'])
+                for role in ('asr', 'diar', 'llm'):
+                    key = mode + '_' + role
+                    release = threading.Event()
+                    runtime.holds[key] = release
+                    self.addCleanup(release.set)
+                    job = commander.submit(role, {}, cfg.default if role == 'llm' else None, request_id=key)
+                    eventually(lambda: key in runtime.started)
+                    if role == 'asr':
+                        self.assertEqual(mode != 'serial', runtime.loaded['diar'])
+                    elif role == 'diar':
+                        self.assertTrue(runtime.loaded['diar'])
+                        self.assertEqual(mode != 'serial', runtime.loaded['asr'])
+                        self.assertIsNone(runtime.loaded['llm'])
+                    else:
+                        self.assertEqual(mode == 'resident', runtime.loaded['diar'])
+                        self.assertFalse(runtime.loaded['asr'])
+                    release.set()
+                    job.future.result(3)
+                eventually(lambda: runtime.loaded['llm'] is None and not commander.status()['transition_running'])
+                self.assertFalse(runtime.loaded['asr'])
+                self.assertEqual(1, runtime.events.count('load_asr'))
+                commander.close()
+
+    def test_invalid_diarization_policy_is_rejected(self):
+        source = configuration()
+        source['DiarizationMode'] = 'unknown'
+        with self.assertRaises(ValueError):
+            runtime_config(source)
 
 
 if __name__ == '__main__':

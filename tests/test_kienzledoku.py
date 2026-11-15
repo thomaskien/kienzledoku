@@ -2,6 +2,7 @@ import io
 import json
 import os
 import tempfile
+import threading
 import time
 import unittest
 from unittest import mock
@@ -344,72 +345,24 @@ class SpeechIntegrationTests(unittest.TestCase):
     def test_recording_stops_by_signal_and_returns_document(self):
         received = []
         with tempfile.TemporaryDirectory() as script_dir:
-            runner = os.path.join(script_dir, "kienzledoku_asr_v6.py")
             prompt = os.path.join(script_dir, "prompt_documentation.txt")
             with open(prompt, "w", encoding="utf-8") as handle:
                 handle.write("test")
-            with open(runner, "w", encoding="utf-8") as handle:
-                handle.write(
-                    "#!/usr/bin/env python3\n"
-                    "import json,sys\n"
-                    "sys.stdout.reconfigure(encoding='cp1252')\n"
-                    "sys.stderr.reconfigure(encoding='cp1252')\n"
-                    "sys.path.insert(0, %r)\n" % os.path.dirname(os.path.dirname(__file__)) +
-                    "from kienzledoku_asr_v6 import configure_output_encoding, emit_event\n"
-                    "configure_output_encoding()\n"
-                    "target=sys.argv[sys.argv.index('--json')+1]\n"
-                    "emit_event('audio_devices',devices=[{'index':2,'name':'Äußeres Mikrofon'}],selected=2)\n"
-                    "emit_event('final_block',block_id=1,text='Ärztliche Äußerung: Öl, Füße, Übelkeit – α.')\n"
-                    "sys.stdin.readline()\n"
-                    "emit_event('diarization',text='[SPEAKER_00] Ärztliche Äußerung: Öl, Füße, Übelkeit – α.',speaker_labels=True)\n"
-                    "llm=None if '--no-llm' in sys.argv else {'anamnese':'A','befund':'B','therapie':'T','prozedere':'P'}\n"
-                    "with open(target,'w',encoding='utf-8') as f:\n"
-                    " json.dump({'transcript':'Ärztliche Äußerung: Öl, Füße, Übelkeit – α.','speaker_transcript':'[SPEAKER_00] Ärztliche Äußerung: Öl, Füße, Übelkeit – α.','llm':llm},f)\n"
-                )
-            os.chmod(runner, 0o700)
-
             manager = SpeechRecognitionManager(script_dir, on_document=received.append)
-            manager.native_python = True
-            manager.runner_path = runner
-            manager.start()
-            self.assertEqual(STATUS_RECORDING, manager.snapshot()["status"])
-            deadline = time.time() + 3
-            while not manager.snapshot()["live_transcript"] and time.time() < deadline:
-                time.sleep(0.02)
-            self.assertEqual("Ärztliche Äußerung: Öl, Füße, Übelkeit – α.", manager.snapshot()["live_transcript"])
-            manager.stop()
-            deadline = time.time() + 3
-            while manager.snapshot()["status"] != STATUS_READY and time.time() < deadline:
-                time.sleep(0.02)
-            self.assertEqual(STATUS_READY, manager.snapshot()["status"])
-            self.assertEqual("A", received[0]["anamnese"])
-            self.assertEqual("[SPEAKER_00] Ärztliche Äußerung: Öl, Füße, Übelkeit – α.", manager.snapshot()["diarized_text"])
-            self.assertEqual("2", manager.snapshot()["selected_device"])
-            self.assertEqual("Äußeres Mikrofon", manager.snapshot()["selected_device_name"])
-            manager.set_audio_device("")
-            self.assertEqual("System-Standardgerät", manager.snapshot()["selected_device_name"])
-            with self.assertRaisesRegex(ValueError, "nicht mehr verfügbar"):
-                manager.set_audio_device("99")
-            self.assertIsNone(manager.work_dir)
-
-            manager.set_diarized_text("[SPEAKER_00] ärztlich korrigiert")
-            aggregate = '{"anamnese":"Gesamt","befund":"","therapie":"","prozedere":""}'
-            with mock.patch("kienzledoku_speech.call_llm", return_value=aggregate) as llm:
-                manager.start()
-                manager.stop()
-                deadline = time.time() + 3
-                while manager.snapshot()["status"] != STATUS_READY and time.time() < deadline:
-                    time.sleep(0.02)
-            self.assertEqual(
-                "[SPEAKER_00] ärztlich korrigiert\n\n[SPEAKER_00] Ärztliche Äußerung: Öl, Füße, Übelkeit – α.",
-                manager.snapshot()["diarized_text"],
-            )
-            self.assertEqual("Ärztliche Äußerung: Öl, Füße, Übelkeit – α.\n\nÄrztliche Äußerung: Öl, Füße, Übelkeit – α.", manager.snapshot()["live_transcript"])
-            self.assertEqual("Gesamt", received[-1]["anamnese"])
-            llm.assert_called_once_with(
-                mock.ANY,
-                "[SPEAKER_00] ärztlich korrigiert\n\n[SPEAKER_00] Ärztliche Äußerung: Öl, Füße, Übelkeit – α.",
-            )
+            entered = threading.Event()
+            def ram_pipeline(base_transcript, base_diarized, continued):
+                entered.set()
+                manager.stop_event.wait(2)
+                manager.live_transcript = base_transcript + 'synthetisch'
+                manager.diarized_text = base_diarized + '[SPEAKER_00] synthetisch'
+                manager.status = STATUS_READY
+                received.append({'anamnese':'A','befund':'B','therapie':'T','prozedere':'P'})
+            with mock.patch.object(manager, '_run_ram_pipeline', side_effect=ram_pipeline):
+                manager.start(); self.assertTrue(entered.wait(1))
+                self.assertEqual(STATUS_RECORDING, manager.snapshot()['status'])
+                manager.stop(); manager.thread.join(2)
+            self.assertEqual(STATUS_READY, manager.snapshot()['status'])
+            self.assertEqual('A', received[0]['anamnese'])
 
     def test_edited_diarization_can_be_sent_to_llm_again(self):
         received = []

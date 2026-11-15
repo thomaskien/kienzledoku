@@ -23,6 +23,12 @@ FINALIZED_HEADER = "X-Kienzledoku-Recording-Finalized"
 QUALITY_RE = re.compile(r"[a-z0-9][a-z0-9_]{0,63}\Z")
 
 
+class CommanderRequestError(RuntimeError):
+    def __init__(self, message, status=None):
+        super(CommanderRequestError, self).__init__(message)
+        self.status = status
+
+
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
         return None
@@ -43,6 +49,8 @@ def _quality_id(value):
 
 
 def profile_label(quality, profiles):
+    if quality in LEGACY_LABELS:
+        return LEGACY_LABELS[quality]
     for profile in profiles or ():
         if profile.get("id") == quality:
             return profile.get("label") or quality
@@ -51,7 +59,7 @@ def profile_label(quality, profiles):
 
 class CommanderClient:
     def __init__(self, url, token_env="KIENZLEDOKU_COMMANDER_TOKEN",
-                 request_timeout=2400, default_quality="auto", token_file=None,
+                 request_timeout=14400, default_quality="auto", token_file=None,
                  token_loader=None, token_override=None):
         if not isinstance(url, str):
             raise ValueError("Commander-Adresse fehlt.")
@@ -63,7 +71,7 @@ class CommanderClient:
         if not isinstance(token_env, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", token_env):
             raise ValueError("Ungültige Commander-Tokenvariable.")
         if (type(request_timeout) not in (float, int) or not math.isfinite(request_timeout)
-                or not 30 <= request_timeout <= 7200):
+                or not 30 <= request_timeout <= 21600):
             raise ValueError("Commander-Zeitgrenze muss zwischen 30 und 7200 Sekunden liegen.")
         if default_quality != "auto" and not _quality_id(default_quality):
             raise ValueError("Unbekannte Commander-Standardqualität.")
@@ -113,8 +121,6 @@ class CommanderClient:
         if not token and self.token_loader:
             token = self.token_loader()
         token = self._validate_token(token)
-        if not token and urlsplit(self.url).hostname not in ("localhost", "::1", "127.0.0.1"):
-            raise ValueError("Commander-Token fehlt in der Umgebungsvariable %s." % self.token_env)
         return token
 
     def request(self, path, payload=None, timeout=None):
@@ -145,9 +151,59 @@ class CommanderClient:
                 502: "Auch die erlaubte Ersatzstufe konnte keine vollständige Dokumentation erzeugen.",
                 503: "Commander ist derzeit nicht bereit. Das Sprechertranskript bleibt erhalten.",
             }
-            raise RuntimeError(messages.get(exc.code, "Commander-Anfrage fehlgeschlagen (HTTP %d)." % exc.code)) from None
+            raise CommanderRequestError(
+                messages.get(exc.code, "Commander-Anfrage fehlgeschlagen (HTTP %d)." % exc.code),
+                status=exc.code,
+            ) from None
         except (OSError, ValueError, UnicodeError):
-            raise RuntimeError("Commander ist nicht erreichbar oder liefert keine gültige Antwort. Das Sprechertranskript bleibt zur erneuten Verarbeitung erhalten.") from None
+            raise CommanderRequestError("Commander ist nicht erreichbar oder liefert keine gültige Antwort. Das Sprechertranskript bleibt zur erneuten Verarbeitung erhalten.") from None
+
+    def documentation_settings(self):
+        """Read the Commander's authoritative fields and prompt configuration.
+
+        Only a real 404 denotes the pre-1.4 API. Connectivity and malformed
+        responses are deliberately not interpreted as a configuration change.
+        """
+        from kienzledoku_document import DEFAULT_DOCUMENT_FIELDS, validate_fields
+        try:
+            value = self.request("/v1/documentation/settings", timeout=3)
+        except CommanderRequestError as exc:
+            if exc.status == 404:
+                return {
+                    "fields": DEFAULT_DOCUMENT_FIELDS,
+                    "prompt": "",
+                    "prompt_template": "",
+                    "legacy": True,
+                }
+            raise
+        try:
+            fields = validate_fields(value["fields"])
+            prompt = value["prompt"]
+            prompt_template = value["prompt_template"]
+            if (not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 200000
+                    or not isinstance(prompt_template, str) or len(prompt_template) > 200000):
+                raise ValueError()
+        except (KeyError, TypeError, ValueError):
+            raise RuntimeError("Commander liefert keine gültige Dokumentationskonfiguration.") from None
+        return {"fields": fields, "prompt": prompt, "prompt_template": prompt_template,
+                "legacy": False}
+
+    def runtime_status(self):
+        value = self.request("/v1/runtime/status", timeout=3)
+        allowed = {"loading", "standby", "ready", "busy", "error", "disabled"}
+        try:
+            raw = value["services"]
+            result = {}
+            for name in ("asr", "diar", "llm"):
+                item = raw[name]
+                state = item["state"]
+                message = item.get("message", "")
+                if state not in allowed or not isinstance(message, str) or len(message) > 2000:
+                    raise ValueError()
+                result[name] = {"state": state, "message": message}
+            return result
+        except (KeyError, TypeError, ValueError):
+            raise RuntimeError("Commander liefert keinen gültigen Dienststatus.") from None
 
     def profiles(self):
         value = self.request("/v1/runtime/profiles", timeout=3)
@@ -163,7 +219,7 @@ class CommanderClient:
                     raise ValueError()
                 quality = entry.get("id")
                 label = entry.get("label", LEGACY_LABELS.get(quality, quality))
-                persistent = entry.get("persistent")
+                persistent = entry.get("persistent", False)
                 fallback = entry.get("fallback")
                 is_default = entry.get("default", False)
                 if (not _quality_id(quality) or quality in ids
@@ -174,9 +230,17 @@ class CommanderClient:
                     raise ValueError()
                 ids.append(quality)
                 default_count += int(is_default)
-                profiles.append({"id": quality, "label": label.strip(),
+                profiles.append({"id": quality, "label": LEGACY_LABELS.get(quality, label.strip()),
                                  "persistent": persistent,
                                  "default": is_default})
+                if quality in LEGACY_LABELS and label.strip() != LEGACY_LABELS[quality]:
+                    profiles[-1]["model_label"] = label.strip()
+                for metadata_name in ("model_id", "model_label"):
+                    metadata_value = entry.get(metadata_name)
+                    if metadata_value is not None:
+                        if not _valid_text(metadata_value, 200):
+                            raise ValueError()
+                        profiles[-1][metadata_name] = metadata_value.strip()
                 if "fallback" in entry:
                     profiles[-1]["fallback"] = fallback
             if default_count > 1:
@@ -190,7 +254,7 @@ class CommanderClient:
         except (KeyError, TypeError, ValueError):
             raise RuntimeError("Commander liefert keine gültigen Qualitätsprofile.") from None
 
-    def extract(self, transcript, quality, profiles, recording_finalized=False):
+    def extract(self, transcript, quality, profiles, recording_finalized=False, fields=None):
         if recording_finalized is not True:
             raise ValueError("Die Aufnahme muss vor der Dokumentation vollständig beendet sein.")
         if not isinstance(transcript, str) or not transcript.strip():
@@ -208,7 +272,7 @@ class CommanderClient:
             raw = result["documentation"]
             if not isinstance(raw, dict) or any(not isinstance(value, str) for value in raw.values()):
                 raise ValueError()
-            document = parse_documentation_json(raw)
+            document = parse_documentation_json(raw, fields)
             meta = result["commander"]
             requested = meta["requested_quality"]
             used = meta["used_quality"]
@@ -265,7 +329,7 @@ def configured_client(block, token_override=None):
     return CommanderClient(
         block.get("url"),
         block.get("token_env", "KIENZLEDOKU_COMMANDER_TOKEN"),
-        block.get("request_timeout", 2400),
+        block.get("request_timeout", 14400),
         block.get("default_quality", "auto"),
         block.get("token_file") or None,
         token_loader=read_commander_token,

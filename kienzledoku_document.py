@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Gemeinsamer Dokumentationsvertrag für Kienzledoku 1.3.1.
+"""Gemeinsamer Dokumentationsvertrag für Kienzledoku 1.7.6.
 
 Dieses Modul enthält bewusst weder FHIR- noch ASR-/LLM-Transportlogik. Es ist
 die stabile Grenze zwischen der Kienzlefon-Pipeline und dem T2med-Adapter.
@@ -11,34 +11,50 @@ from __future__ import print_function
 import json
 
 
-DOCUMENT_FIELDS = ("anamnese", "befund", "therapie", "prozedere")
+DEFAULT_DOCUMENT_FIELDS = ("anamnese", "befund", "therapie", "prozedere")
+DOCUMENT_FIELDS = ("anamnese", "befund", "ekg", "sonografie", "therapie", "prozedere", "notiz")
 DOCUMENT_LABELS = {
     "anamnese": "Anamnese",
     "befund": "Befund",
+    "ekg": "EKG",
+    "sonografie": "Sonografie",
     "therapie": "Therapie",
     "prozedere": "Prozedere",
+    "notiz": "Notiz",
 }
+DOCUMENT_CODES = {"ekg": "EKG", "sonografie": "SON", "notiz": "NOT"}
 
 OUTPUT_MODE_STRUCTURED = "structured"
 OUTPUT_MODE_SINGLE = "single"
 OUTPUT_MODES = (OUTPUT_MODE_STRUCTURED, OUTPUT_MODE_SINGLE)
 
 
-def empty_documentation():
-    return {field: "" for field in DOCUMENT_FIELDS}
+def validate_fields(fields=None):
+    if fields is None:
+        return DEFAULT_DOCUMENT_FIELDS
+    if not isinstance(fields, (list, tuple)) or not fields or any(not isinstance(v, str) for v in fields):
+        raise ValueError("Mindestens ein Dokumentationsfeld muss ausgewählt sein")
+    if len(set(fields)) != len(fields) or set(fields) - set(DOCUMENT_FIELDS):
+        raise ValueError("Ungültige Dokumentationsfelder")
+    return tuple(field for field in DOCUMENT_FIELDS if field in fields)
 
 
-def normalize_documentation(value):
-    """Return a strict four-field document without inventing missing content."""
+def empty_documentation(fields=None):
+    return {field: "" for field in validate_fields(fields)}
+
+
+def normalize_documentation(value, fields=None):
+    """Normalize the selected fields without inventing missing content."""
     if not isinstance(value, dict):
         raise ValueError("Dokumentation muss ein JSON-Objekt sein")
 
-    unknown = sorted(set(value) - set(DOCUMENT_FIELDS))
+    fields = validate_fields(fields)
+    unknown = sorted(set(value) - set(fields))
     if unknown:
         raise ValueError("Unbekannte Dokumentationsfelder: %s" % ", ".join(unknown))
 
-    normalized = empty_documentation()
-    for field in DOCUMENT_FIELDS:
+    normalized = empty_documentation(fields)
+    for field in fields:
         item = value.get(field, "")
         if item is None:
             item = ""
@@ -48,8 +64,9 @@ def normalize_documentation(value):
     return normalized
 
 
-def parse_documentation_json(raw):
+def parse_documentation_json(raw, fields=None):
     """Parse the pure JSON contract; tolerate only an enclosing Markdown fence."""
+    fields = validate_fields(fields)
     if isinstance(raw, dict):
         value = raw
     else:
@@ -77,10 +94,10 @@ def parse_documentation_json(raw):
             raise ValueError("LLM-Dokumentation ist kein gültiges JSON: %s" % exc)
 
     if isinstance(value, dict):
-        missing = sorted(set(DOCUMENT_FIELDS) - set(value))
+        missing = sorted(set(fields) - set(value))
         if missing:
             raise ValueError("Fehlende Dokumentationsfelder: %s" % ", ".join(missing))
-    return normalize_documentation(value)
+    return normalize_documentation(value, fields)
 
 
 def normalize_output_mode(value):
@@ -101,14 +118,15 @@ def normalize_entry_code(value):
     return code
 
 
-def nonempty_fields(documentation):
-    document = normalize_documentation(documentation)
-    return [(field, document[field]) for field in DOCUMENT_FIELDS if document[field]]
+def nonempty_fields(documentation, fields=None):
+    fields = validate_fields(fields)
+    document = normalize_documentation(documentation, fields)
+    return [(field, document[field]) for field in fields if document[field]]
 
 
-def compose_single_block(documentation):
+def compose_single_block(documentation, fields=None):
     """Combine non-empty fields deterministically, preserving their order."""
     sections = []
-    for field, text in nonempty_fields(documentation):
+    for field, text in nonempty_fields(documentation, fields):
         sections.append("%s\n%s" % (DOCUMENT_LABELS[field].upper(), text))
     return "\n\n".join(sections)

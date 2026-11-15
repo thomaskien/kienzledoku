@@ -1,4 +1,6 @@
 import json
+import io
+import wave
 from concurrent.futures import ThreadPoolExecutor
 import os
 from pathlib import Path
@@ -21,6 +23,14 @@ from kienzledoku_commander.runtime import Runtime, document
 from kienzledoku_commander.scheduler import Commander, Job
 from test_commander import RuntimeDouble, eventually
 
+def synthetic_wav():
+    data = io.BytesIO()
+    with wave.open(data, 'wb') as wav:
+        wav.setnchannels(1); wav.setsampwidth(2); wav.setframerate(16000)
+        wav.writeframes(b'\0\0' * 160)
+    return data.getvalue()
+
+
 DOC = {"anamnese": "Synthetisch: seit drei Tagen Husten.", "befund": "", "therapie": "", "prozedere": ""}
 
 
@@ -36,7 +46,7 @@ class APIRuntime(RuntimeDouble):
 
 class APITests(unittest.TestCase):
     def setUp(self):
-        self.cfg = Settings(tier=24)
+        self.cfg = Settings(tier=24, auth_enabled=True)
         self.runtime = APIRuntime(self.cfg)
         self.commander = Commander(self.cfg, self.runtime)
         self.addCleanup(self.commander.close)
@@ -65,7 +75,8 @@ class APITests(unittest.TestCase):
             return response.status, json.load(response)
 
     def test_auth_and_profile_discovery_never_expose_basis_on_24gib(self):
-        self.assertEqual(200, self.call("/health", token=None)[0])
+        self.assertEqual(401, self.call("/health", token=None)[0])
+        self.assertEqual(200, self.call("/health")[0])
         self.assertEqual(401, self.call("/v1/runtime/status", token=None)[0])
         code, models = self.call("/v1/models")
         self.assertEqual(200, code)
@@ -102,12 +113,23 @@ class APITests(unittest.TestCase):
         self.assertNotIn(secret, json.dumps(result))
         self.assertNotIn(secret, json.dumps(self.call("/v1/runtime/status")[1]))
 
+    def test_audio_size_and_duration_rejected_before_model_switch(self):
+        from kienzledoku_commander import api
+        import struct
+        before=list(self.runtime.events)
+        size=7201*32000
+        header=struct.pack('<4sI4s4sIHHIIHH4sI',b'RIFF',size+36,b'WAVE',b'fmt ',16,1,1,16000,32000,2,16,b'data',size)
+        self.assertEqual(413,self.call('/v1/diarize',raw=header,headers={'Content-Type':'audio/wav'})[0])
+        with patch.object(api,'MAX_AUDIO',16):
+            self.assertEqual(413,self.call('/v1/diarize',raw=b'x'*17,headers={'Content-Type':'audio/wav'})[0])
+        self.assertEqual(before,self.runtime.events)
+
     def test_asr_and_diar_proxy_with_explicit_query_validation(self):
         self.assertEqual(200, self.call("/v1/asr/final-block", raw=b"synthetic-multipart",
             headers={"Content-Type": "multipart/form-data; boundary=test"})[0])
-        self.assertEqual(200, self.call("/v1/diarize?num_speakers=2", raw=b"synthetic-wav",
+        self.assertEqual(200, self.call("/v1/diarize?num_speakers=2", raw=synthetic_wav(),
             headers={"Content-Type": "audio/wav"})[0])
-        self.assertEqual(400, self.call("/v1/diarize?target=http://example.org", raw=b"synthetic-wav",
+        self.assertEqual(400, self.call("/v1/diarize?target=http://example.org", raw=synthetic_wav(),
             headers={"Content-Type": "audio/wav"})[0])
 
     def test_http_audio_queues_during_serial_llm_and_health_stays_available(self):
@@ -118,7 +140,7 @@ class APITests(unittest.TestCase):
                 llm = pool.submit(self.call, "/v1/documentation/extract", {
                     "quality": "sehr_gruendlich", "transcript": "Synthetisches Gespräch", "request_id": "serial"})
                 eventually(lambda: "serial" in self.runtime.started)
-                code, health = self.call("/health", token=None)
+                code, health = self.call("/health")
                 self.assertEqual(200, code)
                 self.assertFalse(health["asr_ready"])
                 audio = pool.submit(self.call, "/v1/asr/final-block", raw=b"synthetic-audio-block",
@@ -196,7 +218,7 @@ HTTPServer(('127.0.0.1', int(args[args.index('--port')+1])), H).serve_forever()
 
     def test_config_rejects_remote_backends_and_invalid_types(self):
         for options in ({"llm_url": "http://example.org:8080"}, {"max_pending": "128"},
-                        {"tier": True}, {"host": "0.0.0.0", "token_env": "UNSET_COMMANDER_TEST_TOKEN"}):
+                        {"tier": True}, {"host": "0.0.0.0", "auth_enabled": True, "token_env": "UNSET_COMMANDER_TEST_TOKEN"}):
             with self.subTest(options=options), self.assertRaises(ValueError):Settings(**options).validate()
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory) / "config.toml"

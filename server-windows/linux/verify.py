@@ -18,7 +18,11 @@ def expected_baseline(cfg):
     resident=cfg.get('resident_quality')
     if resident is None:
         resident=cfg['default_quality'] if cfg['profiles'][cfg['default_quality']].get('mode','serial')=='parallel' else ''
-    return {'asr':True,'diar':bool(resident),'llm':resident or None}
+    if cfg.get('remote_llm_url'): resident = ''
+    asr = not cfg.get('asr_on_demand',False)
+    mode = cfg.get('diarization_mode')
+    diar = True if mode == 'resident' else asr if mode == 'with_asr' else False if mode == 'serial' else bool(resident)
+    return {'asr':asr,'diar':diar,'llm':(('@' if cfg.get('quality_models') else '')+resident) if resident else None}
 
 def main():
     cfg=json.loads((CONFIG/'installer.json').read_text())
@@ -39,7 +43,7 @@ def main():
         while time.monotonic()<deadline:
             try:
                 s=get('/v1/runtime/status')
-                if (s['asr_ready'] and s['loaded']==wanted_baseline
+                if ((s['asr_ready'] or cfg.get('asr_on_demand',False)) and all(s['loaded'][key]==value for key,value in wanted_baseline.items() if key!='asr' or not cfg.get('asr_on_demand',False) or not wanted_baseline['llm'])
                     and not s['transition_running'] and not s['pending'] and not s['active'] and not s['last_error']):
                     return s
             except (OSError,ValueError):pass
@@ -59,9 +63,11 @@ def main():
     original=worker('whisper.sock',cfg['control_dir'])
     profiles=get('/v1/runtime/profiles')
     assert all(p['context_per_slot']==32768 and p['slots']==1 for p in profiles['data'])
-    try:get('/v1/runtime/status',auth=False)
-    except HTTPError as exc:assert exc.code==401
-    else:raise AssertionError('Tokenprüfung fehlt.')
+    if cfg.get('auth_enabled',True):
+        try:get('/v1/runtime/status',auth=False)
+        except HTTPError as exc:assert exc.code==401
+        else:raise AssertionError('Tokenprüfung fehlt.')
+    else: get('/v1/runtime/status',auth=False)
     try:get('/v1/documentation/extract',json.dumps({'transcript':'Synthetischer Test.'}).encode())
     except HTTPError as exc:assert exc.code==409
     else:raise AssertionError('Abschlussbestätigung fehlt.')
@@ -86,7 +92,7 @@ def main():
             subprocess.run(['ffmpeg','-nostdin','-loglevel','error','-y','-i',str(folder/'source.wav'),
                             '-ar','16000','-ac','1',str(folder/'test.wav')],check=True)
             wav=(folder/'test.wav').read_bytes()
-            qualities=list(cfg['profiles'])
+            qualities=[p['id'] for p in profiles['data']]
             for number,quality in enumerate(qualities*3):
                 print('Prüfe vollständige Audiokette',number+1,flush=True)
                 started=time.monotonic();boundary='kienzledoku-verify-boundary'
@@ -101,12 +107,13 @@ def main():
                     transcript=asr['text'],quality=quality)).encode())
                 assert response['commander']['used_quality']==quality and not response['commander']['fallback_used']
                 document=response['documentation']
-                assert set(document)=={'anamnese','befund','therapie','prozedere'}
+                assert set(document)==set(cfg.get('enabled_fields',['anamnese','befund','therapie','prozedere']))
                 assert all(isinstance(v,str) for v in document.values()) and any(document.values())
                 restored=baseline();current=worker('whisper.sock',cfg['control_dir'])
                 for key in ('pid','ct2_object_id','shared_object_id'):
                     assert current[key]==original[key],('Whisper-Objekt wurde ersetzt',key)
-                assert current['ready'] and current['loaded'] and current['ct2_loaded']
+                assert current['ready']
+                if not cfg.get('asr_on_demand',False): assert current['loaded'] and current['ct2_loaded']
                 result['cycles'].append(dict(number=number+1,elapsed_s=time.monotonic()-started,
                     asr_characters=len(asr['text']),diar_segments=len(diar['segments']),
                     used_quality=response['commander']['used_quality'],
@@ -122,7 +129,7 @@ def main():
                           {'role':'user','content':long_text}])).encode())
             assert response['choices'][0]['finish_reason']=='stop'
             document=json.loads(response['choices'][0]['message']['content'])
-            assert set(document)=={'anamnese','befund','therapie','prozedere'}
+            assert set(document)==set(cfg.get('enabled_fields',['anamnese','befund','therapie','prozedere']))
             assert response['usage']['prompt_tokens']>=20000
             baseline()
             current=worker('whisper.sock',cfg['control_dir'])

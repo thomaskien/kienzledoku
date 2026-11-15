@@ -1,4 +1,35 @@
 {
+  "qwen4-q4": {
+    "label": "Qwen3.5 4B Q4",
+    "quality": "qwen4_q4",
+    "grade": "basis",
+    "repository": "unsloth/Qwen3.5-4B-GGUF",
+    "revision": "e87f176479d0855a907a41277aca2f8ee7a09523",
+    "min_vram_mib": 7936,
+    "min_ram_bytes": 20000000000,
+    "files": [
+      {
+        "filename": "Qwen3.5-4B-Q4_K_M.gguf",
+        "bytes": 2740937888,
+        "sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+        "path": "qwen4-q4/Qwen3.5-4B-Q4_K_M.gguf",
+        "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf",
+        "gated": false
+      }
+    ],
+    "profile": {
+      "context": 32768,
+      "slots": 1,
+      "kv": "q8_0",
+      "backend": "llama.cpp",
+      "gpu_layers": 999
+    },
+    "serial_vram_mib": 7936,
+    "parallel_vram_mib": null,
+    "recommended_wsl_gib": 16,
+    "description": "Basis: Qwen3.5 4B Q4, seriell ab 8 GiB Grafikspeicher.",
+    "fallbacks": []
+  },
   "9b-q4": {
     "label": "Qwen_Qwen3.5-9B-Q4_K_M",
     "quality": "basis",
@@ -26,7 +57,8 @@
     "serial_vram_mib": 7936,
     "parallel_vram_mib": 16128,
     "recommended_wsl_gib": 24,
-    "description": "Schneller Einstieg, geringer Grafikspeicherbedarf. Seriell ab 8 GiB VRAM; parallel geladen ab 16 GiB."
+    "description": "Schneller Einstieg, geringer Grafikspeicherbedarf. Seriell ab 8 GiB VRAM; parallel geladen ab 16 GiB.",
+    "grade": "basis"
   },
   "9b-q6": {
     "label": "Qwen_Qwen3.5-9B-Q6_K",
@@ -55,7 +87,8 @@
     "serial_vram_mib": 12032,
     "parallel_vram_mib": 20224,
     "recommended_wsl_gib": 28,
-    "description": "Höhere Quantisierungsgenauigkeit. Seriell ab 12 GiB VRAM; parallel geladen ab 20 GiB, 24-GB-Karte empfohlen."
+    "description": "Höhere Quantisierungsgenauigkeit. Seriell ab 12 GiB VRAM; parallel geladen ab 20 GiB, 24-GB-Karte empfohlen.",
+    "grade": "gruendlich"
   },
   "27b-q4": {
     "label": "Qwen3.8-27B-UD-Q4_K_M",
@@ -85,7 +118,8 @@
     "parallel_vram_mib": null,
     "recommended_wsl_gib": 32,
     "ram_audio_min_wsl_gib": 24,
-    "description": "Größeres Dokumentationsmodell. Seriell ab 20 GiB VRAM, 24-GB-Karte empfohlen. Kein freigegebenes Parallelprofil."
+    "description": "Größeres Dokumentationsmodell. Seriell ab 20 GiB VRAM, 24-GB-Karte empfohlen. Kein freigegebenes Parallelprofil.",
+    "grade": "sehr_gruendlich"
   },
   "gemma12-qat-q4": {
     "label": "Gemma 4 12B QAT Q4_0",
@@ -115,7 +149,8 @@
     "parallel_vram_mib": 16128,
     "recommended_wsl_gib": 24,
     "description": "Kompaktes Gemma-4-Modell mit QAT. Seriell ab 8 GiB VRAM; parallel geladen ab 16 GiB (z. B. RTX 5060 Ti 16 GB).",
-    "fallbacks": []
+    "fallbacks": [],
+    "grade": "basis"
   },
   "gemma12-q8": {
     "label": "Gemma 4 12B Q8_0",
@@ -145,7 +180,8 @@
     "parallel_vram_mib": 24320,
     "recommended_wsl_gib": 28,
     "description": "Gemma 4 mit 8-Bit-Gewichten. Seriell ab 16 GiB VRAM; parallel geladen ab 24 GiB (z. B. RTX 3090/4090).",
-    "fallbacks": []
+    "fallbacks": [],
+    "grade": "gruendlich"
   },
   "gemma26-qat-q4": {
     "label": "Gemma 4 26B-A4B QAT Q4_0",
@@ -175,6 +211,7 @@
     "parallel_vram_mib": 24320,
     "recommended_wsl_gib": 32,
     "description": "Gemma 4 mit 26B Gesamt- und ca. 4B aktiven Parametern. Seriell ab 20 GiB VRAM; parallel ab 24 GiB (RTX 3090/4090).",
-    "fallbacks": []
+    "fallbacks": [],
+    "grade": "gruendlich"
   }
 }

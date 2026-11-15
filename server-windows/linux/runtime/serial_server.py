@@ -12,7 +12,7 @@ import threading
 import time
 from urllib.parse import urlsplit
 
-from kienzledoku_commander.config import Settings, Model, LABELS
+from kienzledoku_commander.config import Settings, Model, LABELS, QUALITIES
 from kienzledoku_commander.errors import BackendFailure
 from kienzledoku_commander.runtime import Runtime
 from kienzledoku_commander.scheduler import Commander
@@ -29,25 +29,45 @@ class SerialModel(Model):
 class SerialSettings(Settings):
     profiles: dict = field(default_factory=dict)
     resident_quality: str | None = None
+    quality_models: dict = field(default_factory=dict)
+    auth_enabled: bool = True
 
     @property
     def allowed(self):
-        return tuple(self.profiles)
+        return tuple(self.quality_models or self.profiles) if not self.remote_llm_url else ()
 
     @property
     def default(self):
-        return self.default_quality
+        return (self.default_quality if self.default_quality != "auto" else next(iter(self.allowed), None))
 
     @property
     def baseline_llm(self):
+        if self.remote_llm_url: return None
         if self.resident_quality is not None:
-            return self.resident_quality or None
+            return (("@" if self.quality_models else "") + self.resident_quality) if self.resident_quality else None
         return self.default if self.persistent(self.default) else None
 
     def persistent(self, quality):
-        return self.profiles[quality].get('mode', 'serial') == 'parallel'
+        return self.profiles[self.profile_id(quality)].get('mode', 'serial') == 'parallel'
+
+    def profile_id(self, quality):
+        return quality[1:] if quality.startswith('@') else self.quality_models.get(quality, quality)
+
+    def runtime_quality(self, quality):
+        # The same installed model may be addressed by a public quality and by
+        # the resident selection. Both must share one process and backend alias.
+        return '@' + self.profile_id(quality) if self.quality_models else quality
+
+    def quality(self, value=None):
+        q = self.default if value is None else value
+        if q is not None and (q in self.allowed or self.profile_id(q) in self.profiles): return q
+        return super().quality(value)
 
     def fallback(self, quality):
+        if self.quality_models:
+            grades = ('basis', 'gruendlich', 'sehr_gruendlich')
+            before = grades[:grades.index(quality)] if quality in grades else ()
+            return next((q for q in reversed(before) if q in self.allowed), None)
         if 'fallbacks' in self.profiles[quality]:
             return next((q for q in self.profiles[quality]['fallbacks'] if q != quality and q in self.allowed),None)
         # Larger selections may fall back only to an installed 9B model.
@@ -57,26 +77,28 @@ class SerialSettings(Settings):
 
     def model(self, quality):
         quality = self.quality(quality)
-        p = self.profiles[quality]
-        return SerialModel(quality,p['path'],p['context'],p['slots'],p['kv'],
-                           p['backend'],p['gpu_layers'],p.get('run_config',''))
+        p = self.profiles[self.profile_id(quality)]
+        return SerialModel(quality=quality,path=p['path'],context=p['context'],slots=p['slots'],kv=p['kv'],
+                           model_id=self.profile_id(quality),label=p['label'],backend=p['backend'],gpu_layers=p['gpu_layers'],run_config=p.get('run_config',''))
 
     def validate(self):
         if type(self.tier) is not int or not 7 <= self.tier <= 128:
             raise ValueError('Ungültiger physischer VRAM-Wert.')
         # Preserve all original transport, queue, path and timeout checks.
         common = {f.name:getattr(self,f.name) for f in fields(Settings)}
-        common.update(tier=8,default_quality='basis')
+        common.update(tier=8,default_quality='auto')
         Settings(**common).validate()
         ipaddress.ip_address(self.host)
-        if not self.profiles or self.default not in self.profiles:
+        if not self.profiles or (not self.remote_llm_url and self.profile_id(self.default) not in self.profiles):
             raise ValueError('Standardmodell fehlt.')
         if self.resident_quality is not None:
-            if not isinstance(self.resident_quality,str) or (self.resident_quality and self.resident_quality not in self.allowed):
+            if not isinstance(self.resident_quality,str) or (self.resident_quality and self.resident_quality not in self.profiles):
                 raise ValueError('Parallelmodell fehlt.')
-            selected=[q for q in self.allowed if self.persistent(q)]
+            selected=[q for q,p in self.profiles.items() if p.get('mode','serial') == 'parallel']
             if selected != ([self.resident_quality] if self.resident_quality else []):
                 raise ValueError('Genau das ausgewählte Parallelmodell darf als parallel konfiguriert sein.')
+        if set(self.quality_models) - {'basis','gruendlich','sehr_gruendlich'} or any(v not in self.profiles for v in self.quality_models.values()):
+            raise ValueError('Ungültige Stufenzuordnung.')
         for quality,p in self.profiles.items():
             if not isinstance(quality,str) or not quality.replace('_','').isalnum():
                 raise ValueError('Ungültige Modell-ID.')
@@ -89,28 +111,41 @@ class SerialSettings(Settings):
             if p.get('mode','serial') not in ('serial','parallel'):
                 raise ValueError('Ungültige Betriebsart.')
             minimum=p.get('parallel_vram_mib',{'basis':16128,'gruendlich':20224}.get(quality))
-            if self.persistent(quality) and (type(minimum) is not int or minimum <= 0 or self.tier*1024 < minimum):
+            if p.get('mode','serial') == 'parallel' and (type(minimum) is not int or minimum <= 0 or self.tier*1024 < minimum):
                 raise ValueError('Kein freigegebenes Parallelprofil für dieses Modell/VRAM.')
             if 'fallbacks' in p and (not isinstance(p['fallbacks'],list) or any(not isinstance(q,str) for q in p['fallbacks'])):
                 raise ValueError('Ungültige Modell-Fallbacks.')
             if p['backend']=='strata' and not Path(p.get('run_config','')).is_absolute():
                 raise ValueError('Strata benötigt eine vorbereitete Startkonfiguration.')
-            LABELS[quality] = p['label']
+            if quality not in QUALITIES:
+                LABELS[quality] = p['label']
         return self
 
 class SerialCommander(Commander):
-    def _baseline(self):
-        return {'asr':True,'diar':self.settings.baseline_llm is not None,
+    def status(self):
+        value=super().status()
+        loaded=value['loaded']['llm']
+        value.update(resident_quality=self.settings.resident_quality if self.settings.resident_quality is not None else self.settings.baseline_llm,
+            loaded_llm_label=self.settings.model(loaded).label if loaded else None,
+            loaded_llm_mode=('parallel' if self.settings.persistent(loaded) else 'serial') if loaded else None,
+            asr_on_demand=self.settings.asr_on_demand)
+        return value
+
+    def _baseline_legacy(self):
+        return {'asr': 'asr' in self.settings.enabled_roles and (not self.settings.asr_on_demand or bool(self._loaded['asr'])),'diar':self.settings.baseline_llm is not None,
                 'llm':self.settings.baseline_llm}
 
-    def _desired(self,job):
+    def _desired_legacy(self,job):
+        if job.role=='llm' and self.settings.remote_llm_url: return dict(self._loaded)
         if job.role=='llm':
             if self.settings.persistent(job.quality):
                 return {'asr':True,'diar':True,'llm':job.quality}
             return {'asr':False,'diar':False,'llm':job.quality}
         if job.role=='diar' and self.settings.baseline_llm is None:
             return {'asr':False,'diar':True,'llm':None}
-        return self._baseline()
+        desired = self._baseline()
+        desired[job.role] = True
+        return desired
 
 def model_command(settings,spec,quality):
     address=urlsplit(settings.llm_url)
@@ -128,13 +163,14 @@ def model_command(settings,spec,quality):
 
 class SerialRuntime(Runtime):
     def infer(self,job):
-        if job.role=='llm' and self.settings.model(job.quality).backend=='strata':
+        if job.role=='llm' and not self.settings.remote_llm_url and self.settings.model(job.quality).backend=='strata':
             request=dict(job.payload['llm'])
             request.update(chat_template_kwargs={'enable_thinking':False},reasoning_effort='none')
             job=replace(job,payload=dict(job.payload,llm=request))
         return super().infer(job)
 
     def load_llm(self,quality):
+        if self._shutdown.is_set():raise BackendFailure('Commander wird beendet.')
         if self.process is not None:
             if self.model==quality and self.process.poll() is None:
                 return
@@ -153,7 +189,7 @@ class SerialRuntime(Runtime):
             self.process=subprocess.Popen(model_command(self.settings,spec,quality),env=env,
                 stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
             deadline=time.monotonic()+self.settings.load_timeout
-            while time.monotonic()<deadline:
+            while time.monotonic()<deadline and not self._shutdown.is_set():
                 if self.process.poll() is not None:
                     raise BackendFailure('LLM-Start fehlgeschlagen.')
                 try:
@@ -182,7 +218,7 @@ def main():
     if args.check_config:
         print(json.dumps({'default':settings.default,'allowed':settings.allowed,
                           'resident_quality':settings.baseline_llm,
-                          'modes':{q:settings.profiles[q].get('mode','serial') for q in settings.allowed}}));return
+                          'modes':{q:settings.profiles[settings.profile_id(q)].get('mode','serial') for q in settings.allowed}}));return
     with owner(settings.control_dir):
         commander=SerialCommander(settings,SerialRuntime(settings))
         try:

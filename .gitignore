@@ -23,6 +23,13 @@ transcripts/
 !tests/fixtures/localhost-cert.pem
 !tests/fixtures/localhost-key.pem
 *.key
+*.prodkey
+*api-key*.txt
+*api_key*.txt
+*apikey*.txt
+.private/
+private-keys/
+__T2med-Key*
 
 # Lokale Laufzeitkonfiguration und macOS-Metadaten.
 config.json
@@ -49,3 +56,19 @@ kienzleconnect
 kienzleconnect.exe
 *.dpapi
 sessions/
+
+# Release binaries and generated evidence are published separately.
+/kienzledoku_window
+/server-windows/linux-payload.tar
+/server-windows/SHA256SUMS
+/server-windows/evidence/*
+!/server-windows/evidence/source-provenance.json
+!/server-windows/evidence/gemma-publisher-verification-1.8.json
+!/server-windows/evidence/windows-user-verification-2026-11-04.json
+# Local coordination and machine-specific validation reports.
+AGENTS.md
+/server-windows/NEXT_VERSION.md
+/docs/handoffs/
+/docs/release-*-validation.md
+/docs/update-cleanup-validation.md
+/docs/diarization-memory-m4.json

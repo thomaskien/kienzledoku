@@ -7,21 +7,37 @@ import time
 from unittest import mock
 import urllib.parse
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, os.environ.get('KIENZLEDOKU_TEST_SOURCE_ROOT', str(Path(__file__).resolve().parents[2])))
 import kienzledoku as record
+if os.environ.get('KIENZLEDOKU_TEST_WINDOWS_LAYOUT') == '1':
+    record.WINDOWS_STATUS_LAYOUT = True
 from kienzledoku_speech import SpeechRecognitionManager, STATUS_RECORDING, STATUS_PROCESSING, STATUS_READY
 
 
 class FakeSpeech(SpeechRecognitionManager):
-    def start_service_check(self):
+    def load_documentation_settings(self):
+        from kienzledoku_document import DOCUMENT_FIELDS
+        self.active_fields = DOCUMENT_FIELDS
+        self.active_prompt = 'Synthetischer aktiver Prompt. Nur diktierte Informationen.'
+        self.prompt_template = self.active_prompt
+
+    def start_service_check(self, background=False):
         if os.environ.get('KIENZLEDOKU_TEST_COMMANDER_UI') == '1':
             self.quality_profiles = [
-                {'id': 'basis', 'label': 'Basis', 'persistent': True, 'default': True, 'fallback': None},
-                {'id': 'gemma12_q8', 'label': 'Gemma 4 12B Q8_0', 'persistent': False,
+                {'id': 'basis', 'label': 'Qwen3.5 4B Q4', 'persistent': True, 'default': True, 'fallback': None},
+                {'id': 'gruendlich', 'label': 'Gemma 4 12B Q8', 'persistent': False,
+                 'default': False, 'fallback': 'basis'},
+                {'id': 'sehr_gruendlich', 'label': 'Qwen3.8 27B Q4', 'persistent': False,
                  'default': False, 'fallback': 'basis'},
             ]
-        for service in self.services.values():
-            service['status'] = 'ok'
+        if os.environ.get('KIENZLEDOKU_TEST_COMMANDER_UI') == 'single':
+            self.quality_profiles = [{'id': 'basis', 'label': 'Qwen3.5 4B Q4', 'default': True}]
+        if self.commander and self.quality_profiles:
+            # Older Linux/WSL servers put model names in label; exercise the real client adapter.
+            with mock.patch.object(self.commander,'request',return_value={'data':self.quality_profiles}):
+                self.quality_profiles = self.commander.profiles()
+        for name, service in self.services.items():
+            service['status'] = 'loading' if name == 'asr' else 'standby'
 
     def start(self):
         self.status = STATUS_RECORDING
@@ -35,12 +51,12 @@ class FakeSpeech(SpeechRecognitionManager):
             self.used_quality = 'basis'
             self.diarized_text = '[SPEAKER_00] Synthetisches Testgespräch: Übelkeit seit gestern.'
             self.message = 'Dokumentation erstellt. Synthetischer UI-Test.'
-            self.commander_notice = 'Die Verarbeitung mit „Gemma 4 12B Q8_0“ ist fehlgeschlagen. Die Dokumentation wurde mit „Basis“ erstellt.'
+            self.commander_notice = 'Die Verarbeitung mit „Gründlich“ ist fehlgeschlagen. Die Dokumentation wurde mit „Basis“ erstellt.'
             self.status = STATUS_PROCESSING
             def finish():
                 if self.on_document:
                     self.on_document({'anamnese': 'Synthetischer Test: Übelkeit seit gestern.',
-                                      'befund': '', 'therapie': '', 'prozedere': ''})
+                                      'befund': '', 'ekg': '', 'sonografie': '', 'therapie': '', 'prozedere': '', 'notiz': ''})
                 self.status = STATUS_READY
             threading.Thread(target=finish, daemon=True).start()
             return

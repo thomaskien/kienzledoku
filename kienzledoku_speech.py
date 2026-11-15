@@ -1,33 +1,27 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Gekapselte Kienzlefon-ASR-Anbindung für kienzledoku record 1.3.
-
-Der Prozess verwendet den unveränderten Final-Block-Ablauf der v6.2-Basis.
-Audio, Transkript und LLM-Rohantwort liegen nur in einem geschützten temporären
-Verzeichnis und werden nach Abschluss wieder entfernt.
-"""
+"""RAM-only microphone, ASR, diarization and documentation pipeline."""
 
 from __future__ import print_function
 
+import asyncio
 import json
-import importlib.util
 import os
-from pathlib import Path
-import shutil
-import subprocess
-import sys
-from kienzledoku_session import session_dir
+import re
 import kienzledoku_config as record_config
-import tempfile
 import threading
 import time
 import urllib.parse
 import urllib.request
 from types import SimpleNamespace
+from kienzledoku_vad import AudioControls, dbfs
 
-from kienzledoku_document import parse_documentation_json
-from kienzledoku_asr_v6 import EVENT_PREFIX, call_llm
-from kienzledoku_commander_client import configured_client, profile_label
+from kienzledoku_document import DEFAULT_DOCUMENT_FIELDS, parse_documentation_json
+from kienzledoku_asr_v6 import (
+    call_llm, diarize_audio, run_recording, speaker_transcript,
+    speaker_transcript_words,
+)
+from kienzledoku_commander_client import CommanderRequestError, configured_client, profile_label
 
 
 STATUS_IDLE = "idle"
@@ -134,6 +128,21 @@ def append_text(existing, addition):
     return "\n\n".join(value for value in parts if value)
 
 
+def continuation_marker(section):
+    return ("### Aufnahme fortgesetzt – Abschnitt %d ###\n"
+            "Sprecherzuordnung kann ab hier vom vorherigen Abschnitt abweichen." % section)
+
+
+_CONTINUATION_RE = re.compile(
+    r"(?:^|\n)### Aufnahme fortgesetzt – Abschnitt \d+ ###\n"
+    r"Sprecherzuordnung kann ab hier vom vorherigen Abschnitt abweichen\.?(?:\n|$)")
+
+
+def strip_continuation_markers(document):
+    return {name: _CONTINUATION_RE.sub('\n', value).strip()
+            for name, value in document.items()}
+
+
 def documentation_from_asr_payload(payload):
     if not isinstance(payload, dict):
         raise ValueError("ASR-Ergebnis ist kein JSON-Objekt")
@@ -147,6 +156,10 @@ def documentation_from_asr_payload(payload):
             )
         raise ValueError("Die Spracherkennung enthält keine LLM-Dokumentation")
     return parse_documentation_json(llm_value)
+
+
+class NoSpeechDetected(Exception):
+    pass
 
 
 class SpeechRecognitionManager(object):
@@ -163,14 +176,12 @@ class SpeechRecognitionManager(object):
             if os.path.isfile(self.config_path)
             else "Lokale Standardwerte"
         )
-        self.native_python = sys.platform == "win32" or importlib.util.find_spec("sounddevice") is not None
-        self.runner_path = os.path.join(self.script_dir, "kienzledoku_asr_v6.py" if self.native_python else "start_kienzledoku_asr.sh")
         self.prompt_path = os.path.join(self.script_dir, "prompt_documentation.txt")
         self.on_document = on_document
         self.lock = threading.RLock()
-        self.process = None
+        self.process = None  # compatibility: Record 1.4 does not spawn an ASR child
         self.thread = None
-        self.work_dir = None
+        self.stop_event = None
         self.status = STATUS_IDLE
         self.message = "Bereit für die Aufnahme."
         self.started_at = None
@@ -185,8 +196,8 @@ class SpeechRecognitionManager(object):
             "KIENZLEDOKU_AUDIO_DEVICE", ""
         ).strip()
         self.audio_rms = 0
-        self.interrupted_audio = ''
         self.cancelled = False
+        self.section_number = 0
         self.record_options = record_config.defaults()['record']
         self.selected_device = self.record_options['microphone'] or self.selected_device
         self.config_error = ""
@@ -196,6 +207,9 @@ class SpeechRecognitionManager(object):
         self.commander_notice = ''
         self.requested_quality = ''
         self.used_quality = ''
+        self.active_fields = DEFAULT_DOCUMENT_FIELDS
+        self.active_prompt = ''
+        self.prompt_template = ''
         try:
             if self.config_path.endswith('.toml'):
                 self.record_options = record_config.load(self.config_path)['record']
@@ -211,6 +225,7 @@ class SpeechRecognitionManager(object):
                 name: definition["default"]
                 for name, definition in SERVICE_DEFINITIONS.items()
             }
+        self.audio_controls = AudioControls(self.record_options['vad_enabled'], self.record_options['silence_threshold_dbfs'])
         self.asr_url = self.service_urls["asr"]
         self.diarization_url = self.service_urls["diarization"]
         self.llm_url = self.service_urls["llm"]
@@ -228,6 +243,29 @@ class SpeechRecognitionManager(object):
         self.service_message = self.config_error or "Kienzlefon-Dienste werden geprüft."
         self.service_host = self._configured_service_host()
         self.health_thread = None
+        self.last_service_check = 0.0
+
+    def set_audio_controls(self, enabled, threshold):
+        AudioControls.validate(enabled, threshold)
+        with self.lock:
+            # Read latest technical configuration only for saving; other live
+            # session objects retain their own controls snapshot.
+            path = self.config_path if self.config_path.endswith('.toml') else os.path.splitext(self.config_path)[0] + '.toml'
+            config = record_config.load(path)
+            config['record']['vad_enabled'] = enabled
+            config['record']['silence_threshold_dbfs'] = threshold
+            record_config.save(config, path)
+            self.audio_controls.update(enabled, threshold)
+            return self.audio_controls.snapshot()
+
+    def load_documentation_settings(self):
+        if not self.commander:
+            return
+        settings = self.commander.documentation_settings()
+        with self.lock:
+            self.active_fields = tuple(settings['fields'])
+            self.active_prompt = settings['prompt']
+            self.prompt_template = settings['prompt_template']
 
     def snapshot(self):
         with self.lock:
@@ -242,7 +280,8 @@ class SpeechRecognitionManager(object):
             return {
                 "status": self.status,
                 "audio_rms": self.audio_rms,
-                "interrupted_audio": self.interrupted_audio or (os.path.join(self.work_dir, "aufnahme.wav.partial.wav") if self.work_dir else ""),
+                "audio_dbfs": round(dbfs(self.audio_rms), 1),
+                **self.audio_controls.snapshot(),
                 "audio_base_transcript": self.run_base_transcript,
                 "audio_base_diarized": self.run_base_diarized,
                 "message": self.message,
@@ -265,15 +304,20 @@ class SpeechRecognitionManager(object):
                 "commander_notice": self.commander_notice,
                 "requested_quality_label": profile_label(self.requested_quality, self.quality_profiles) if self.requested_quality else '',
                 "used_quality_label": profile_label(self.used_quality, self.quality_profiles) if self.used_quality else '',
+                "active_fields": list(self.active_fields),
+                "active_prompt": self.active_prompt,
                 "services": {
                     name: dict(details) for name, details in self.services.items()
                 },
             }
 
-    def start_service_check(self):
+    def start_service_check(self, *, background=False):
         with self.lock:
             if self.health_thread is not None and self.health_thread.is_alive():
                 return
+            if background and time.monotonic() - self.last_service_check < 2:
+                return
+            self.last_service_check = time.monotonic()
             if self.config_error:
                 self.service_status = "error"
                 self.service_message = self.config_error
@@ -281,13 +325,15 @@ class SpeechRecognitionManager(object):
                     details["status"] = "error"
                     details["message"] = self.config_error
                 return
-            self.service_status = "checking"
-            self.service_message = "Kienzlefon-Dienste werden geprüft."
-            for details in self.services.values():
-                details["status"] = "checking"
-                details["message"] = "%s wird geprüft." % details["label"]
+            if not background:
+                self.service_status = "checking"
+                self.service_message = "Commander-Dienste werden geprüft."
+                for details in self.services.values():
+                    details["status"] = "checking"
+                    details["message"] = "%s wird geprüft." % details["label"]
             self.health_thread = threading.Thread(
                 target=self._service_check_worker,
+                kwargs={'refresh_profiles': not background},
                 name="Kienzledoku-Servicecheck",
             )
             self.health_thread.daemon = True
@@ -340,93 +386,25 @@ class SpeechRecognitionManager(object):
                 raise ValueError("Die Spracherkennung läuft bereits")
             if self.config_error:
                 raise RuntimeError(self.config_error)
-            if self.commander and not self.quality_profiles:
-                self._refresh_quality_profiles()
-            if self.commander:
+            if self.commander and self.quality_profiles:
                 self.set_quality(self.selected_quality)
-            if not os.path.isfile(self.runner_path):
-                raise RuntimeError("ASR-Startskript fehlt")
-            if not os.path.isfile(self.prompt_path):
+            if not self.commander and not os.path.isfile(self.prompt_path):
                 raise RuntimeError("Kienzledoku-LLM-Prompt fehlt")
 
             self.live_blocks = {}
-            replay_source = self.interrupted_audio
-            if not replay_source:
-                self.run_base_transcript = self.live_transcript.strip()
-                self.run_base_diarized = (
-                    self.diarized_text.strip() or self.run_base_transcript
-                )
-            # A replay replaces the interrupted segment. Only text from recordings
-            # completed before that segment is prepended, avoiding duplicate speech.
-            is_continuation = bool(
-                self.run_base_transcript or self.run_base_diarized
-            )
+            self.run_base_transcript = self.live_transcript.strip()
+            self.run_base_diarized = self.diarized_text.strip() or self.run_base_transcript
+            self.section_number += 1
+            is_continuation = bool(self.run_base_transcript or self.run_base_diarized)
+            if is_continuation:
+                marker = continuation_marker(self.section_number)
+                self.run_base_transcript = append_text(self.run_base_transcript, marker)
+                self.run_base_diarized = append_text(self.run_base_diarized, marker)
+                self.live_transcript = self.run_base_transcript
+                self.diarized_text = self.run_base_diarized
 
-            work_dir = tempfile.mkdtemp(prefix="audio-", dir=str(session_dir()))
-            os.chmod(work_dir, 0o700)
-            wav_path = os.path.join(work_dir, "aufnahme.wav")
-            json_path = os.path.join(work_dir, "ergebnis.json")
-
-            command = [
-                self.runner_path,
-                "--asr", self.asr_url,
-                "--diarization", self.diarization_url,
-                "--llm", self.llm_url,
-                "--prompt-file", self.prompt_path,
-                "--wav", wav_path,
-                "--json", json_path,
-            ]
-            if self.native_python:
-                # pythonw is fine for the UI; the child must expose stdin/stdout.
-                executable = os.path.join(os.path.dirname(sys.executable), 'python.exe') if sys.platform == 'win32' else sys.executable
-                command.insert(0, executable)
-            if self.interrupted_audio:
-                command.extend(['--input-wav', self.interrupted_audio, '--replay-speed', '0'])
-            if not self.record_options['diarization']:
-                command.append('--no-diarization')
-            if is_continuation or self.commander:
-                # The runner would only document the new recording. Kienzledoku
-                # instead runs the LLM once on the complete accumulated text.
-                command.append("--no-llm")
-            if self.commander:
-                command.extend([
-                    '--commander', self.commander.url,
-                    '--commander-token-env', self.commander.token_env,
-                    '--commander-timeout', str(self.commander.timeout),
-                ])
-            device = self.selected_device
-            if device:
-                command.extend(["--device", device])
-            if os.environ.get("KIENZLEDOKU_NO_DIARIZATION", "").strip().lower() in (
-                "1", "true", "yes",
-            ):
-                command.append("--no-diarization")
-
-            child_env = os.environ.copy()
-            child_env["PYTHONUNBUFFERED"] = "1"
-            child_env["PYTHONIOENCODING"] = "utf-8"
-            try:
-                if self.commander:
-                    child_env[self.commander.token_env] = self.commander.token
-                process = subprocess.Popen(
-                    command,
-                    cwd=self.script_dir,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    env=child_env,
-                    start_new_session=sys.platform != "win32",
-                    **({"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}),
-                )
-            except Exception:
-                shutil.rmtree(work_dir, ignore_errors=True)
-                raise
-
-            self.process = process
-            self.work_dir = work_dir
+            self.stop_event = threading.Event()
+            self.cancel_event = threading.Event()
             self.status = STATUS_RECORDING
             self.commander_notice = ''
             self.requested_quality = ''
@@ -434,16 +412,8 @@ class SpeechRecognitionManager(object):
             self.message = "Aufnahme läuft. Zum Beenden „Aufnahme stoppen“ drücken."
             self.started_at = time.time()
             self.thread = threading.Thread(
-                target=self._wait_for_result,
-                args=(
-                    process,
-                    json_path,
-                    work_dir,
-                    self.run_base_transcript,
-                    self.run_base_diarized,
-                    is_continuation,
-                    replay_source,
-                ),
+                target=self._run_ram_pipeline,
+                args=(self.run_base_transcript, self.run_base_diarized, is_continuation),
                 name="Kienzledoku-ASR",
             )
             self.thread.daemon = True
@@ -473,130 +443,123 @@ class SpeechRecognitionManager(object):
 
     def stop(self):
         with self.lock:
-            if self.status != STATUS_RECORDING or self.process is None:
+            if self.status != STATUS_RECORDING or self.stop_event is None:
                 raise ValueError("Es läuft keine Aufnahme")
-            process = self.process
             self.status = STATUS_PROCESSING
             self.message = "Aufnahme beendet. ASR, Diarisierung und Dokumentation werden abgeschlossen."
-            try:
-                process.stdin.write("\n")
-                process.stdin.flush()
-            except Exception:
-                if process.poll() is None:
-                    raise RuntimeError("Die Aufnahme konnte nicht beendet werden")
+            self.stop_event.set()
 
     def cancel(self):
         with self.lock:
             self.cancelled = True
+            if getattr(self, "cancel_event", None) is not None:
+                self.cancel_event.set()
             self.on_document = None
-            process = self.process
-            if process is not None and process.poll() is None:
-                try:
-                    process.terminate()
-                except Exception:
-                    pass
-        if process is not None:
-            try:
-                process.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                process.kill(); process.wait()
+            if self.stop_event is not None:
+                self.stop_event.set()
         for thread in (self.thread,):
             if thread and thread.is_alive() and thread is not threading.current_thread():
                 thread.join(timeout=5)
 
-    def _wait_for_result(
-        self,
-        process,
-        json_path,
-        work_dir,
-        base_transcript,
-        base_diarized,
-        is_continuation,
-        replay_source='',
-    ):
+    def _recording_args(self):
+        return SimpleNamespace(
+            asr=self.asr_url, language='de', asr_api_key=(self.commander.token if self.commander else
+                os.environ.get('KIENZLEDOKU_ASR_API_KEY')), asr_timeout=(self.commander.timeout if self.commander else 120.0),
+            pause_seconds=.8, short_block_pause_seconds=1.5, min_block_seconds=4.0,
+            max_block_seconds=20.0, context_seconds=.7, segment_frame_ms=30,
+            audio_chunk_ms=100, status_seconds=5.0,
+            input_wav=None, replay_speed=1.0, device=self.selected_device or None,
+            wav='', json='', commander=(self.commander.url if self.commander else None),
+            recording_finalized=False, commander_metadata=None, ram_only=True,
+            quiet=True, audio_controls=self.audio_controls,
+            stop_event=self.stop_event, cancel_event=getattr(self, "cancel_event", None), event_callback=self._handle_event,
+        )
+
+    def _run_ram_pipeline(self, base_transcript, base_diarized, is_continuation):
         document = None
         error_message = ""
+        phase = 'recording'
+        no_speech = False
         try:
-            # Drain without storing: output can contain transcript text. Using
-            # communicate() here would close stdin and stop recording at once.
-            for line in process.stdout:
-                if line.startswith(EVENT_PREFIX):
-                    try:
-                        self._handle_event(json.loads(line[len(EVENT_PREFIX):]))
-                    except Exception:
-                        pass
-            process.wait()
-            if process.returncode != 0:
-                raise RuntimeError(
-                    "Spracherkennung fehlgeschlagen (Prozesscode %s)"
-                    % process.returncode
-                )
-            with open(json_path, "r", encoding="utf-8") as handle:
-                payload = json.load(handle)
+            args = self._recording_args()
+            payload = asyncio.run(run_recording(args))
+            if self.cancelled:
+                raise RuntimeError('Vorgang wurde verworfen.')
             new_transcript = str(payload.get("transcript") or "").strip()
             if not new_transcript:
-                raise ValueError(
-                    "Kein Sprachsignal erkannt. Bitte Mikrofonzugriff für kienzledoku record "
-                    "erlauben, das Eingabegerät prüfen und die Aufnahme wiederholen."
+                if payload.get('metrics', {}).get('failed'):
+                    failures = [b.get('error') for b in payload.get('blocks', []) if b.get('error')]
+                    raise ValueError(failures[0] if failures else 'Spracherkennung fehlgeschlagen. Einstellungen und Verbindung prüfen.')
+                raise NoSpeechDetected()
+            new_diarized = new_transcript
+            # Preserve completed ASR in the editable field before speaker
+            # assignment can fail. This also keeps physician edits in the base.
+            with self.lock:
+                self.live_transcript = append_text(base_transcript, new_transcript)
+                self.diarized_text = append_text(base_diarized, new_transcript)
+            if payload.get('metrics', {}).get('failed'):
+                raise ValueError('Ein Audioblock konnte nicht verarbeitet werden. Der bisher erkannte Text bleibt erhalten; keine automatische Dokumentation.')
+            use_diarization = (self.record_options['diarization'] and
+                os.environ.get("KIENZLEDOKU_NO_DIARIZATION", "").strip().lower() not in ("1", "true", "yes"))
+            if use_diarization:
+                phase = 'diarization'
+                self._handle_event({'type': 'phase', 'phase': 'diarization'})
+                diarization = diarize_audio(
+                    self.diarization_url, payload['_audio_wav'], 1, 4, None,
+                    self.commander.timeout if self.commander else 300.0,
+                    api_key=self.commander.token if self.commander else None,
+                    recording_finalized=payload.get('recording_finalized') is True,
+                    commander=bool(self.commander),
                 )
-            new_diarized = str(
-                payload.get("speaker_transcript") or new_transcript
-            ).strip()
+                segments = diarization.get('segments') or []
+                if payload.get('words'):
+                    rendered, _paragraphs = speaker_transcript_words(payload['words'], segments)
+                else:
+                    rendered, _paragraphs = speaker_transcript(payload.get('segments') or [], segments)
+                if rendered:
+                    new_diarized = rendered
+            if self.cancelled:
+                raise RuntimeError('Vorgang wurde verworfen.')
+            phase = 'documentation'
             combined_transcript = append_text(base_transcript, new_transcript)
             combined_diarized = append_text(base_diarized, new_diarized)
             with self.lock:
                 self.live_transcript = combined_transcript
                 self.diarized_text = combined_diarized
-                self.speaker_labels = (
-                    self.speaker_labels or bool(payload.get("speaker_transcript"))
-                )
+                self.speaker_labels = self.speaker_labels or new_diarized != new_transcript
                 if is_continuation:
                     self.message = "Das gesamte Sprechertranskript wird neu dokumentiert."
             if self.commander and payload.get('recording_finalized') is not True:
                 raise ValueError('Aufnahme noch nicht vollständig finalisiert; es wird keine Modellumschaltung angefordert.')
-            if is_continuation or self.commander:
-                document = self._document_text(combined_diarized)
-            else:
-                document = documentation_from_asr_payload(payload)
+            self._handle_event({'type': 'phase', 'phase': 'llm'})
+            if self.cancelled:
+                raise RuntimeError('Vorgang wurde verworfen.')
+            document = self._document_text(combined_diarized)
+        except NoSpeechDetected:
+            no_speech = True
         except Exception as exc:
             error_message = str(exc)
-        finally:
-            for stream in (process.stdin, process.stdout):
-                try:
-                    if stream is not None:
-                        stream.close()
-                except Exception:
-                    pass
-            if error_message:
-                partial = os.path.join(work_dir, 'aufnahme.wav.partial.wav')
-                if replay_source and os.path.isfile(replay_source):
-                    self.interrupted_audio = replay_source
-                elif os.path.isfile(partial):
-                    self.interrupted_audio = partial
-            else:
-                self.interrupted_audio = ''
-                if replay_source:
-                    old_dir = Path(replay_source).parent
-                    if old_dir.parent.resolve() == session_dir().resolve() and old_dir.name.startswith('audio-'):
-                        shutil.rmtree(old_dir, ignore_errors=True)
-                shutil.rmtree(work_dir, ignore_errors=True)
+            if phase == 'diarization' and not self.cancelled:
+                error_message += (' Der erkannte Text bleibt im Gesprächsfeld ohne neue '
+                                  'Sprecherzuordnung erhalten. Bitte prüfen; die Dokumentation '
+                                  'kann aus diesem Text erneut erstellt werden.')
 
         callback = None
         with self.lock:
-            if self.process is process:
-                self.process = None
-                self.work_dir = None
-                self.started_at = None
-                if error_message:
-                    self.status = STATUS_ERROR
-                    self.message = error_message
-                else:
-                    self.status = STATUS_READY
-                    self.message = (
-                        "Spracherkennung und Dokumentation abgeschlossen. Texte können "
-                        "geprüft oder erneut an das LLM gesendet werden."
-                    )
-                    callback = None if self.cancelled else self.on_document
+            self.stop_event = None
+            self.started_at = None
+            if error_message:
+                self.status = STATUS_ERROR
+                self.message = error_message
+            else:
+                self.status = STATUS_READY
+                self.message = (
+                    "Spracherkennung und Dokumentation abgeschlossen. Texte können "
+                    "geprüft oder erneut an das LLM gesendet werden."
+                )
+                if no_speech:
+                    self.message = 'Keine Sprache erkannt. Vorhandener Text bleibt erhalten; keine neue Dokumentation erstellt.'
+                callback = None if self.cancelled or no_speech else self.on_document
 
         if callback is not None:
             try:
@@ -607,12 +570,18 @@ class SpeechRecognitionManager(object):
                     self.message = "ASR-Ergebnis konnte nicht in die Oberfläche übernommen werden"
 
     def _handle_event(self, event):
-        if not isinstance(event, dict):
+        if self.cancelled or not isinstance(event, dict):
             return
         event_type = event.get("type")
         with self.lock:
             if event_type == 'audio_level':
                 self.audio_rms = int(event.get('rms') or 0)
+            elif event_type == 'asr_error':
+                self.message = 'Ein Audioblock konnte nicht verarbeitet werden. Aufnahme kann gestoppt werden; bereits erkannter Text bleibt erhalten.'
+            elif event_type == 'recording_limit':
+                self.status = STATUS_PROCESSING
+                self.commander_notice = 'Zwei Stunden erreicht. Dieser Aufnahmeabschnitt wird abgeschlossen; danach kann die Aufnahme fortgesetzt werden.'
+                self.message = self.commander_notice
             elif event_type == "final_block":
                 block_id = int(event.get("block_id") or 0)
                 self.live_blocks[block_id] = str(event.get("text") or "").strip()
@@ -627,6 +596,7 @@ class SpeechRecognitionManager(object):
             elif event_type == "phase":
                 phase = event.get("phase")
                 if phase == 'audio_stopped':
+                    self.status = STATUS_PROCESSING
                     self.message = 'Aufnahme beendet. Letzte ASR-Blöcke werden noch abgeschlossen.'
                 elif phase == 'recording_finalized':
                     self.message = 'Aufnahme beendet; letzte ASR-Blöcke abgeschlossen.'
@@ -696,12 +666,13 @@ class SpeechRecognitionManager(object):
             if not self.quality_profiles:
                 self._refresh_quality_profiles()
             document, metadata = self.commander.extract(
-                text, quality, self.quality_profiles, recording_finalized=True)
+                text, quality, self.quality_profiles, recording_finalized=True,
+                fields=self.active_fields)
             with self.lock:
                 self.commander_notice = metadata['notice']
                 self.requested_quality = metadata['requested_quality']
                 self.used_quality = metadata['used_quality']
-            return document
+            return strip_continuation_markers(document)
         args = SimpleNamespace(
             llm=self.llm_url,
             llm_api_key=os.environ.get("KIENZLEDOKU_LLM_API_KEY"),
@@ -710,7 +681,8 @@ class SpeechRecognitionManager(object):
             temperature=0.1,
             max_tokens=1600,
         )
-        return parse_documentation_json(call_llm(args, text))
+        return strip_continuation_markers(
+            parse_documentation_json(call_llm(args, text), self.active_fields))
 
     def _configured_service_host(self):
         hosts = []
@@ -720,19 +692,36 @@ class SpeechRecognitionManager(object):
                 hosts.append(host)
         return ", ".join(hosts) or "unbekannt"
 
-    def _service_check_worker(self):
+    def _service_check_worker(self, refresh_profiles=True):
         if self.commander:
             try:
-                self._refresh_quality_profiles()
-                self.commander.request('/health', timeout=3)
-                message = 'Commander erreichbar. Audioaufträge können angenommen werden.'
-                status = 'ok'
+                if not self.active_prompt:
+                    self.load_documentation_settings()
+                if refresh_profiles:
+                    self._refresh_quality_profiles()
+                try:
+                    runtime = self.commander.runtime_status()
+                except CommanderRequestError as exc:
+                    if exc.status != 404:
+                        raise
+                    self.commander.request('/health', timeout=3)
+                    runtime = {name: {'state': 'ready', 'message': 'Commander erreichbar.'}
+                               for name in ('asr', 'diar', 'llm')}
             except Exception as exc:
-                message, status = str(exc), 'error'
+                with self.lock:
+                    for details in self.services.values():
+                        details['status'], details['message'] = 'error', str(exc)
+                    self.service_status, self.service_message = 'error', str(exc)
+                return
             with self.lock:
-                for details in self.services.values():
-                    details['status'], details['message'] = status, message
-                self.service_status, self.service_message = status, message
+                mapping = {'asr': 'asr', 'diarization': 'diar', 'llm': 'llm'}
+                for local_name, remote_name in mapping.items():
+                    item = runtime[remote_name]
+                    self.services[local_name]['status'] = item['state']
+                    self.services[local_name]['message'] = item['message']
+                self.service_status = 'ok' if all(
+                    item['state'] not in ('error', 'disabled') for item in runtime.values()) else 'error'
+                self.service_message = 'Commander-Dienststatus aktualisiert.'
             return
         llm_base = self.llm_url.rstrip("/")
         llm_models_url = (

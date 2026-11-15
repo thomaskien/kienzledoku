@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>kienzledoku installieren</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Helvetica Neue", sans-serif;
+      color: #182333;
+      background: #edf2f7;
+      --blue: #1769aa;
+      --blue-dark: #0d4f86;
+      --blue-soft: #eaf4fc;
+      --orange: #e97824;
+      --line: #d7e0e9;
+      --muted: #657486;
+      --danger: #a82a24;
+      --success: #15704b;
+      --panel: #fff;
+      --shadow: 0 18px 50px rgba(36, 56, 79, .12);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { min-width: 760px; }
+    button, input, select, textarea { font: inherit; }
+    button, label, select { -webkit-user-select: none; user-select: none; }
+    button { cursor: pointer; }
+    button:disabled { cursor: default; opacity: .48; }
+    a { color: var(--blue); }
+    .app {
+      height: 100%; min-height: 640px; display: grid;
+      grid-template-rows: 72px minmax(0, 1fr) 78px;
+      background: #f5f7fa;
+    }
+    header {
+      display: flex; align-items: center; gap: 14px; padding: 0 32px;
+      border-bottom: 1px solid var(--line); background: rgba(255,255,255,.96);
+    }
+    .brand-logo { width: 38px; height: 38px; object-fit: contain; }
+    .brand { min-width: 0; }
+    .brand strong { display: block; font-size: 17px; letter-spacing: -.01em; }
+    .brand span { color: var(--muted); font-size: 13px; }
+    .version { margin-left: auto; color: var(--muted); font-size: 13px; }
+    .shell { min-height: 0; display: grid; grid-template-columns: 244px minmax(0, 1fr); }
+    .shell.uninstall-mode { grid-template-columns: minmax(0, 1fr); }
+    aside { padding: 30px 22px; background: #edf3f8; border-right: 1px solid var(--line); }
+    .steps { list-style: none; padding: 0; margin: 0; }
+    .step-indicator { display: grid; grid-template-columns: 30px 1fr; gap: 11px; align-items: center; padding: 10px 8px; color: var(--muted); border-radius: 9px; }
+    .step-indicator + .step-indicator { margin-top: 4px; }
+    .step-number { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid #bcc9d5; border-radius: 50%; background: #fff; font-size: 13px; font-weight: 650; }
+    .step-indicator.current { color: var(--blue-dark); background: rgba(255,255,255,.75); font-weight: 650; }
+    .step-indicator.current .step-number { color: #fff; border-color: var(--blue); background: var(--blue); }
+    .step-indicator.complete .step-number { color: var(--success); border-color: #95c7b1; background: #edf9f4; }
+    main { min-width: 0; overflow: auto; padding: 38px clamp(36px, 6vw, 78px) 48px; }
+    .page { display: none; max-width: 790px; margin: 0 auto; }
+    .page.active { display: block; }
+    h1 { margin: 0 0 8px; color: #132235; font-size: 29px; line-height: 1.18; letter-spacing: -.025em; }
+    h2 { margin: 30px 0 7px; font-size: 18px; letter-spacing: -.012em; }
+    h3 { margin: 0 0 5px; font-size: 16px; }
+    p { margin: 0 0 14px; }
+    .lead { color: var(--muted); font-size: 16px; margin-bottom: 28px; max-width: 690px; }
+    .card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 13px; }
+    .choice-card { display: block; position: relative; min-height: 144px; padding: 20px 18px 17px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); cursor: pointer; }
+    .choice-card:hover { border-color: #9bb8d0; }
+    .choice-card:has(input:checked) { border: 2px solid var(--blue); padding: 19px 17px 16px; box-shadow: 0 6px 18px rgba(23,105,170,.1); }
+    .choice-card input { position: absolute; top: 17px; right: 17px; width: 17px; height: 17px; accent-color: var(--blue); }
+    .choice-card strong { display: block; padding-right: 24px; margin-bottom: 7px; font-size: 16px; }
+    .choice-card small { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .panel { margin-top: 17px; padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .panel.subtle { background: #f9fbfd; }
+    .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .field { display: block; margin-top: 16px; }
+    .field:first-child { margin-top: 0; }
+    .field > span:first-child { display: block; margin-bottom: 6px; font-weight: 620; }
+    .hint, .field small { display: block; margin-top: 5px; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+    input[type="text"], input[type="url"], input[type="password"], select, textarea {
+      width: 100%; border: 1px solid #b9c6d2; border-radius: 8px; color: #172536; background: #fff;
+      padding: 9px 11px; outline: none; transition: border-color .12s, box-shadow .12s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(23,105,170,.14); }
+    textarea { min-height: 164px; resize: vertical; line-height: 1.5; }
+    input[readonly], textarea[readonly] { color: #566576; background: #f1f4f7; }
+    .radio-row, .toggle-row { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+    .radio-row label, .toggle-row label, .check-line { display: flex; gap: 8px; align-items: center; }
+    input[type="radio"], input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--blue); }
+    .switch-line { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; padding: 13px 0; }
+    .switch-line + .switch-line { border-top: 1px solid #e8edf1; }
+    .switch-line strong { display: block; }
+    .switch-line small { display: block; margin-top: 3px; color: var(--muted); }
+    .model-list { display: grid; gap: 10px; }
+    .model { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: start; padding: 15px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+    .model.unsupported { background: #f3f5f7; color: #737d88; }
+    .model-label { font-weight: 650; }
+    .model-meta { display: block; color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+    .badge { white-space: nowrap; padding: 3px 8px; border-radius: 99px; background: var(--blue-soft); color: var(--blue-dark); font-size: 11.5px; font-weight: 650; }
+    .unsupported .badge { background: #e2e6ea; color: #65717d; }
+    .quality-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .quality-grid .field { margin: 0; }
+    .field-list { display: grid; gap: 8px; margin-top: 13px; }
+    .field-item { display: grid; grid-template-columns: auto 1fr auto; gap: 11px; align-items: center; min-height: 46px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+    .order-buttons { display: flex; gap: 4px; }
+    .icon-button { min-width: 32px; min-height: 30px; padding: 2px 7px; border: 1px solid #c1ccd6; border-radius: 7px; color: #365269; background: #f7f9fb; }
+    .inline-actions { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; margin-top: 13px; }
+    .button { min-height: 40px; padding: 8px 17px; border: 1px solid #b6c3cf; border-radius: 9px; background: #fff; color: #22364a; font-weight: 620; }
+    .button:hover:not(:disabled) { background: #f4f7fa; }
+    .button.primary { color: #fff; border-color: var(--blue); background: var(--blue); }
+    .button.primary:hover:not(:disabled) { background: var(--blue-dark); }
+    .button.danger { color: var(--danger); }
+    .button.danger.primary { color: #fff; border-color: var(--danger); background: var(--danger); }
+    .button.danger.primary:hover:not(:disabled) { background: #83201c; }
+    .button.linklike { padding-left: 10px; padding-right: 10px; border-color: transparent; color: var(--blue); background: transparent; }
+    .notice { margin: 16px 0; padding: 13px 15px; border: 1px solid #bdd4e6; border-radius: 9px; color: #234e70; background: var(--blue-soft); }
+    .notice.error { border-color: #e2b1ad; color: var(--danger); background: #fff0ef; }
+    .notice.success { border-color: #abd3c1; color: var(--success); background: #eef9f4; }
+    .hidden { display: none !important; }
+    .summary-list { padding: 0; margin: 16px 0 0; list-style: none; border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
+    .summary-list li { padding: 12px 15px; background: #fff; }
+    .summary-list li + li { border-top: 1px solid #e5eaf0; }
+    .download-size { margin-top: 12px; color: var(--muted); }
+    .progress-track { height: 12px; overflow: hidden; margin: 24px 0 12px; border-radius: 99px; background: #dfe6ed; }
+    .progress-bar { height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--blue), #3e96d0); transition: width .3s ease; }
+    .progress-meta { display: flex; justify-content: space-between; gap: 20px; color: var(--muted); }
+    .logs { max-height: 142px; overflow: auto; margin-top: 18px; padding: 12px; border-radius: 8px; color: #455668; background: #edf1f4; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+    .success-mark { display: grid; place-items: center; width: 58px; height: 58px; margin-bottom: 18px; border-radius: 50%; color: #fff; background: var(--success); font-size: 31px; }
+    .copy-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 10px; }
+    .copy-value { min-width: 0; overflow-wrap: anywhere; line-height: 1.55; padding: 12px 14px; border: 1px solid #c9d4dd; border-radius: 8px; background: #f6f8fa; color: #253a4e; white-space: normal; -webkit-user-select: text; user-select: text; }
+    .copy-button { min-width: 160px; }
+    .guide-steps { padding-left: 22px; }
+    .guide-steps li { margin: 8px 0; }
+    .screenshots { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; margin-top: 14px; }
+    .screenshots figure { margin: 0; }
+    .screenshots img { display: block; width: 100%; max-height: 220px; object-fit: contain; object-position: top; border: 1px solid var(--line); border-radius: 8px; background: #eef2f5; }
+    .screenshots figcaption { margin-top: 5px; color: var(--muted); font-size: 12px; }
+    footer { display: flex; align-items: center; gap: 10px; padding: 0 32px; border-top: 1px solid var(--line); background: #fff; }
+    #footer-status { margin-right: auto; color: var(--muted); font-size: 13px; }
+    .loading { height: 100%; display: grid; place-items: center; text-align: center; }
+    .spinner { width: 34px; height: 34px; margin: 0 auto 14px; border: 3px solid #d9e3ec; border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 880px) {
+      .shell { grid-template-columns: 190px minmax(0,1fr); }
+      aside { padding: 22px 12px; }
+      main { padding: 28px 28px 38px; }
+      .card-grid, .quality-grid { grid-template-columns: 1fr; }
+      .choice-card { min-height: 0; }
+      .screenshots { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <img class="brand-logo" src="/assets/kienzledoku-record.svg" alt="">
+    <div class="brand"><strong>kienzledoku</strong><span>Einrichtung für diesen Mac</span></div>
+    <div class="version" id="version">Installation wird vorbereitet …</div>
+  </header>
+  <div class="shell">
+    <aside aria-label="Installationsschritte">
+      <ol class="steps">
+        <li class="step-indicator current" data-step-indicator="1"><span class="step-number">1</span><span>Komponenten</span></li>
+        <li class="step-indicator" data-step-indicator="2"><span class="step-number">2</span><span>Verbindungen</span></li>
+        <li class="step-indicator" data-step-indicator="3"><span class="step-number">3</span><span>Modelle</span></li>
+        <li class="step-indicator" data-step-indicator="4"><span class="step-number">4</span><span>Dokumentation</span></li>
+        <li class="step-indicator" data-step-indicator="5"><span class="step-number">5</span><span>Zusammenfassung</span></li>
+        <li class="step-indicator" data-step-indicator="6"><span class="step-number">6</span><span>Installation</span></li>
+      </ol>
+    </aside>
+    <main id="main">
+      <div class="loading" id="loading"><div><div class="spinner"></div><strong>Installationsassistent wird geladen</strong><p class="hint">Die Voraussetzungen werden geprüft.</p></div></div>
+
+      <section class="page" data-step="1" aria-labelledby="title-1">
+        <h1 id="title-1">Was möchten Sie einrichten?</h1>
+        <p class="lead">Wählen Sie, was auf diesem Mac verwendet werden soll. Sie können Client und Server gemeinsam oder getrennt installieren.</p>
+        <div class="card-grid" id="mode-cards">
+          <label class="choice-card"><input type="radio" name="mode" value="combined"><strong>Client und Server</strong><small>Empfohlen für einen einzelnen Mac: Aufnahme, Dokumentation und lokale Verarbeitung.</small></label>
+          <label class="choice-card"><input type="radio" name="mode" value="client"><strong>Nur Client</strong><small>Aufnahme auf diesem Mac; die Verarbeitung übernimmt ein vorhandener Server.</small></label>
+          <label class="choice-card"><input type="radio" name="mode" value="server"><strong>Nur Server</strong><small>Dieser Mac stellt Verarbeitung für andere Arbeitsplätze bereit.</small></label>
+        </div>
+        <div class="panel" id="server-role-panel">
+          <h2 style="margin-top:0">Aufgabe des Servers</h2>
+          <p class="hint">„Vollständig“ passt für die meisten Installationen. Einzelne Rollen sind für eine verteilte Einrichtung gedacht.</p>
+          <div class="radio-row" id="server-roles">
+            <label><input type="radio" name="server_role" value="full"> Vollständig</label>
+            <label><input type="radio" name="server_role" value="asr"> Nur Spracherkennung</label>
+            <label><input type="radio" name="server_role" value="llm"> Nur Dokumentation</label>
+          </div>
+        </div>
+        <div id="windows-requirements" class="notice hidden"></div>
+        <div class="inline-actions" style="margin-top:26px"><button type="button" class="button linklike danger" id="open-uninstall">Deinstallieren …</button></div>
+      </section>
+
+      <section class="page" data-step="2" aria-labelledby="title-2">
+        <h1 id="title-2">Verbindungen festlegen</h1>
+        <p class="lead">Tragen Sie die Adressen ein, die Sie von Ihrer Praxis- oder Serveradministration erhalten haben.</p>
+        <div id="client-connections">
+          <div class="panel">
+            <h2 style="margin-top:0">T2med</h2>
+            <div class="radio-row">
+              <label><input type="radio" name="connection_mode" value="connect"> Über Kienzledoku Connect</label>
+              <label><input type="radio" name="connection_mode" value="direct"> Direkt mit T2med</label>
+            </div>
+            <label class="field" id="t2med-url-field"><span>T2med-Zieladresse</span><input type="url" id="t2med_url" autocomplete="off" spellcheck="false"><small>Beispiel: https://praxis-server:16567/aps/fhir/api/r4</small></label>
+            <label class="check-line field" id="t2med-insecure-field"><input type="checkbox" id="t2med_insecure"><span>Selbst ausgestelltes Zertifikat dieses Praxisservers zulassen</span></label>
+          </div>
+          <div class="panel" id="external-commander-panel">
+            <h2 style="margin-top:0">Verarbeitungsserver (Commander)</h2>
+            <label class="field"><span>Commander-Adresse</span><input type="url" id="commander_url" autocomplete="off" spellcheck="false"></label>
+            <label class="field"><span>Token <span class="hint" style="display:inline">(optional)</span></span><input type="password" id="commander_token" autocomplete="new-password" spellcheck="false"></label>
+          </div>
+        </div>
+        <div id="server-connections">
+          <div class="panel">
+            <h2 style="margin-top:0">Zugriff auf diesen Server</h2>
+            <div class="radio-row">
+              <label><input type="radio" name="network" value="local"> Nur auf diesem Mac</label>
+              <label><input type="radio" name="network" value="lan"> Im Praxisnetz (LAN)</label>
+            </div>
+            <label class="field"><span>Serveradresse</span><input type="text" id="listen_host" autocomplete="off" spellcheck="false"><small>Für das Praxisnetz normalerweise 0.0.0.0.</small></label>
+            <div class="switch-line"><div><strong>Zugriff mit Token schützen</strong><small>Für „Nur auf diesem Mac“ optional, im Praxisnetz empfohlen.</small></div><label class="check-line"><input type="checkbox" id="auth_enabled"><span>Aktiv</span></label></div>
+            <div id="server-token-area" class="hidden">
+              <label class="field"><span>Server-Token</span><input type="password" id="server_token" autocomplete="new-password" spellcheck="false"></label>
+              <button type="button" class="button" id="generate-token">Sicheren Token erzeugen</button>
+            </div>
+          </div>
+          <div class="panel" id="remote-llm-panel">
+            <h2 style="margin-top:0">Zweiter Dokumentationsserver (LLM-Commander) <span class="hint" style="display:inline">(optional)</span></h2>
+            <p class="hint">Nur ausfüllen, wenn die Dokumentation von einem anderen Commander übernommen werden soll.</p>
+            <label class="field"><span>Commander-Adresse</span><input type="url" id="remote_llm_url" autocomplete="off" spellcheck="false"></label>
+            <label class="field"><span>Token <span class="hint" style="display:inline">(optional)</span></span><input type="password" id="remote_llm_token" autocomplete="new-password" spellcheck="false"></label>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" data-step="3" aria-labelledby="title-3">
+        <h1 id="title-3">Modelle auswählen</h1>
+        <p class="lead">Mehrere Modelle können installiert werden. Für jede Qualitätsstufe legen Sie anschließend das aktive Modell fest.</p>
+        <div id="no-local-models" class="notice hidden">Auf diesem Mac werden keine lokalen Dokumentationsmodelle benötigt. Die Auswahl kommt vom verbundenen Server.</div>
+        <div id="local-model-area">
+          <div id="model-list" class="model-list" aria-label="Installierbare Modelle"></div>
+          <div class="panel">
+            <h2 style="margin-top:0">Aktives Modell je Qualitätsstufe</h2>
+            <div class="quality-grid">
+              <label class="field"><span>Basis</span><select id="quality-basis"></select></label>
+              <label class="field"><span>Gründlich</span><select id="quality-gruendlich"></select></label>
+              <label class="field"><span>Sehr gründlich</span><select id="quality-sehr_gruendlich"></select></label>
+            </div>
+            <div class="switch-line"><div><strong>Speichernutzung</strong><small>Seriell spart Arbeitsspeicher; parallel beschleunigt Wechsel bei genügend RAM.</small></div><div class="radio-row"><label><input type="radio" name="memory_mode" value="serial"> Seriell</label><label><input type="radio" name="memory_mode" value="parallel"> Parallel</label></div></div>
+          </div>
+        </div>
+        <div class="panel hidden" id="windows-model-options">
+          <label class="field"><span>Standardstufe für neue Aufnahmen</span><select id="default_model"></select></label>
+          <label class="field" id="parallel-model-field"><span>Parallel vorgehaltenes LLM</span><select id="parallel_model"></select><small>Dieses Modell bleibt geladen. Andere installierte Modelle werden bei Bedarf seriell verwendet.</small></label>
+        </div>
+        <div class="panel" id="speech-options">
+          <h2 style="margin-top:0">Sprache</h2>
+          <div class="switch-line" id="asr-demand-row"><div><strong>Verschärfter serieller Modus</strong><small>Whisper lädt mit dem ersten Audioblock und bleibt nach dem Entladen aus. Die Sprechertrennung folgt ihrer eigenen Auswahl unten.</small></div><label class="check-line"><input type="checkbox" id="asr_on_demand"><span>Aktiv</span></label></div>
+          <div class="switch-line"><div><strong>Sprechertrennung</strong><small>Kennzeichnet unterschiedliche Sprecher im Transkript.</small></div><label class="check-line"><input type="checkbox" id="diarization"><span>Aktiv</span></label></div>
+          <label class="field" id="diarization-mode-field"><span>Speichernutzung der Sprechertrennung</span><select id="diarization_mode"><option value="resident">Immer geladen</option><option value="with_asr">Zusammen mit Whisper</option><option value="serial">Seriell – nach Whisper, vor dem LLM</option></select><small>Immer geladen vermeidet erneutes Laden. Zusammen mit Whisper folgt dessen Lade- und Entladezeitpunkt. Seriell gibt den Speicher zwischen den Schritten frei. Bei serieller Sprechertrennung folgt sie auch im verschärft seriellen Modus direkt auf die abgeschlossenen Whisper-Blöcke.</small><small id="mac-diarization-memory">Mac-Richtwert: ca. 0,6 GB frisch geladen; im kurzen M4-Test bis 5,2 GB während der Verarbeitung. Etwa 6 GB Arbeitsreserve einplanen; längere Gespräche können mehr benötigen.</small></label>
+          <label class="field hidden" id="hf-token-field"><span>Hugging-Face-Token <small id="hf-token-presence"></small></span><input type="password" id="hf_token" autocomplete="off" spellcheck="false"><small>Für das Modell der Sprechertrennung: <a href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank" rel="noopener noreferrer">Modellbedingungen bei Hugging Face akzeptieren</a> und ein Lesetoken eingeben. Ein vorhandener Token wird vorbelegt und nach erfolgreicher Installation geschützt für spätere Installationen hinterlegt. Ein bereits heruntergeladenes Modell benötigt keinen neuen Token.</small></label>
+        </div>
+      </section>
+
+      <div id="windows-advanced-template" class="hidden">
+        <details class="panel" id="windows-advanced"><summary>Windows / WSL: Speicher, Modellquellen und Prüfungen</summary>
+          <div class="row"><label class="field"><span>NVIDIA-GPU</span><select id="gpu_index"></select></label><label class="field"><span>WSL-Arbeitsspeicher</span><select id="wsl_ram_gib"><option value="16">16 GB</option><option value="24">24 GB</option><option value="28">28 GB</option><option value="32">32 GB</option></select><small>Mindestens 4 GB bleiben für Windows frei.</small></label></div>
+          <label class="field"><span>Audiocache</span><select id="audio_cache"><option value="ram">Im Arbeitsspeicher</option><option value="disk">Whisper-SSD-Sparmodus</option></select></label>
+          <label class="field"><span>Lokales Modellarchiv / Downloads</span><input type="text" id="cache_directory"></label>
+          <label class="field"><span>Weitere Modellquellen (eine pro Zeile)</span><textarea id="sources"></textarea></label>
+          <label class="field"><span>Lokaler Installationsordner</span><input type="text" id="install_directory"></label>
+          <label class="check-line field"><input type="checkbox" id="autostart"> Server bei Windows-Anmeldung starten</label>
+          <label class="check-line field"><input type="checkbox" id="verify"> Synthetische Serverprüfung durchführen</label>
+          <label class="check-line field"><input type="checkbox" id="verify_models"> Modell-Prüfsummen kontrollieren; vorhandene Prüfnachweise wiederverwenden</label>
+          <label class="check-line field"><input type="checkbox" id="recheck_models"> Alle Modell-Prüfsummen erneut berechnen</label>
+          <label class="check-line field"><input type="checkbox" id="cleanup_staging"> Zugeordnete Zwischenkopien nach erfolgreicher Installation entfernen</label>
+        </details>
+      </div>
+      <section class="page" data-step="4" aria-labelledby="title-4">
+        <h1 id="title-4">Dokumentation anpassen</h1>
+        <p class="lead">Wählen Sie die Abschnitte der Dokumentation. Der Standardprompt kann jederzeit wiederhergestellt werden.</p>
+        <div id="remote-config" class="notice hidden">
+          <strong>Zentrale Einstellungen</strong>
+          <p class="hint">Felder und Prompt werden vom verbundenen Commander bereitgestellt und sind hier nur lesbar.</p>
+          <button type="button" class="button" id="probe-server">Verbindung prüfen und Einstellungen laden</button>
+          <div id="probe-result" class="hint" role="status"></div>
+        </div>
+        <div class="panel">
+          <h2 style="margin-top:0">Aktive Dokumentationsfelder</h2>
+          <div id="field-list" class="field-list"></div>
+        </div>
+        <div class="panel">
+          <div id="prompt-encoding-notice" class="notice hidden" role="status">Ein gespeicherter Standardprompt enthielt falsch kodierte Umlaute. Hier ist die korrigierte Vorlage vorbelegt; sie wird beim Abschluss der Serverinstallation übernommen.</div>
+          <label class="field"><span>Prompt für die Dokumentation</span><textarea id="prompt" spellcheck="true"></textarea></label>
+          <div class="inline-actions"><button type="button" class="button" id="reset-prompt">Standardprompt wiederherstellen</button><span class="hint" id="prompt-mode-hint"></span></div>
+        </div>
+      </section>
+
+      <section class="page" data-step="5" aria-labelledby="title-5">
+        <h1 id="title-5">Bereit zur Installation</h1>
+        <p class="lead">Prüfen Sie die Auswahl. Erst mit „Installieren“ werden Dateien geladen und Änderungen vorgenommen.</p>
+        <div id="validation-error" class="notice error hidden" role="alert"></div>
+        <ul id="summary-list" class="summary-list"></ul>
+        <p id="download-size" class="download-size"></p>
+        <div class="notice">Passwörter und Tokens werden aus Sicherheitsgründen nicht in dieser Übersicht angezeigt.</div>
+      </section>
+
+      <section class="page" data-step="6" aria-labelledby="title-6">
+        <div id="install-running">
+          <h1 id="title-6">Installation läuft</h1>
+          <p class="lead">Bitte lassen Sie dieses Fenster geöffnet. Die einzelnen Schritte können einige Minuten dauern.</p>
+          <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="progress-bar"></div></div>
+          <div class="progress-meta"><strong id="progress-message">Installation wird gestartet …</strong><span id="progress-percent">0 %</span></div>
+          <pre class="logs" id="install-logs" aria-label="Installationsprotokoll"></pre>
+          <div id="install-error" class="notice error hidden" role="alert"></div>
+          <div class="inline-actions"><button type="button" class="button danger" id="cancel-install">Installation abbrechen</button><button type="button" class="button primary hidden" id="retry-install">Einstellungen korrigieren</button></div>
+        </div>
+        <div id="install-finished" class="hidden">
+          <div class="success-mark" aria-hidden="true">✓</div>
+          <h1>Installation abgeschlossen</h1>
+          <p class="lead">kienzledoku ist eingerichtet. Die folgenden Angaben helfen beim ersten Start.</p>
+          <div id="server-finish" class="panel hidden">
+            <h2 style="margin-top:0">Serververbindung</h2>
+            <div id="commander-finish-row"><span class="hint">Commander-Adresse</span><div class="copy-row"><code class="copy-value" id="finish-commander-url"></code><button type="button" class="button copy-button" data-copy-target="finish-commander-url">Kopieren</button></div></div>
+            <div id="server-token-finish-row" class="hidden"><span class="hint">Server-Token</span><div class="copy-row"><code class="copy-value" id="finish-server-token"></code><button type="button" class="button copy-button" data-copy-target="finish-server-token">Kopieren</button></div></div>
+          </div>
+          <div id="client-guide" class="panel hidden">
+            <h2 style="margin-top:0">T2med jetzt verbinden</h2>
+            <p>Hinterlegen Sie diese vollständige Adresse in T2med:</p>
+            <div class="copy-row"><code class="copy-value" id="launch-url"></code><button type="button" class="button copy-button" data-copy-target="launch-url">Adresse kopieren</button></div>
+            <p class="hint" id="launch-mode-hint"></p>
+            <ol class="guide-steps">
+              <li>In T2med nach <strong>„dritt“</strong> suchen.</li>
+              <li><strong>Drittanbieter-Zugriffe verwalten</strong> öffnen.</li>
+              <li><strong>Per Produktcode aktivieren</strong> wählen.</li>
+              <li>Den Produktcode <strong>kienzledoku</strong> eingeben und bestätigen.</li>
+              <li><strong>Dr. Thomas Kienzle - KienzleDoku</strong> erscheint mit einem <strong>grünen Statuspunkt</strong>.</li>
+              <li id="t2med-entry-help">Den aktivierten Eintrag <strong>KienzleDoku</strong> auswählen und <strong>Bearbeiten</strong> öffnen.</li>
+              <li>Die oben kopierte URL einfügen.</li>
+              <li>Als Bezeichnung <strong>kienzledoku record</strong> eintragen.</li>
+              <li>Mit dem Häkchen speichern.</li>
+              <li>Den neuen Knopf einer Stelle in der Menüleiste zuordnen.</li>
+            </ol>
+            <div class="screenshots">
+              <figure><img src="/assets/t2med-produktcode-aktivieren.png" alt="Per Produktcode aktivieren"><figcaption>1. Per Produktcode aktivieren wählen</figcaption></figure>
+              <figure><img src="/assets/t2med-produktcode-kienzledoku.png" alt="Produktcode kienzledoku"><figcaption>2. Produktcode kienzledoku eingeben</figcaption></figure>
+              <figure><img src="/assets/t2med-kienzledoku-aktiv.png" alt="KienzleDoku mit grünem Statuspunkt"><figcaption>3. Der grüne Punkt bestätigt die Aktivierung.</figcaption></figure>
+              <figure><img src="/assets/t2med-drittanbieter-suche.png" alt="T2med-Suche nach Drittanbieter-Zugriffen"><figcaption>Suche und Verwaltung öffnen</figcaption></figure>
+              <figure><img src="/assets/t2med-drittanbieter-url.png" alt="URL-Feld eines Drittanbieter-Zugriffs in T2med"><figcaption>Die URL im Screenshot kann älter sein – bitte die aktuelle Zeile oben kopieren.</figcaption></figure>
+            </div>
+            <p style="margin-top:16px"><a id="docs-link" href="#" target="_blank" rel="noopener noreferrer">Ausführliche Anleitung in der GitHub-README öffnen</a></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="uninstall-page" aria-labelledby="uninstall-title">
+        <div id="uninstall-form">
+          <h1 id="uninstall-title">Kienzledoku deinstallieren</h1>
+          <p class="lead">Wählen Sie gezielt die Komponenten und Daten aus. Eine offene Aufnahme wird niemals beendet oder verworfen.</p>
+          <div id="uninstall-detection" class="notice">Vorhandene Installation wird geprüft …</div>
+          <div class="card-grid">
+            <label class="choice-card"><input type="radio" name="uninstall_mode" value="client"><strong>Nur Client</strong><small>Entfernt Aufnahme-App, URL-Starter und deren Protokollregistrierungen.</small></label>
+            <label class="choice-card"><input type="radio" name="uninstall_mode" value="server"><strong>Nur Server</strong><small>Beendet und entfernt ausschließlich den eigenen Commander-Autostart.</small></label>
+            <label class="choice-card"><input type="radio" name="uninstall_mode" value="both"><strong>Client und Server</strong><small>Entfernt beide Komponenten sowie die danach nicht mehr benötigten eigenen Laufzeiten.</small></label>
+          </div>
+          <div class="panel">
+            <div class="switch-line"><div><strong>Heruntergeladene Modelle behalten</strong><small>Modellarchive und Downloads werden nur auf ausdrücklichen Wunsch gelöscht. Externe Caches und alte separate KI-Dienste bleiben immer erhalten.</small></div><label class="check-line"><input type="checkbox" id="keep-models" checked><span>Behalten</span></label></div>
+            <div class="switch-line"><div><strong>Technische Einstellungen behalten</strong><small>Standardmäßig bleiben Konfiguration und Zugangsdaten erhalten. Beim Löschen werden nur Einstellungen der ausgewählten Komponente entfernt; gemeinsame Einstellungen nur bei vollständiger Deinstallation.</small></div><label class="check-line"><input type="checkbox" id="keep-settings" checked><span>Behalten</span></label></div>
+          </div>
+          <h2>Zusammenfassung</h2>
+          <ul id="uninstall-summary" class="summary-list"></ul>
+          <label class="check-line field"><input type="checkbox" id="confirm-uninstall"><span>Ich habe die Auswahl geprüft und möchte sie deinstallieren.</span></label>
+          <div id="uninstall-error" class="notice error hidden" role="alert"></div>
+          <div class="inline-actions"><button type="button" class="button" id="cancel-uninstall">Abbrechen</button><button type="button" class="button danger primary" id="start-uninstall" disabled>Deinstallieren</button></div>
+        </div>
+        <div id="uninstall-running" class="hidden">
+          <h1>Deinstallation läuft</h1>
+          <p class="lead">Bitte lassen Sie dieses Fenster geöffnet.</p>
+          <div class="progress-track" aria-hidden="true"><div class="progress-bar" id="uninstall-progress-bar"></div></div>
+          <div class="progress-meta"><strong id="uninstall-progress-message">Deinstallation wird gestartet …</strong><span id="uninstall-progress-percent">0 %</span></div>
+          <pre class="logs" id="uninstall-logs" aria-label="Deinstallationsprotokoll"></pre>
+          <div id="uninstall-result-error" class="notice error hidden" role="alert"></div>
+        </div>
+        <div id="uninstall-finished" class="hidden">
+          <div class="success-mark" aria-hidden="true">✓</div>
+          <h1>Deinstallation abgeschlossen</h1>
+          <p class="lead">Die ausgewählten Kienzledoku-Komponenten und Daten wurden entfernt.</p>
+          <button type="button" class="button primary" id="uninstall-close">Fenster schließen</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <footer>
+    <span id="footer-status" role="status"></span>
+    <button type="button" class="button" id="back">Zurück</button>
+    <button type="button" class="button primary" id="next">Weiter</button>
+    <button type="button" class="button primary hidden" id="finish-close">Fenster schließen</button>
+  </footer>
+</div>
+<script>
+(() => {
+  'use strict';
+  const $ = selector => document.querySelector(selector);
+  const $$ = selector => Array.from(document.querySelectorAll(selector));
+  let bootstrap = null;
+  let config = null;
+  let currentStep = 1;
+  let validated = false;
+  let installing = false;
+  let uninstalling = false;
+  let statusTimer = null;
+  let uninstallStatusTimer = null;
+  let remoteFields = null;
+
+  function clone(value) { return JSON.parse(JSON.stringify(value)); }
+  function setText(target, value) { (typeof target === 'string' ? $(target) : target).textContent = value == null ? '' : String(value); }
+  function show(target, visible) { (typeof target === 'string' ? $(target) : target).classList.toggle('hidden', !visible); }
+  function selected(name) { const element = document.querySelector('input[name="' + name + '"]:checked'); return element ? element.value : ''; }
+  function setRadio(name, value) { const element = document.querySelector('input[name="' + name + '"][value="' + CSS.escape(value) + '"]'); if (element) element.checked = true; }
+  function includesClient() { return config.mode === 'combined' || config.mode === 'client'; }
+  function includesServer() { return config.mode === 'combined' || config.mode === 'server'; }
+  function localLLM() { return includesServer() && !config.remote_llm_url.trim() && (config.server_role === 'full' || config.server_role === 'llm'); }
+  function centralConfig() { return config.mode === 'client' || Boolean(config.remote_llm_url.trim()) || (includesServer() && config.server_role === 'asr'); }
+  function nativeMessage(message) {
+    try {
+      const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.installer;
+      if (handler) { handler.postMessage(message); return true; }
+      if (window.chrome && window.chrome.webview && ['busy','close'].includes(message.action)) {
+        window.chrome.webview.postMessage(message.action === 'busy' ? (message.value ? 'installer-busy' : 'installer-idle') : 'installer-close'); return true;
+      }
+    } catch (_) { /* Browser fallback below. */ }
+    return false;
+  }
+  function reportBusy(value) { nativeMessage({ action: 'busy', value: Boolean(value) }); }
+
+  async function api(path, options = {}) {
+    const request = { method: options.method || 'GET', headers: { Accept: 'application/json' } };
+    if (options.body !== undefined) {
+      request.headers['Content-Type'] = 'application/json';
+      request.headers['X-CSRF-Token'] = bootstrap.csrf;
+      request.body = JSON.stringify(options.body);
+    }
+    const response = await fetch(path, request);
+    let data = {};
+    try { data = await response.json(); } catch (_) { data = {}; }
+    if (!response.ok) throw new Error(data.error || 'Die Anfrage konnte nicht ausgeführt werden.');
+    return data;
+  }
+
+  function syncConfig() {
+    if (bootstrap.platform === 'windows') {
+      for (const id of ['default_model','parallel_model','audio_cache','cache_directory','install_directory','sources']) config[id]=$('#'+id).value;
+      for (const id of ['gpu_index','wsl_ram_gib']) config[id]=Number($('#'+id).value);
+      for (const id of ['autostart','verify','verify_models','cleanup_staging','recheck_models']) config[id]=$('#'+id).checked;
+    }
+    config.mode = selected('mode') || config.mode;
+    config.server_role = selected('server_role') || config.server_role;
+    config.connection_mode = selected('connection_mode') || config.connection_mode;
+    config.network = selected('network') || config.network;
+    config.memory_mode = selected('memory_mode') || config.memory_mode;
+    config.diarization_mode = $('#diarization_mode').value || config.diarization_mode;
+    for (const id of ['t2med_url','commander_url','commander_token','listen_host','server_token','remote_llm_url','remote_llm_token','hf_token','prompt']) {
+      config[id] = $('#' + id).value;
+    }
+    for (const id of ['t2med_insecure','auth_enabled','asr_on_demand','diarization']) config[id] = $('#' + id).checked;
+    config.selected_models = $$('#model-list input[type="checkbox"]:checked').map(element => element.value);
+    for (const quality of ['basis','gruendlich','sehr_gruendlich']) { const value=$('#quality-' + quality).value; if(value) config.quality_models[quality]=value; else delete config.quality_models[quality]; }
+    if (!centralConfig()) config.fields = $$('#field-list input[type="checkbox"]:checked').map(element => element.value);
+  }
+
+  function applyVisibility() {
+    if (!config) return;
+    show('#server-role-panel', includesServer() && bootstrap.platform !== 'windows');
+    show('#client-connections', includesClient());
+    show('#server-connections', includesServer());
+    show('#t2med-url-field', includesClient());
+    show('#external-commander-panel', config.mode === 'client');
+    show('#t2med-insecure-field', includesClient());
+    show('#server-token-area', config.auth_enabled);
+    show('#remote-llm-panel', includesServer() && config.server_role !== 'llm');
+    show('#no-local-models', !localLLM() && !(bootstrap.platform === 'windows' && includesServer()));
+    show('#local-model-area', localLLM() || (bootstrap.platform === 'windows' && includesServer()));
+    show('#speech-options', includesServer() && config.server_role !== 'llm');
+    show('#asr-demand-row', config.memory_mode === 'serial');
+    show('#windows-model-options', bootstrap.platform === 'windows' && includesServer());
+    show('#windows-advanced', bootstrap.platform === 'windows' && includesServer());
+    show('#parallel-model-field', config.memory_mode === 'parallel');
+    show('#diarization-mode-field', config.diarization && config.server_role !== 'llm');
+    show('#remote-config', centralConfig());
+    show('#prompt-encoding-notice', Boolean(bootstrap.prompt_encoding_repaired) && includesServer() && !centralConfig());
+    $('#prompt').readOnly = centralConfig();
+    $('#reset-prompt').disabled = centralConfig();
+    setText('#prompt-mode-hint', centralConfig() ? 'Vom Commander verwaltet' : 'Ändert nicht die gewählten Felder.');
+  }
+
+  function modelSize(bytes) {
+    if (!Number.isFinite(bytes)) return '';
+    return (bytes / 1073741824).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' GB';
+  }
+
+  function renderModels() {
+    const list = $('#model-list');
+    list.replaceChildren();
+    for (const model of bootstrap.models) {
+      const label = document.createElement('label');
+      label.className = 'model' + (model.supported ? '' : ' unsupported');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox'; checkbox.value = model.id; checkbox.checked = config.selected_models.includes(model.id) && model.supported; checkbox.disabled = !model.supported;
+      checkbox.addEventListener('change', () => { syncConfig(); renderQualitySelects(); validated = false; });
+      const description = document.createElement('span');
+      const title = document.createElement('span'); title.className = 'model-label'; title.textContent = model.label;
+      const meta = document.createElement('span'); meta.className = 'model-meta';
+      meta.textContent = model.supported ? modelSize(model.bytes) + ' · mindestens ' + model.min_ram_gib + ' GB RAM' : (model.reason || 'Für diese Hardware nicht geeignet');
+      description.append(title, meta);
+      const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = model.quality === 'sehr_gruendlich' ? 'Sehr gründlich' : model.quality === 'gruendlich' ? 'Gründlich' : 'Basis';
+      label.append(checkbox, description, badge); list.append(label);
+    }
+    renderQualitySelects();
+  }
+
+  function renderQualitySelects() {
+    const selectedIds = new Set($$('#model-list input[type="checkbox"]:checked').map(element => element.value));
+    for (const quality of ['basis','gruendlich','sehr_gruendlich']) {
+      const select = $('#quality-' + quality);
+      const previous = config.quality_models[quality];
+      select.replaceChildren();
+      const eligible = bootstrap.models.filter(model => model.supported && selectedIds.has(model.id) && model.quality === quality);
+      for (const model of eligible) {
+        const option = document.createElement('option'); option.value = model.id; option.textContent = model.label; select.append(option);
+      }
+      if (eligible.some(model => model.id === previous)) select.value = previous;
+      else if (eligible[0]) { select.value = eligible[0].id; config.quality_models[quality] = eligible[0].id; }
+      else delete config.quality_models[quality];
+      select.disabled=eligible.length < 2;
+    }
+    if (bootstrap.platform === 'windows') renderWindowsModelOptions();
+  }
+
+  function renderWindowsModelOptions() {
+    for (const id of ['default_model','parallel_model']) {
+      const select=$('#'+id); const previous=config[id]; select.replaceChildren();
+      const eligible=bootstrap.models.filter(m=>config.selected_models.includes(m.id) && (id==='parallel_model' ? m.parallel_supported : Object.values(config.quality_models).includes(m.id)));
+      for (const model of eligible) { const option=document.createElement('option'); option.value=model.id; option.textContent=(id==='default_model' ? ({basis:'Basis',gruendlich:'Gründlich',sehr_gruendlich:'Sehr gründlich'}[model.quality])+' — ' : '')+model.label; select.append(option); }
+      select.value=eligible.some(m=>m.id===previous) ? previous : eligible[0]?.id || '';
+      config[id]=select.value; select.disabled=eligible.length<2;
+    }
+  }
+
+  function renderFields() {
+    const list = $('#field-list'); list.replaceChildren();
+    for (const field of bootstrap.fields) {
+      const row=document.createElement('label'); row.className='field-item'; row.dataset.fieldId=field.id;
+      const checkbox=document.createElement('input'); checkbox.type='checkbox'; checkbox.value=field.id;
+      checkbox.checked=config.fields.includes(field.id); checkbox.disabled=centralConfig();
+      checkbox.setAttribute('aria-label',field.label+' aktiv');
+      checkbox.addEventListener('change',()=>{syncConfig();validated=false;});
+      const label=document.createElement('span');label.textContent=field.label;
+      row.append(checkbox,label);list.append(row);
+    }
+  }
+
+  function renderStep() {
+    $$('.page').forEach(page => page.classList.toggle('active', Number(page.dataset.step) === currentStep));
+    $$('.step-indicator').forEach(item => {
+      const step = Number(item.dataset.stepIndicator);
+      item.classList.toggle('current', step === currentStep);
+      item.classList.toggle('complete', step < currentStep || (installing && step === 6));
+      const marker = item.querySelector('.step-number'); marker.textContent = step < currentStep ? '✓' : String(step);
+    });
+    $('#back').disabled = currentStep === 1 || installing;
+    $('#next').disabled = installing;
+    show('#back', currentStep < 6 || !installing);
+    show('#next', currentStep < 6);
+    setText('#next', currentStep === 5 ? 'Installieren' : 'Weiter');
+    setText('#footer-status', currentStep < 5 ? 'Schritt ' + currentStep + ' von 6' : currentStep === 5 ? 'Noch keine Änderungen vorgenommen' : '');
+    $('#main').scrollTop = 0;
+  }
+
+  function readInitialValues() {
+    setRadio('mode', config.mode); setRadio('server_role', config.server_role); setRadio('connection_mode', config.connection_mode); setRadio('network', config.network); setRadio('memory_mode', config.memory_mode);
+    $('#diarization_mode').value = config.diarization_mode || (config.memory_mode === 'parallel' ? 'resident' : 'serial');
+    for (const id of ['t2med_url','commander_url','commander_token','listen_host','server_token','remote_llm_url','remote_llm_token','hf_token','prompt']) $('#' + id).value = config[id] || '';
+    for (const id of ['t2med_insecure','auth_enabled','asr_on_demand','diarization']) $('#' + id).checked = Boolean(config[id]);
+  }
+
+  function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return 'Keine zusätzlichen Downloads erforderlich.';
+    return 'Voraussichtlicher Download: ' + (bytes / 1073741824).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' GB';
+  }
+
+  async function validateConfig() {
+    syncConfig();
+    show('#validation-error', false);
+    setText('#footer-status', 'Einstellungen werden geprüft …');
+    try {
+      const result = await api('/api/validate', { method: 'POST', body: config });
+      const list = $('#summary-list'); list.replaceChildren();
+      for (const text of result.summary || []) { const item = document.createElement('li'); item.textContent = text; list.append(item); }
+      setText('#download-size', formatBytes(result.download_bytes));
+      validated = true;
+      return true;
+    } catch (error) {
+      setText('#validation-error', error.message); show('#validation-error', true); validated = false;
+      return false;
+    }
+  }
+
+  async function startInstall() {
+    if (!validated && !(await validateConfig())) return;
+    try {
+      $('#next').disabled = true;
+      await api('/api/install', { method: 'POST', body: config });
+      currentStep = 6; installing = true; reportBusy(true); renderStep(); show('#install-error', false); show('#retry-install', false);
+      pollStatus();
+    } catch (error) {
+      setText('#validation-error', error.message); show('#validation-error', true); $('#next').disabled = false;
+    }
+  }
+
+  async function pollStatus() {
+    clearTimeout(statusTimer);
+    try {
+      const status = await api('/api/status');
+      const progress = Math.max(0, Math.min(100, Number(status.progress) || 0));
+      $('#progress-bar').style.width = progress + '%'; setText('#progress-percent', Math.round(progress) + ' %'); setText('#progress-message', status.message || status.step || 'Installation läuft …');
+      setText('#install-logs', Array.isArray(status.logs) ? status.logs.join('\n') : '');
+      if (bootstrap.platform === 'windows') { $('#cancel-install').disabled=!status.can_cancel; }
+      if (status.error) {
+        installing = false; reportBusy(false); setText('#install-error', status.error); show('#install-error', true); show('#retry-install', true); show('#cancel-install', false); renderStep(); return;
+      }
+      if (status.done) { installing = false; reportBusy(false); finishInstall(status); return; }
+      statusTimer = setTimeout(pollStatus, status.running ? 500 : 900);
+    } catch (error) {
+      setText('#progress-message', 'Verbindung zum Installationsdienst wird wiederhergestellt …');
+      statusTimer = setTimeout(pollStatus, 1000);
+    }
+  }
+
+  function finishInstall(status) {
+    show('#install-running', false); show('#install-finished', true); show('#back', false); show('#next', false);
+    setText('#footer-status', 'Installation erfolgreich abgeschlossen');
+    show('#finish-close', true);
+    const hasServer = includesServer() && (status.commander_url || config.commander_url);
+    show('#server-finish', hasServer);
+    setText('#finish-commander-url', status.commander_url || config.commander_url || '');
+    const token = status.server_token || (config.auth_enabled ? config.server_token : '');
+    show('#server-token-finish-row', Boolean(token)); setText('#finish-server-token', token);
+    const hasClient = Boolean(status.client_installed);
+    show('#client-guide', hasClient);
+    const launchAddress = $('#launch-url');
+    launchAddress.replaceChildren();
+    (status.launch_url || '').split(/(?=[?&])/).forEach((part, index) => {
+      if (index) launchAddress.append(document.createElement('wbr'));
+      launchAddress.append(document.createTextNode(part));
+    });
+    setText('#launch-mode-hint', config.connection_mode === 'direct' ? 'Direktverbindung zu T2med: Kopieren Sie die vollständige aktuelle Adresse.' : 'Verbindung über Kienzledoku Connect: Kopieren Sie die vollständige aktuelle Adresse.');
+    $('#docs-link').href = bootstrap.docs_url;
+  }
+
+  function uninstallOptions() {
+    const mode = selected('uninstall_mode');
+    return {
+      remove_client: mode === 'client' || mode === 'both',
+      remove_server: mode === 'server' || mode === 'both',
+      remove_models: !$('#keep-models').checked,
+      remove_settings: !$('#keep-settings').checked,
+    };
+  }
+
+  function renderUninstallSummary() {
+    const options = uninstallOptions();
+    if (!options.remove_server) { $('#keep-models').checked = true; $('#keep-models').disabled = true; }
+    else $('#keep-models').disabled = false;
+    const list = $('#uninstall-summary'); list.replaceChildren();
+    const lines = [options.remove_client && options.remove_server ? 'Client und lokaler Server werden entfernt.' : options.remove_client ? 'Der Client wird entfernt.' : options.remove_server ? 'Der lokale Server wird entfernt.' : 'Bitte eine Komponente auswählen.'];
+    lines.push(bootstrap.platform==='windows' ? ($('#keep-models').checked ? 'Server wird deaktiviert; eigene WSL-Umgebung und Modelle bleiben erhalten.' : 'Eigene WSL-Umgebung kienzledoku-server samt Servermodellen entfernen. Andere WSL-Umgebungen und Downloadarchive bleiben erhalten.') : ($('#keep-models').checked ? 'Heruntergeladene Modelle und Installer-Downloads bleiben erhalten.' : 'Eigene heruntergeladene Modelle und Installer-Downloads werden gelöscht.'));
+    lines.push($('#keep-settings').checked ? 'Technische Einstellungen und Zugangsdaten bleiben erhalten.' : 'Technische Einstellungen der ausgewählten Komponenten werden gelöscht.');
+    if (!(options.remove_client && options.remove_server)) lines.push('Gemeinsame Laufzeiten und Einstellungen bleiben für den Teilbetrieb erhalten.');
+    for (const text of lines) { const item=document.createElement('li'); item.textContent=text; list.append(item); }
+    $('#start-uninstall').disabled = !selected('uninstall_mode') || !$('#confirm-uninstall').checked;
+  }
+
+  async function openUninstall() {
+    $('.shell').classList.add('uninstall-mode');
+    $$('.page').forEach(page => page.classList.remove('active'));
+    $('#uninstall-page').classList.add('active'); show('aside', false); show('#back', false); show('#next', false); show('#finish-close', false);
+    setText('#footer-status', 'Noch keine Änderungen vorgenommen'); show('#uninstall-error', false);
+    try {
+      const info = await api('/api/uninstall');
+      const detected = info.client && info.server ? 'Client und Server erkannt.' : info.client ? 'Client erkannt.' : info.server ? 'Lokaler Server erkannt.' : 'Keine eindeutig zuordenbare aktive Komponente erkannt.';
+      setText('#uninstall-detection', detected + (info.models ? ' Eigene Modelldaten sind vorhanden.' : ''));
+      $('#uninstall-detection').classList.toggle('error', Array.isArray(info.unsafe) && info.unsafe.length > 0);
+      if (info.client && info.server) setRadio('uninstall_mode','both');
+      else if (info.client) setRadio('uninstall_mode','client');
+      else if (info.server) setRadio('uninstall_mode','server');
+      if (Array.isArray(info.unsafe) && info.unsafe.length) setText('#uninstall-detection', 'Die Installation enthält nicht sicher zuordenbare Dateien. Diese werden nicht verändert.');
+    } catch (error) { setText('#uninstall-detection', error.message); $('#uninstall-detection').classList.add('error'); }
+    renderUninstallSummary();
+  }
+
+  function leaveUninstall() {
+    if (uninstalling) return;
+    $('.shell').classList.remove('uninstall-mode');
+    $('#uninstall-page').classList.remove('active'); show('aside', true); show('#uninstall-form', true); show('#uninstall-running', false); show('#uninstall-finished', false);
+    $('#confirm-uninstall').checked = false; currentStep = 1; renderStep();
+  }
+
+  async function startUninstall() {
+    if (!$('#confirm-uninstall').checked) return;
+    show('#uninstall-error', false); $('#start-uninstall').disabled = true;
+    try {
+      await api('/api/uninstall', { method: 'POST', body: uninstallOptions() });
+      uninstalling = true; reportBusy(true); show('#uninstall-form', false); show('#uninstall-running', true);
+      setText('#footer-status', 'Deinstallation läuft'); pollUninstallStatus();
+    } catch (error) {
+      setText('#uninstall-error', error.message); show('#uninstall-error', true); renderUninstallSummary();
+    }
+  }
+
+  async function pollUninstallStatus() {
+    clearTimeout(uninstallStatusTimer);
+    try {
+      const status = await api('/api/uninstall/status');
+      const progress = Math.max(0, Math.min(100, Number(status.progress) || 0));
+      $('#uninstall-progress-bar').style.width = progress + '%'; setText('#uninstall-progress-percent', Math.round(progress) + ' %');
+      setText('#uninstall-progress-message', status.message || 'Deinstallation läuft …'); setText('#uninstall-logs', Array.isArray(status.logs) ? status.logs.join('\n') : '');
+      if (status.error) {
+        uninstalling = false; reportBusy(false); show('#uninstall-running', false); show('#uninstall-form', true);
+        setText('#uninstall-error', status.error); show('#uninstall-error', true); $('#confirm-uninstall').checked = false; renderUninstallSummary();
+        setText('#footer-status', 'Deinstallation fehlgeschlagen'); return;
+      }
+      if (status.done) {
+        uninstalling = false; reportBusy(false); show('#uninstall-running', false); show('#uninstall-finished', true);
+        setText('#footer-status', 'Deinstallation erfolgreich abgeschlossen'); return;
+      }
+      uninstallStatusTimer = setTimeout(pollUninstallStatus, status.running ? 400 : 800);
+    } catch (_) {
+      setText('#uninstall-progress-message', 'Verbindung zum Deinstallationsdienst wird wiederhergestellt …');
+      uninstallStatusTimer = setTimeout(pollUninstallStatus, 1000);
+    }
+  }
+
+  function closeInstallerWindow() {
+    if (installing || uninstalling) return;
+    if (!nativeMessage({ action: 'close' })) window.close();
+  }
+
+  async function probeServer() {
+    syncConfig();
+    const asrRemote = includesServer() && Boolean(config.remote_llm_url.trim());
+    const url = asrRemote ? config.remote_llm_url : config.commander_url;
+    const token = asrRemote ? config.remote_llm_token : config.commander_token;
+    if (!url) { setText('#probe-result', 'Bitte zuerst eine Commander-Adresse eintragen.'); return; }
+    $('#probe-server').disabled = true; setText('#probe-result', 'Verbindung wird geprüft …');
+    try {
+      const result = await api('/api/probe', { method: 'POST', body: { url, token } });
+      remoteFields = (result.fields || []).map(id => bootstrap.fields.find(field => field.id === id) || { id, label: id });
+      config.fields = remoteFields.map(field => field.id); config.prompt = result.prompt || ''; $('#prompt').value = config.prompt; renderFields();
+      const profiles = (result.profiles || []).map(profile => profile.label + (profile.model_label ? ' – ' + profile.model_label : '')).join(', ');
+      setText('#probe-result', profiles ? 'Verbindung erfolgreich. Profile: ' + profiles : 'Verbindung erfolgreich.');
+    } catch (error) { setText('#probe-result', error.message); }
+    finally { $('#probe-server').disabled = false; }
+  }
+
+  async function copyText(value, button) {
+    let copied = nativeMessage({ action: 'copy', text: value });
+    if (!copied && navigator.clipboard && window.isSecureContext) {
+      try { await navigator.clipboard.writeText(value); copied = true; } catch (_) { copied = false; }
+    }
+    if (!copied) {
+      const area = document.createElement('textarea'); area.value = value; area.style.position = 'fixed'; area.style.opacity = '0'; document.body.append(area); area.select();
+      try { copied = document.execCommand('copy'); } catch (_) { copied = false; } area.remove();
+    }
+    const original = button.textContent; button.textContent = copied ? 'Kopiert' : 'Bitte markieren'; setTimeout(() => { button.textContent = original; }, 1400);
+  }
+
+  function bindEvents() {
+    $('#finish-close').addEventListener('click', closeInstallerWindow);
+    $('#uninstall-close').addEventListener('click', closeInstallerWindow);
+    $('#open-uninstall').addEventListener('click', openUninstall);
+    $('#cancel-uninstall').addEventListener('click', leaveUninstall);
+    $('#start-uninstall').addEventListener('click', startUninstall);
+    $$('input[name="uninstall_mode"], #keep-models, #keep-settings, #confirm-uninstall').forEach(element => element.addEventListener('change', renderUninstallSummary));
+    $$('input[name="mode"], input[name="server_role"], input[name="connection_mode"], input[name="network"], input[name="memory_mode"]').forEach(element => element.addEventListener('change', () => { syncConfig(); applyVisibility(); renderFields(); validated = false; }));
+    ['t2med_insecure','auth_enabled','asr_on_demand','diarization','diarization_mode'].forEach(id => $('#' + id).addEventListener('change', () => { syncConfig(); applyVisibility(); show('#hf-token-field', config.diarization); validated = false; }));
+    $$('input[type="text"], input[type="url"], input[type="password"], textarea, select').forEach(element => element.addEventListener('input', () => { if (config) { syncConfig(); if(element.id==='remote_llm_url'){ applyVisibility();renderFields(); } validated = false; } }));
+    $('#generate-token').addEventListener('click', async () => {
+      try { const result = await api('/api/token', { method: 'POST', body: {} }); config.server_token = result.token; $('#server_token').value = result.token; validated = false; }
+      catch (error) { setText('#footer-status', error.message); }
+    });
+    $$('#quality-basis,#quality-gruendlich,#quality-sehr_gruendlich').forEach(select=>select.addEventListener('change',()=>{syncConfig();if(bootstrap.platform==='windows')renderWindowsModelOptions();}));
+    $('#remote_llm_url').addEventListener('input',()=>{$('#remote_llm_token').value='';});
+    $('#commander_url').addEventListener('input',()=>{$('#commander_token').value='';});
+    $('#reset-prompt').addEventListener('click', () => { const activeFields = [...config.fields]; config.prompt = bootstrap.default_prompt; $('#prompt').value = bootstrap.default_prompt; config.fields = activeFields; validated = false; });
+    $('#probe-server').addEventListener('click', probeServer);
+    $('#back').addEventListener('click', () => { if (currentStep > 1 && !installing) { currentStep--; renderStep(); } });
+    $('#next').addEventListener('click', async () => {
+      syncConfig();
+      if (currentStep === 4) { await validateConfig(); currentStep = 5; renderStep(); return; }
+      if (currentStep === 5) { await startInstall(); return; }
+      if (currentStep < 5) { currentStep++; if (currentStep === 4) renderFields(); renderStep(); }
+    });
+    $('#cancel-install').addEventListener('click', async () => {
+      if (!window.confirm('Möchten Sie die laufende Installation wirklich abbrechen?')) return;
+      try { await api('/api/cancel', { method: 'POST', body: {} }); setText('#progress-message', 'Installation wird abgebrochen …'); } catch (error) { setText('#install-error', error.message); show('#install-error', true); }
+    });
+    $('#retry-install').addEventListener('click', () => { show('#install-running', true); show('#install-finished', false); show('#cancel-install', true); currentStep = 5; renderStep(); });
+    $$('.copy-button').forEach(button => button.addEventListener('click', () => copyText($('#' + button.dataset.copyTarget).textContent, button)));
+  }
+
+  async function initialize() {
+    try {
+      bootstrap = await api('/api/bootstrap'); config = clone(bootstrap.defaults);
+      if (bootstrap.platform === 'windows') {
+        // One shared wizard; adapt platform wording and Windows-specific engine options.
+        const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+        const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
+        for(const node of nodes) if(node.parentElement.tagName!=='SCRIPT' && node.parentElement.tagName!=='STYLE') node.textContent=node.textContent.replaceAll('diesem Mac','diesem Windows-Rechner').replaceAll('diesen Mac','diesen Windows-Rechner').replaceAll('Dieser Mac','Dieser Windows-Rechner').replaceAll('einzelnen Mac','einzelnen Windows-Rechner');
+        $('[data-step="3"]').append($('#windows-advanced'));
+        show('#windows-requirements',true);
+        setText('#windows-requirements','Client: Windows 10/11 x64, WebView2 und Mikrofon. Lokaler Server: Windows 11, NVIDIA ab 8 GB VRAM, WSL2/Virtualisierung und mindestens 20 GB RAM. WSL-Einrichtung kann Administratorrechte und einen Neustart benötigen. '+(bootstrap.hardware.server_supported ? 'GPU und Arbeitsspeicher erkannt.' : 'Auf diesem Rechner ist derzeit nur der Client verfügbar; Servervoraussetzungen fehlen.'));
+        for(const input of $$('input[name="mode"]')) if(input.value!=='client') input.disabled=!bootstrap.hardware.server_supported;
+        show('#mac-diarization-memory',false);
+        $('#diarization').disabled=true;
+        $('#listen_host').nextElementSibling.textContent='Für LAN eine IP dieses Rechners wählen: '+bootstrap.hardware.lan_addresses.join(', ');
+        for(const gpu of bootstrap.hardware.gpus) { const option=document.createElement('option');option.value=gpu.Index;option.textContent=gpu.Name+' · '+Math.round(gpu.VramMiB/1024)+' GB VRAM';$('#gpu_index').append(option); }
+        for(const id of ['gpu_index','wsl_ram_gib','audio_cache','cache_directory','install_directory','sources']) $('#'+id).value=config[id];
+        for(const id of ['autostart','verify','verify_models','cleanup_staging','recheck_models']) $('#'+id).checked=config[id];
+        $('#gpu_index').addEventListener('change',()=>{
+          syncConfig();const gpu=bootstrap.hardware.gpus.find(g=>g.Index===config.gpu_index);
+          for(const model of bootstrap.models){model.supported=bootstrap.hardware.server_supported && gpu.VramMiB>=model.serial_vram_mib;model.parallel_supported=Boolean(model.parallel_vram_mib && gpu.VramMiB>=model.parallel_vram_mib);}
+          renderModels();syncConfig();validated=false;
+        });
+        for(const id of ['default_model','parallel_model','gpu_index','wsl_ram_gib','audio_cache','cache_directory','install_directory','sources','autostart','verify','verify_models','cleanup_staging','recheck_models']) $('#'+id).addEventListener('change',()=>{syncConfig();validated=false;});
+      }
+      if (!bootstrap.production_key) setText('#t2med-entry-help', 'Dieser Build verwendet den Demo-Key: T2med-Demo auswählen und Bearbeiten öffnen.');
+      config.selected_models = Array.isArray(config.selected_models) ? config.selected_models : [];
+      config.quality_models = config.quality_models || { basis:'', gruendlich:'', sehr_gruendlich:'' };
+      config.fields = Array.isArray(config.fields) ? config.fields : bootstrap.fields.filter(field => field.default).map(field => field.id);
+      setText('#version', 'Version ' + bootstrap.version + ' · ' + bootstrap.hardware.arch + ' · ' + bootstrap.hardware.ram_gib + ' GB RAM');
+      readInitialValues(); setText('#hf-token-presence', config.hf_token ? 'Vorhandener Token ist ausgefüllt (verdeckt).' : 'Optional, wenn alle benötigten Modelle bereits vorhanden sind.'); renderModels(); renderFields(); bindEvents(); applyVisibility(); show('#hf-token-field', config.diarization);
+      $('#loading').remove(); currentStep = 1; renderStep();
+    } catch (error) {
+      $('#loading').replaceChildren();
+      const box = document.createElement('div'); const title = document.createElement('strong'); const text = document.createElement('p');
+      title.textContent = 'Der Installationsassistent konnte nicht geladen werden.'; text.className = 'notice error'; text.textContent = error.message; box.append(title, text); $('#loading').append(box);
+    }
+  }
+  initialize();
+})();
+</script>
+</body>
+</html>

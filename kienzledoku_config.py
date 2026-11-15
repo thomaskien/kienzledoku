@@ -1,4 +1,4 @@
-"""Shared Record 1.3.3 configuration. Patient context and credentials never enter TOML."""
+"""Shared Record 1.7.6 configuration. Patient context and credentials never enter TOML."""
 import copy
 import json
 import os
@@ -10,6 +10,7 @@ import subprocess
 import sys
 import urllib.parse
 
+DEFAULT_COMMANDER_URL = 'http://10.0.83.140:8185'
 
 def config_dir():
     override = os.environ.get('KIENZLEDOKU_CONFIG_DIR')
@@ -28,15 +29,16 @@ def config_path():
 
 def defaults():
     return {
-        'connection': {'mode': 'direct', 'target': 'https://127.0.0.1:16567/aps/fhir/api/r4',
+        'connection': {'mode': 'connect', 'target': 'https://127.0.0.1:16567/aps/fhir/api/r4',
                        'ca_file': '', 'allow_insecure_tls': False},
-        'commander': {'enabled': True, 'url': 'http://127.0.0.1:8185',
+        'commander': {'enabled': True, 'url': DEFAULT_COMMANDER_URL,
                       'token_env': 'KIENZLEDOKU_COMMANDER_TOKEN',
-                      'token_file': '', 'request_timeout': 2400,
+                      'token_file': '', 'request_timeout': 14400,
                       'default_quality': 'auto'},
         'services': {'asr': 'http://127.0.0.1:8179', 'diarization': 'http://127.0.0.1:8183',
                      'llm': 'http://127.0.0.1:8080'},
-        'record': {'diarization': True, 'microphone': '', 'output_mode': 'structured', 'single_code': 'KI'},
+        'record': {'diarization': True, 'microphone': '', 'output_mode': 'structured', 'single_code': 'KI',
+                   'vad_enabled': True, 'silence_threshold_dbfs': -50},
     }
 
 
@@ -77,13 +79,15 @@ def validate(config):
         raise ValueError('Ungültige Commander-Tokenvariable')
     if commander['token_file'] and not Path(commander['token_file']).expanduser().is_absolute():
         raise ValueError('Commander-Tokendatei benötigt einen absoluten Pfad')
-    if not 30 <= commander['request_timeout'] <= 7200:
+    if not 30 <= commander['request_timeout'] <= 21600:
         raise ValueError('Commander-Zeitgrenze muss zwischen 30 und 7200 Sekunden liegen')
     quality = commander['default_quality']
     if quality != 'auto' and not re.fullmatch(r'[a-z0-9][a-z0-9_]{0,63}', quality):
         raise ValueError('Ungültige Commander-Standardqualität')
     if config['record']['output_mode'] not in ('structured', 'single'):
         raise ValueError('Ungültiges Dokumentationsformat')
+    from kienzledoku_vad import AudioControls
+    AudioControls.validate(config['record']['vad_enabled'], config['record']['silence_threshold_dbfs'])
     code = config['record']['single_code']
     if not code.strip() or len(code) > 20 or any(ord(c) < 32 for c in code):
         raise ValueError('Kürzel benötigt 1 bis 20 druckbare Zeichen')
@@ -94,9 +98,10 @@ def load(path=None):
     path = Path(path or config_path())
     result = defaults()
     if path.exists():
-        # Commander is opt-in for configurations created by earlier clients.
-        # Fresh installations use the enabled default above.
-        result['commander']['enabled'] = False
+        # Before 1.7.6 an omitted mode meant direct. Preserve that meaning for
+        # existing TOML/legacy JSON; only a fresh installation defaults to Connect.
+        result['connection']['mode'] = 'direct'
+        # Read legacy fields for compatibility, but Record always uses Commander.
         if path.suffix == '.json':
             old = json.loads(path.read_text(encoding='utf-8'))
             if not isinstance(old, dict):
@@ -124,14 +129,17 @@ def load(path=None):
                 result[section].update(values)
     elif path == config_path() and path.with_suffix('.json').exists():
         result = load(path.with_suffix('.json'))
+    result['commander']['enabled'] = True
     return validate(result)
 
 
 def save(config, path=None):
+    config = copy.deepcopy(config)
+    config['commander']['enabled'] = True
     validate(config)
     path = Path(path or config_path())
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    lines = ['# kienzledoku record 1.3.3 — keine Zugangsdaten/Patienten in dieser Datei.']
+    lines = ['# kienzledoku record 1.7.6 — keine Zugangsdaten/Patienten in dieser Datei.']
     for section, values in config.items():
         lines.extend(['', '[' + section + ']'])
         for name, value in values.items():
@@ -228,7 +236,8 @@ def read_commander_token():
     if callable(getuid) and info.st_uid != getuid():
         raise ValueError('Commander-Tokendatei gehört nicht dem aktuellen Benutzer')
     value = path.read_text(encoding='utf-8').strip()
-    if not value or len(value) > 4096 or any(char.isspace() for char in value):
+    # The installer writes an empty private file when optional auth is disabled.
+    if len(value) > 4096 or any(char.isspace() for char in value):
         raise ValueError('Commander-Token ist ungültig')
     return value
 

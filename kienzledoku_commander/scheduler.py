@@ -40,6 +40,7 @@ class Commander:
         self._loaded = {"asr": False, "diar": False, "llm": None}
         self._blocked = set()
         self._transition = False
+        self._change_target = None
         self._planned = None
         self._llm_fault = False
         self._baseline_retry_at = 0.0
@@ -47,6 +48,7 @@ class Commander:
         self._last_error = None
         self._uncertain = True
         self._return_after_llm = False
+        self._awaiting_documentation = False
         self._retry_at = 0.0
         self._closing = False
         self._ready_once = threading.Event()
@@ -56,16 +58,67 @@ class Commander:
         self._thread.start()
 
     def _baseline(self):
-        return {"asr": True, "diar": self.settings.tier != 8, "llm": self.settings.baseline_llm}
+        if (self.settings.diarization_mode is not None and self._awaiting_documentation
+                and self._loaded['diar'] and not self._uncertain):
+            # The next client request follows the completed diarization result.
+            # Do not reload Whisper in the gap immediately before LLM work.
+            return dict(self._loaded)
+        return self._runtime_target(self._diar_policy(self._baseline_legacy()))
+
+    def _runtime_target(self, desired):
+        if desired['llm']:
+            desired['llm'] = self.settings.runtime_quality(desired['llm'])
+        return desired
+
+    def _baseline_legacy(self):
+        roles = set(self.settings.enabled_roles)
+        # Strict serial mode: cold at startup, retain Whisper between audio
+        # blocks, and leave it cold after another role has unloaded it.
+        asr = "asr" in roles and (not self.settings.asr_on_demand or bool(self._loaded["asr"]))
+        if self.settings.memory_mode == "serial":
+            return {"asr": asr,
+                    "diar": False, "llm": None}
+        return {"asr": asr,
+                "diar": "diar" in roles and self.settings.tier != 8,
+                "llm": self.settings.baseline_llm}
+
+    def _diar_policy(self, desired, role=None):
+        mode = self.settings.diarization_mode
+        if mode is None:
+            return desired
+        if 'diar' not in self.settings.enabled_roles:
+            desired['diar'] = False
+        elif mode == 'resident':
+            desired['diar'] = True
+        elif mode == 'with_asr':
+            if role == 'diar' and 'asr' in self.settings.enabled_roles:
+                desired['asr'] = True
+            desired['diar'] = bool(desired['asr'] or role == 'diar')
+        elif role == 'diar':
+            desired = {'asr': False, 'diar': True, 'llm': None}
+        else:
+            desired['diar'] = False
+        return desired
 
     def _desired(self, job):
+        return self._runtime_target(self._diar_policy(self._desired_legacy(job), job.role))
+
+    def _desired_legacy(self, job):
+        if job.role == "llm" and self.settings.remote_llm_url:
+            return dict(self._loaded)
+        if self.settings.memory_mode == "serial":
+            return {"asr": job.role == "asr", "diar": job.role == "diar",
+                    "llm": job.quality if job.role == "llm" else None}
         if job.role == "llm":
             if self.settings.persistent(job.quality):
-                return {"asr": True, "diar": True, "llm": job.quality}
+                return {"asr": "asr" in self.settings.enabled_roles,
+                        "diar": "diar" in self.settings.enabled_roles, "llm": job.quality}
             return {"asr": False, "diar": False, "llm": job.quality}
         if job.role == "diar" and self.settings.tier == 8:
             return {"asr": False, "diar": True, "llm": None}
-        return self._baseline()
+        desired = self._baseline()
+        desired[job.role] = True
+        return desired
 
     @staticmethod
     def _fingerprint(role, payload, quality):
@@ -90,7 +143,15 @@ class Commander:
     def submit(self, role, payload, quality=None, request_id=None):
         if role not in ("asr", "diar", "llm"):
             raise InvalidRequest()
-        quality = self.settings.quality(quality) if role == "llm" else None
+        if role not in self.settings.enabled_roles:
+            raise InvalidRequest("Diese Serverrolle ist deaktiviert.")
+        if role == "llm" and self.settings.remote_llm_url:
+            allowed = getattr(self.runtime, "remote_allowed", self.settings.allowed)
+            quality = getattr(self.runtime, "remote_default", self.settings.default) if quality is None else quality
+            if quality not in allowed:
+                raise InvalidRequest("Diese Verarbeitungsstufe ist am Remote-Commander nicht verfügbar.")
+        else:
+            quality = self.settings.quality(quality) if role == "llm" else None
         if request_id is not None and (not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,96}", request_id)):
             raise InvalidRequest("Die Anfrage-ID ist ungültig.")
         request_id = request_id or uuid.uuid4().hex
@@ -118,14 +179,33 @@ class Commander:
 
     def status(self):
         with self._condition:
+            allowed = getattr(self.runtime, "remote_allowed", self.settings.allowed)
+            default = getattr(self.runtime, "remote_default", self.settings.default)
+            services = {}
+            for role in ("asr", "diar", "llm"):
+                if role not in self.settings.enabled_roles:
+                    state, message = "disabled", "Dienst ist deaktiviert."
+                elif any(j.role == role for j in self._active.values()):
+                    state, message = "busy", "Dienst verarbeitet einen Auftrag."
+                elif (self._transition and self._change_target and self._change_target[role]
+                      and (role in self._blocked or not self._loaded[role])):
+                    state, message = "loading", "Modellwechsel läuft."
+                elif self._loaded[role] or (role == "llm" and self.settings.remote_llm_url):
+                    state, message = "ready", "Dienst ist bereit."
+                elif self._last_error and self._uncertain:
+                    state, message = "error", "Dienst konnte technisch nicht bereitgestellt werden."
+                else:
+                    state, message = "standby", "Dienst wird bei Bedarf geladen."
+                services[role] = {"state": state, "message": message}
             return {
                 "name": "kienzledoku-commander", "vram_gib": self.settings.tier,
-                "default_quality": self.settings.default, "allowed_qualities": list(self.settings.allowed),
+                "default_quality": default, "allowed_qualities": list(allowed),
                 "phase": self._phase, "asr_ready": bool(self._loaded["asr"] and "asr" not in self._blocked),
                 "loaded": dict(self._loaded), "transition_running": self._transition,
                 "pending": dict(Counter(j.role for j in self._pending)),
                 "active": dict(Counter(j.role for j in self._active.values())),
                 "last_error": self._last_error,
+                "services": services,
             }
 
     def wait_ready(self, timeout=10):
@@ -133,13 +213,16 @@ class Commander:
 
     def _limit(self, job):
         if job.role == "llm":
+            if self.settings.remote_llm_url:
+                return 1
             return self.settings.model(job.quality).slots
         return self.settings.asr_parallel if job.role == "asr" else self.settings.diar_parallel
 
     def _available(self, job):
-        if job.role in self._blocked or not self._loaded[job.role]:
+        remote = job.role == "llm" and self.settings.remote_llm_url
+        if job.role in self._blocked or (not remote and not self._loaded[job.role]):
             return False
-        if job.role == "llm" and (self._loaded["llm"] != job.quality or self._llm_fault):
+        if job.role == "llm" and not remote and (self._loaded["llm"] != self.settings.runtime_quality(job.quality) or self._llm_fault):
             return False
         return sum(j.role == job.role for j in self._active.values()) < self._limit(job)
 
@@ -153,7 +236,7 @@ class Commander:
                 job.future.set_result(value)
 
     def _failed(self, job, error):
-        fallback = self.settings.fallback(job.quality) if job.role == "llm" else None
+        fallback = self.settings.fallback(job.quality) if job.role == "llm" and not self.settings.remote_llm_url else None
         if isinstance(error, BackendFailure) and fallback and fallback not in job.attempted:
             job.attempted.append(job.quality)
             job.quality = fallback
@@ -170,17 +253,22 @@ class Commander:
             try:
                 value = future.result()
                 if job.role == "llm":
-                    fallback = job.quality != job.requested_quality
+                    remote = value.pop("remote_commander", {}) if self.settings.remote_llm_url else {}
+                    used = remote.get("used_quality", job.quality)
+                    requested = remote.get("requested_quality", job.requested_quality)
+                    fallback = remote.get("fallback_used", used != requested)
                     value = {**value, "commander": {
-                        "request_id": job.id, "requested_quality": job.requested_quality,
-                        "used_quality": job.quality, "fallback_used": fallback,
-                        "notice": ("Die angeforderte Verarbeitung ist fehlgeschlagen. Die Dokumentation wurde mit %s erstellt." % LABELS[job.quality]) if fallback else None,
+                        "request_id": job.id, "requested_quality": requested,
+                        "used_quality": used, "fallback_used": fallback,
+                        "notice": remote.get("notice") if remote else (("Die angeforderte Verarbeitung ist fehlgeschlagen. Die Dokumentation wurde mit %s erstellt." % LABELS[used]) if fallback else None),
                         "total_seconds": round(time.monotonic() - job.submitted_at, 4),
                         "initial_wait_seconds": round((job.started_at or time.monotonic()) - job.submitted_at, 4),
                     }}
                 self._complete(job, value=value)
+                if job.role == 'diar':
+                    self._awaiting_documentation = True
             except Exception as error:
-                if job.role == "llm":
+                if job.role == "llm" and not self.settings.remote_llm_url:
                     self._llm_fault = True
                 self._failed(job, error if isinstance(error, CommanderError) else BackendFailure())
             self._condition.notify_all()
@@ -197,6 +285,8 @@ class Commander:
                 self._complete(job, error=CommanderError())
                 continue
             if self._available(job):
+                if job.role in ('asr', 'llm'):
+                    self._awaiting_documentation = False
                 self._pending.remove(job)
                 self._active[job.id] = job
                 if job.started_at is None:
@@ -222,16 +312,17 @@ class Commander:
         with self._condition:
             loaded = dict(self._loaded)
             llm_fault = self._llm_fault
-        if force or (loaded["llm"] and (loaded["llm"] != desired["llm"] or llm_fault)):
+        local_llm = "llm" in self.settings.enabled_roles and not self.settings.remote_llm_url
+        if local_llm and (force or (loaded["llm"] and (loaded["llm"] != desired["llm"] or llm_fault))):
             self.runtime.stop_llm()
             self._publish("llm", None)
             loaded["llm"] = None
         for role in ("asr", "diar"):
-            if not desired[role] and (loaded[role] or force):
+            if role in self.settings.enabled_roles and not desired[role] and (loaded[role] or force):
                 self._worker_change(role, "park", False)
                 loaded[role] = False
         for role in ("asr", "diar"):
-            if desired[role] and (not loaded[role] or force):
+            if role in self.settings.enabled_roles and desired[role] and (not loaded[role] or force):
                 self._worker_change(role, "load", True)
                 loaded[role] = True
         if desired["llm"] and loaded["llm"] != desired["llm"]:
@@ -253,6 +344,7 @@ class Commander:
     def _changed(self, desired, selected, future):
         with self._condition:
             self._transition = False
+            self._change_target = None
             self._blocked.clear()
             try:
                 future.result()
@@ -260,6 +352,8 @@ class Commander:
                 if selected is not None or desired == self._baseline():
                     self._last_error = None
                 self._phase = "asr_ready" if self._loaded["asr"] else "processing"
+                if desired == self._baseline():
+                    self._ready_once.set()
             except Busy:
                 # Busy is not a failed load and must not lower the quality.
                 self._phase = "waiting_for_model"
@@ -280,8 +374,11 @@ class Commander:
         if self._transition or time.monotonic() < self._retry_at:
             return False
         force = self._uncertain
-        affected = {role for role in desired if self._loaded[role] != desired[role] or force}
-        if self._llm_fault:
+        managed = set(self.settings.enabled_roles)
+        if self.settings.remote_llm_url:
+            managed.discard("llm")
+        affected = {role for role in managed if self._loaded[role] != desired[role] or force}
+        if self._llm_fault and "llm" in managed:
             affected.add("llm")
         # Wait until running LLM work finishes before planning its removal.
         # Otherwise a waiting ASR job blocks the next already queued LLM job,
@@ -291,6 +388,10 @@ class Commander:
         if not affected:
             self._blocked.clear()
             self._planned = None
+            if force:
+                self._uncertain = False
+                self._phase = "asr_ready" if self._loaded["asr"] else "processing"
+                self._ready_once.set()
             return False
         self._blocked = affected
         if any(job.role in affected for job in self._active.values()):
@@ -301,6 +402,7 @@ class Commander:
             return True
         self._planned = None
         self._transition = True
+        self._change_target = dict(desired)
         self._phase = "preparing_model" if selected else "restoring_asr"
         future = self._changes.submit(self._perform_change, desired, force)
         future.add_done_callback(lambda result: self._changed(desired, selected, result))
@@ -345,19 +447,14 @@ class Commander:
                                     if not self._pending and not self._active and time.monotonic() >= self._baseline_retry_at:
                                         self._start_change(self._baseline())
                 self._condition.wait(.05)
-        # Shutdown owns only the LLM child. The original ASR/diar workers stay alive.
-        try:
-            self.runtime.stop_llm()
-            self.runtime.load_asr()
-            if self.settings.tier == 8:
-                self.runtime.park_diar()
-            else:
-                self.runtime.load_diar()
-        except Exception:
-            with self._condition:
-                self._last_error = "asr_restore_failed"
+        # Runtime.close stops only processes created by this Commander. Existing
+        # Linux worker objects are deliberately not changed during shutdown.
+        self.runtime.stop_llm()
 
     def close(self):
+        cancel_loading = getattr(self.runtime, 'cancel_loading', None)
+        if cancel_loading:
+            cancel_loading()
         with self._condition:
             self._closing = True
             self._condition.notify_all()

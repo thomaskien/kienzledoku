@@ -1,9 +1,12 @@
 [CmdletBinding()]
-param([string]$Config, [switch]$InPlace, [switch]$NoOpen, [string]$TargetDirectory)
+param([string]$Config, [switch]$InPlace, [switch]$NoOpen, [string]$TargetDirectory, [string]$WizardConfig)
 $ErrorActionPreference = 'Stop'
 $Destination = if ($TargetDirectory) { $TargetDirectory } else { Join-Path $env:LOCALAPPDATA 'Programs/kienzledoku record' }
 if ([IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\') -eq [IO.Path]::GetFullPath($Destination).TrimEnd('\')) { $InPlace = $true }
 $Data = Join-Path $env:LOCALAPPDATA 'kienzledoku record'
+. (Join-Path $PSScriptRoot 'ClientRuntime.ps1')
+# Check native requirements before replacing the installed client tree.
+Initialize-ClientRuntime $PSScriptRoot
 # Evergreen WebView2 runtime is independent from the application package.
 $RuntimeKey = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
 $RuntimeFound = @('HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients', 'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients', 'HKCU:\Software\Microsoft\EdgeUpdate\Clients') | ForEach-Object {
@@ -12,17 +15,23 @@ $RuntimeFound = @('HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients', 'HK
 if (!$RuntimeFound) {
     $Offline = Join-Path $PSScriptRoot 'MicrosoftEdgeWebView2RuntimeInstallerX64.exe'
     if (!(Test-Path $Offline)) {
-        throw 'Microsoft Edge WebView2 Runtime fehlt. Bitte von https://developer.microsoft.com/microsoft-edge/webview2 herunterladen und installieren (Evergreen x64), dann Installation erneut starten. Alternativ Offline-Installer neben install.ps1 ablegen.'
+        [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+        Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -UseBasicParsing -OutFile $Offline
     }
     $Signature = Get-AuthenticodeSignature $Offline
     if ($Signature.Status -ne 'Valid' -or $Signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw 'WebView2-Installer hat keine gueltige Microsoft-Signatur.' }
     $Process = Start-Process $Offline -ArgumentList '/silent /install' -Wait -PassThru
     if ($Process.ExitCode -notin @(0, 3010)) { throw 'WebView2-Installation fehlgeschlagen.' }
 }
-if (!$InPlace) {
-    New-Item -ItemType Directory -Force $Destination | Out-Null
-    Get-ChildItem $PSScriptRoot | Copy-Item -Destination $Destination -Recurse -Force
-}
+# Keep the update lock until payload, registrations and self-test agree.
+. (Join-Path $PSScriptRoot 'Update.ps1')
+$null=Assert-CodePath $Data
+New-Item -ItemType Directory -Force $Data | Out-Null
+$updateLease=[IO.File]::Open((Join-Path $Data 'update.lock'),[IO.FileMode]::OpenOrCreate,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
+$transaction=$null;$validated=$false
+try {
+ Assert-ClientClosed $Destination
+ if($InPlace){Assert-CodeInventory $Destination}else{$transaction=Start-CodeUpdate $PSScriptRoot $Destination 'kienzledoku.py'}
 $Python = Join-Path $Destination 'runtime/pythonw.exe'
 $Script = Join-Path $Destination 'kienzledoku.py'
 $DirectLauncher = Join-Path $Destination 'kienzledoku_launch.py'
@@ -54,6 +63,20 @@ $Shortcut.Arguments = '"' + $Script + '" --settings'
 $Shortcut.WorkingDirectory = $Destination
 $Shortcut.IconLocation = Join-Path $Destination 'assets/kienzledoku-record.ico'
 $Shortcut.Save()
+Assert-ClientVad $Destination
+& (Join-Path $Destination 'runtime/python.exe') $Script --self-test
+if ($LASTEXITCODE -ne 0) { throw 'Der neue Client hat seinen Selbsttest nicht bestanden.' }
+Assert-ClientClosed $Destination
+if($WizardConfig){
+    & (Join-Path $Destination 'runtime/python.exe') (Join-Path $Destination 'installer_client.py') --wizard-config $WizardConfig
+    if($LASTEXITCODE -ne 0){throw 'Clienteinstellungen konnten nicht gespeichert werden.'}
+}
+$validated=$true
+Complete-CodeUpdate $transaction
+} catch {
+ if(!$validated){Undo-CodeUpdate $transaction}
+ throw
+} finally {$updateLease.Dispose()}
 if (!$NoOpen) {
     Write-Host 'Bitte im Record-Fenster die Server eintragen und die Installation abschliessen.'
     $Setup = Start-Process $Python -ArgumentList ('"' + $Script + '" --setup') -Wait -PassThru
@@ -61,4 +84,4 @@ if (!$NoOpen) {
         throw 'Servereinrichtung wurde abgebrochen oder konnte nicht gestartet werden. Vorhandene Einstellungen bleiben erhalten. Bitte dieses Setup erneut ausfuehren.'
     }
 }
-Write-Host 'kienzledoku record 1.3.3 installiert. Einstellungen und Betriebsart bleiben bei Updates erhalten.'
+Write-Host 'kienzledoku record 1.7.6 installiert. Einstellungen und Betriebsart bleiben bei Updates erhalten.'

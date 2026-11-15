@@ -90,7 +90,7 @@ class ModelImport(unittest.TestCase):
 
     def test_archive_has_only_required_audio_assets_and_pinned_model_revisions(self):
         audio=json.loads((ROOT/'audio-files.json').read_text())
-        self.assertEqual({'9b-q4','9b-q6','27b-q4','gemma12-qat-q4','gemma12-q8','gemma26-qat-q4'},set(CATALOG))
+        self.assertEqual({'qwen4-q4','9b-q4','9b-q6','27b-q4','gemma12-qat-q4','gemma12-q8','gemma26-qat-q4'},set(CATALOG))
         for entry in audio:
             self.assertTrue(entry.get('sha256') or entry.get('git_blob_sha1'))
             self.assertGreater(entry['bytes'],0)
@@ -98,6 +98,7 @@ class ModelImport(unittest.TestCase):
         self.assertIn('whisper/large-v3.pt',{f['path'] for f in audio})
         self.assertIn('pyannote/embedding/pytorch_model.bin',{f['path'] for f in audio})
 
+@unittest.skipUnless(sys.platform == "linux", "Linux malloc_trim / CUDA checkpoint wrapper")
 class MappedWhisper(unittest.TestCase):
     def test_checkpoint_maps_to_cpu_and_loader_is_restored_after_transfer(self):
         calls=[];torch=types.ModuleType('torch')

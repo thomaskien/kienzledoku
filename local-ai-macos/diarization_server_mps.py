@@ -20,7 +20,7 @@ MODEL_DIR = os.environ.get("KIENZLEDOKU_PYANNOTE_MODEL", "")
 MODEL_ID = "pyannote/speaker-diarization-community-1"
 MODEL_REVISION = "3533c8cf8e369892e6b79ff1bf80f7b0286a54ee"
 MAX_BYTES = int(
-    os.environ.get("KIENZLEDOKU_DIARIZATION_MAX_BYTES", str(100 * 1024 * 1024))
+    os.environ.get("KIENZLEDOKU_DIARIZATION_MAX_BYTES", str(256 * 1024 * 1024))
 )
 
 RUNTIME: dict[str, object] = {}
@@ -209,9 +209,9 @@ class Handler(BaseHTTPRequestHandler):
             )
         except ValueError as exc:
             self.send_json(400, {"error": "invalid_request", "detail": str(exc)})
-        except Exception as exc:
-            print("Diarisierungsfehler: %r" % (exc,), flush=True)
-            self.send_json(500, {"error": "diarization_failed", "detail": str(exc)})
+        except Exception:
+            # Never expose backend exception text derived from patient audio.
+            self.send_json(500, {"error": "diarization_failed", "detail": "Technischer Diarisierungsfehler"})
 
 
 def self_test() -> None:
