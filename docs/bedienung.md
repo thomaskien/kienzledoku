@@ -37,7 +37,7 @@ dem Hintergrundpegel und unter leiser Sprache liegen; −60 dBFS ist empfindlich
 als −40 dBFS. VAD prüft zusätzlich auf Sprache. Die Stilleschwelle bleibt auch
 bei ausgeschaltetem VAD wirksam.
 
-![Stilleschwelle und Eingangspegel](images/pegel.jpg)
+![Stilleschwelle und Eingangspegel](images/pegel.png)
 
 Vorgabe bei Erstinstallation: VAD an, −50 dBFS. Änderungen gelten für die kommende
 Verarbeitung und werden für diesen Client gespeichert. Die Mikrofonlautstärke

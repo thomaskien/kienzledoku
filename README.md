@@ -80,7 +80,7 @@ Die Verarbeitungsschritte folgen weiterhin aufeinander.
 
 ## Pegel einstellen
 
-![Aufnahme-Einstellungen mit Stilleschwelle und Eingangspegel](docs/images/pegel.jpg)
+![Aufnahme-Einstellungen mit Stilleschwelle und Eingangspegel](docs/images/pegel.png)
 
 Bitte die **Stilleschwelle** so einstellen, dass auch leise Sprache erkannt wird.
 Eine zu empfindliche Einstellung kann Halluzinationen bei der Texterkennung

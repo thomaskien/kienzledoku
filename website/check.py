@@ -36,7 +36,7 @@ def main():
         elif target.fragment:assert target.fragment in page.ids,url
     assert not re.search(r'<iframe', (site/'index.html').read_text()), 'YouTube loaded before click'
     assert (site/'install_linux.sh').read_bytes()==(repo/'bootstrap/install_linux.sh').read_bytes()
-    for name in ['kienzledoku-record.jpg','ki-ablauf.svg','pegel.jpg']:
+    for name in ['kienzledoku-record.jpg','ki-ablauf.svg','pegel.png']:
         assert (site/'assets'/name).read_bytes()==(repo/'docs/images'/name).read_bytes()
     docs=[repo/'README.md',*(repo/'docs').glob('*.md'),*(repo/'docs/archiv').glob('*.md')]
     owned={'README.md','docs/installation.md','docs/t2med.md','docs/bedienung.md','docs/technik.md','docs/archiv/direktbetrieb.md','docs/archiv/readme-vor-2026-11-15.md'}

@@ -28,7 +28,7 @@ def main():
     shutil.copytree(baseline, output, dirs_exist_ok=True)
     shutil.copy2(source/'index.html', output/'index.html')
     shutil.copytree(source/'assets', output/'assets', dirs_exist_ok=True)
-    for name in ['kienzledoku-record.jpg','ki-ablauf.svg','pegel.jpg']:
+    for name in ['kienzledoku-record.jpg','ki-ablauf.svg','pegel.png']:
         shutil.copy2(repo/'docs/images'/name, output/'assets'/name)
     shutil.copy2(repo/'bootstrap/install_linux.sh', output/'install_linux.sh')
     gpu = (baseline/'grafikkarten.html').read_text()
