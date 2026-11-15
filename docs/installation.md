@@ -113,6 +113,20 @@ installierbares Paket.** Der Befehl weist darauf hin und installiert nichts.
 Die verwendeten Dateien stammen aus demselben Release; eine reine Windows-Ausgabe
 verändert die Auswahl des Linux-Pakets nicht.
 
+### Client mit einem kurzen Aufruf installieren
+
+Am Arbeitsplatz mit Desktop-Sitzung und Mikrofon als angemeldeter Benutzer ausführen:
+
+```bash
+wget -O install_linux.sh https://kienzledoku.de/install_linux.sh && \
+bash install_linux.sh --components client
+```
+
+Der Client benötigt die Adresse des vorhandenen KI-Servers und die T2med-Anbindung.
+Auch dieser Aufruf wartet auf ein freigegebenes Linux-Paket. Nicht als root starten.
+
+### Weitere Komponentenauswahl
+
 Ohne Komponentenvorgabe öffnet der Installer seine Auswahl:
 
 ```bash
