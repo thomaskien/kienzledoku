@@ -13,6 +13,27 @@ Wählen Sie **Client**, **Server** oder **beides**. Für den Client werden Mikro
 T2med-Verbindung und die Adresse des Commanders benötigt. Ein vorhandener
 KI-Server kann von mehreren Arbeitsplätzen im Praxisnetz verwendet werden.
 
+## Hugging-Face-Token einrichten
+
+Der KI-Server benötigt für den Download geschützter Modelle einen Hugging-Face-Zugang,
+insbesondere für die **Sprechertrennung mit pyannote Community-1**. Ein reiner Client
+an einem bereits eingerichteten Server benötigt dafür keinen eigenen Token.
+
+1. Bei [Hugging Face](https://huggingface.co/join) ein Konto erstellen oder anmelden.
+2. Die [Modellseite von pyannote Community-1](https://huggingface.co/pyannote/speaker-diarization-community-1) öffnen, die angezeigten Bedingungen lesen und akzeptieren. Die abgefragten Angaben ausfüllen und die Zugriffsfreigabe abwarten. **Token und Modellfreigabe müssen zum selben Konto gehören.**
+3. Unter [Settings → Access Tokens](https://huggingface.co/settings/tokens) auf **New token** klicken. Als Namen beispielsweise `KienzleDoku` und als Typ **Read** wählen. Schreibrechte sind für den Download nicht erforderlich. Alternativ ist ein **Fine-grained**-Token mit Lesezugriff auf die benötigten, freigeschalteten Modell-Repositories möglich. [Token-Typen bei Hugging Face](https://huggingface.co/docs/hub/security-tokens).
+4. Den erzeugten Token kopieren; er beginnt mit `hf_`. Im grafischen Installer unter **Sprache → Hugging-Face-Token** einfügen und die Installation fortsetzen. Der Linux-Installer fragt nach dem **Hugging-Face-Read-Token**: Die Eingabe bleibt unsichtbar, auch beim Einfügen; anschließend Enter drücken.
+
+**Falls der Download scheitert:** Modellseite mit demselben Konto öffnen und prüfen,
+ob der Zugriff freigegeben ist. Danach Token, Leserechte und vollständiges Einfügen
+prüfen. Ein Token allein ersetzt die Modellfreigabe nicht. Bei weiteren geschützten
+Modellen gelten die Bedingungen auf deren jeweiliger Modellseite.
+[Hilfe zu Modellfreigaben](https://huggingface.co/docs/hub/models-gated).
+
+Den Token wie ein Passwort behandeln und nicht in Screenshots oder Fehlermeldungen
+veröffentlichen. Vorhandene Tokens können bei Updates wiederverwendet werden.
+Die Modellverarbeitung läuft nach dem Download auf der eigenen Hardware.
+
 ## Windows
 
 **Client:** Windows 10/11 x64 und ein Mikrofon. Python und Audio-Laufzeit sind im
@@ -107,7 +128,7 @@ Adresse, normalerweise `http://SERVER:8185` – keine einzelnen KI-Dienstadresse
 
 Internet wird für benötigte Komponenten und Modelle gebraucht. Geschützte
 Hugging-Face-Modelle erfordern die Annahme der Modellbedingungen und ein
-Lesetoken. Vorhandene Tokens und Konfigurationswerte werden bei Updates als
+Lesetoken: [Hugging-Face-Token Schritt für Schritt einrichten](#hugging-face-token-einrichten). Vorhandene Tokens und Konfigurationswerte werden bei Updates als
 Vorgaben übernommen; Tokenwerte nicht in Screenshots oder Protokollen weitergeben.
 
 [Benchmarks und Modelle](https://kienzledoku.de/benchmarks.html)

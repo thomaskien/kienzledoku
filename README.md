@@ -15,6 +15,8 @@ Freigabe hier bereitgestellt. **Aktuell sind noch keine gemeinsamen Installer
 als GitHub-Release veröffentlicht.** Diese Anleitung und die Videos beschreiben
 den neuen Installerstand; der bisherige Quellcode auf `main` ist noch älter.
 
+**Vor der Serverinstallation:** [Hugging-Face-Token einrichten](docs/installation.md#hugging-face-token-einrichten) – Konto, Modellfreigabe, Lesetoken und Eingabe im Installer.
+
 | Betriebssystem | Download und Anleitung | Installationsvideo |
 | --- | --- | --- |
 | Windows x64 | [Windows installieren](docs/installation.md#windows) | [Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
