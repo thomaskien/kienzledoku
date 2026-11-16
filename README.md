@@ -10,17 +10,19 @@ bearbeiten den Entwurf und übernehmen ihn anschließend bewusst in die Patiente
 
 ## Download und Installation
 
-Der Quellstand **1.8.1** enthält die Auditkorrekturen und die [Vorbereitung für Kienzlebench](docs/commander-benchmark-api.md). Die zuletzt veröffentlichte Installer-Version **1.7.6 für Windows, macOS und Linux** ist
-[als GitHub-Release verfügbar](https://github.com/thomaskien/kienzledoku/releases/tag/v1.7.6).
-Der zugehörige Quellcode ist unter demselben Tag veröffentlicht.
+**KienzleDoku 1.8.1 für Windows, macOS und Linux** ist
+[als GitHub-Release verfügbar](https://github.com/thomaskien/kienzledoku/releases/tag/v1.8.1).
+Der zugehörige Quellcode ist unter demselben Tag veröffentlicht. Enthalten sind
+Auditkorrekturen, verteilte Sprechertrennung, Temperaturanzeigen und die
+[Vorbereitung für Kienzlebench](docs/commander-benchmark-api.md).
 
 **Vor der Serverinstallation:** [Hugging-Face-Token einrichten](docs/installation.md#hugging-face-token-einrichten) – Konto, Modellfreigabe, Lesetoken und Eingabe im Installer.
 
 | Betriebssystem | Download und Anleitung | Installationsvideo |
 | --- | --- | --- |
-| Windows x64 | [Installer 1.7.6](https://github.com/thomaskien/kienzledoku/releases/download/v1.7.6/kienzledoku-1.7.6-windows-x64-setup.exe) · [Anleitung](docs/installation.md#windows) | [Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
-| macOS / Apple Silicon | [Installer 1.7.6](https://github.com/thomaskien/kienzledoku/releases/download/v1.7.6/kienzledoku-1.7.6-macOS-arm64.dmg) · [Anleitung](docs/installation.md#macos) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
-| Ubuntu 24.04 / x86_64 | [Archiv 1.7.6](https://github.com/thomaskien/kienzledoku/releases/download/v1.7.6/kienzledoku-1.7.6-linux-x86_64.tar.gz) · [Anleitung](docs/installation.md#linux) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
+| Windows x64 | [Installer 1.8.1](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.1/kienzledoku-1.8.1-windows-x64-setup.exe) · [Anleitung](docs/installation.md#windows) | [Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
+| macOS / Apple Silicon | [Installer 1.8.1](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.1/kienzledoku-1.8.1-macOS-arm64.dmg) · [Anleitung](docs/installation.md#macos) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
+| Ubuntu 24.04 / x86_64 | [Archiv 1.8.1](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.1/kienzledoku-1.8.1-linux-x86_64.tar.gz) · [Anleitung](docs/installation.md#linux) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
 
 [Veröffentlichte Pakete auf GitHub](https://github.com/thomaskien/kienzledoku/releases)
 · [Homepage](https://kienzledoku.de/)
@@ -56,7 +58,8 @@ prüft und entpackt es und startet den enthaltenen Installer. Bei fehlendem Pake
 
 Modellgröße, Grafikspeicher und Arbeitsspeicher bestimmen, welche Modelle passen
 und wie schnell sie arbeiten. Mit passenden Modellen und seriellem Modellwechsel
-ist der NVIDIA-Serverbetrieb ab **8 GB Grafikspeicher** vorgesehen; Apple Silicon
+ist der NVIDIA-Serverbetrieb mit den 4-GB-Modellen und Whisper Turbo ab
+**4 GB Grafikspeicher** vorgesehen; Apple Silicon
 verwendet gemeinsamen Arbeitsspeicher. Die Benchmarks vergleichen Qualität,
 Laufzeiten und Speicherbedarf und kennzeichnen Messwerte und Schätzungen.
 
@@ -94,7 +97,7 @@ wirkt auch ohne VAD. Einstellungen werden für diesen Client gespeichert.
 
 ## T2med einrichten und verwenden
 
-Diese Anleitung gehört zum gemeinsamen Installerstand 1.8.1; die neuen Pakete werden separat freigegeben.
+Diese Anleitung gehört zum gemeinsamen Installerstand **1.8.1**.
 Die älteren Quellcode-Installer sind separat im
 [Archiv](docs/archiv/direktbetrieb.md) beschrieben.
 

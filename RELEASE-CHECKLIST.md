@@ -18,7 +18,7 @@ werden.
   Ausnahme: die ausdrücklich öffentlichen localhost-Zertifikate unter `tests/fixtures`.
 - [ ] Screenshots nochmals auf Patienten-, Praxis- und Zugangsdaten prüfen.
 - [ ] Prüfen, dass alle Versionsangaben in Python, Installer, nativem Fenster
-  und Dokumentation auf `1.8` stehen; historische Angaben bleiben erhalten.
+  und Dokumentation auf `1.8.1` stehen; historische Angaben bleiben erhalten.
 - [ ] Netzwerkfreie Tests ausführen.
 - [ ] Modellfreien Selbsttest des Local-AI-Installers ausführen.
 - [ ] Statischen Selbsttest des Ubuntu/NVIDIA-Installers ausführen.
@@ -110,11 +110,11 @@ reale Tokens dürfen nicht enthalten sein.
 
 ## Empfohlene Release-Angaben
 
-- Tag: `v1.8` (nach Abnahme)
-- Titel: `KienzleDoku 1.8`
-- Plattform: kienzledoku record für Windows x64, Ubuntu 24.04 x86_64 sowie macOS auf Intel
-  und Apple Silicon; Local AI für Apple Silicon mit mindestens 32 GB Unified
-  Memory; Serverdienste für Ubuntu 24.04 x86_64 mit NVIDIA/CUDA
-- Status: Entwicklungs- und Integrationsstand
+- Tag: `v1.8.1`
+- Titel: `KienzleDoku 1.8.1`
+- Pakete: Windows x64, Ubuntu 24.04 x86_64 und macOS Apple Silicon.
+  Hardwareanforderungen und Modellprofile stehen in `docs/installation.md`.
+- Status: freigegebene Veröffentlichung; Einschränkungen der jeweiligen
+  Plattformprüfung im Prüfnachweis festhalten.
 - Verweis auf `CHANGELOG.md`, `SECURITY.md` und die Sicherheitsgrenzen der
   README
