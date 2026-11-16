@@ -19,7 +19,7 @@ from urllib.parse import urlsplit
 HOST = os.environ.get("KIENZLEDOKU_ASR_HOST", "127.0.0.1")
 PORT = int(os.environ.get("KIENZLEDOKU_ASR_PORT", "8179"))
 MODEL_DIR = os.environ.get("KIENZLEDOKU_WHISPER_MODEL", "")
-MODEL_ID = "mlx-community/whisper-large-v3-mlx"
+MODEL_ID = "mlx-community/whisper-large-v3-turbo-8bit" if "turbo" in MODEL_DIR else "mlx-community/whisper-large-v3-mlx"
 MAX_BYTES = int(os.environ.get("KIENZLEDOKU_ASR_MAX_BYTES", str(256 * 1024 * 1024)))
 
 RUNTIME: dict[str, object] = {}
@@ -112,7 +112,7 @@ def normalize_result(result: dict, processing_seconds: float, duration: float) -
         "processing_seconds": processing_seconds,
         "rtf": (processing_seconds / duration) if duration > 0 else None,
         "duration": duration,
-        "decoder": "mlx-whisper-large-v3",
+        "decoder": "mlx-whisper-turbo-8bit" if "turbo" in MODEL_DIR else "mlx-whisper-large-v3",
         "model": MODEL_ID,
         "device": "metal",
     }
@@ -181,7 +181,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/v1/models":
             self.send_json(
                 200,
-                {"object": "list", "data": [{"id": "whisper-large-v3", "object": "model"}]},
+                {"object": "list", "data": [{"id": MODEL_ID, "object": "model"}]},
             )
         else:
             self.send_json(404, {"error": "not_found"})

@@ -7,14 +7,10 @@ from .errors import Busy, CommanderError, InvalidRequest
 SESSION_HEADER = 'X-Kienzledoku-Benchmark-Session'
 
 
-class BenchmarkAuthenticationRequired(CommanderError):
-    code, status, message = 'benchmark_auth_required', 403, 'Benchmarksteuerung benötigt aktivierten Commander-Token-Schutz.'
-
-
 def context(commander):
     cfg=commander.settings
-    return dict(source='local_commander', roles=[r for r in cfg.enabled_roles if r!='llm' or not cfg.remote_llm_url],
-                remote_llm_url=cfg.remote_llm_url or None, gpu_index=cfg.gpu_index,
+    return dict(source='local_commander', roles=[r for r in cfg.enabled_roles if (r!='llm' or not cfg.remote_llm_url) and (r!='diar' or not cfg.remote_diar_url)],
+                remote_llm_url=cfg.remote_llm_url or None, remote_diar_url=cfg.remote_diar_url or None, gpu_index=cfg.gpu_index,
                 commander_version=VERSION)
 
 
@@ -22,8 +18,8 @@ def capabilities(commander):
     cfg=commander.settings
     return dict(schema_version=1, commander_version=VERSION, api_version='1.8',
         hardware_inventory=True, current_temperatures=True, temperature_history=False,
-        benchmark_control=cfg.auth_enabled, benchmark_unavailable_reason=None if cfg.auth_enabled else 'authentication_required',
-        benchmark_authentication='configured_commander_bearer_token',
+        benchmark_control=True, benchmark_unavailable_reason=None,
+        benchmark_authentication='configured_commander_bearer_token' if cfg.auth_enabled else 'none',
         benchmark_roles=[r for r in cfg.enabled_roles if r=='asr' or (r=='llm' and not cfg.remote_llm_url)],
         benchmark_modes=['serial','parallel'], parallel_requires_approved_model_profile=True,
         raw_prompt=True, streaming=False, ttft=False, verified_cold_filesystem_cache=False,
@@ -77,20 +73,27 @@ def dispatch(handler, path, post):
             elif path.endswith('/inventory'):value=dict(schema_version=1,models=inventory(cfg,cmd.status()['loaded']['llm']))
             else:value=capabilities(cmd)
             value['context']=context(cmd)
-            if cfg.remote_llm_url:
-                # Separate origin; bounded query, never redirect a hardware request to a user-supplied URL.
-                try:
-                    remote=cmd.runtime._http(cfg.remote_llm_url.rstrip('/')+path,timeout=10,
-                        token=__import__('os').environ.get(cfg.remote_llm_token_env),
-                        extra_headers={'X-Kienzledoku-Commander-Hop':'1'})
-                    value['remote_llm']=dict(source=cfg.remote_llm_url,data=remote,status='available')
-                except CommanderError:
-                    value['remote_llm']=dict(source=cfg.remote_llm_url,data=None,status='unavailable',reason='remote_query_failed')
+            if not handler.headers.get('X-Kienzledoku-Commander-Hop'):
+                fetched = {}
+                for role in ('llm', 'diar'):
+                    target = getattr(cfg, 'remote_'+role+'_url')
+                    if not target or role not in cfg.enabled_roles:
+                        continue
+                    # One query per configured target, using only its own configured token.
+                    key = target.rstrip('/').lower()
+                    if key not in fetched:
+                        try:
+                            remote = cmd.runtime._http(target.rstrip('/')+path,timeout=cfg.metadata_timeout,
+                                token=__import__('os').environ.get(getattr(cfg,'remote_'+role+'_token_env')),
+                                extra_headers={'X-Kienzledoku-Commander-Hop':'1'})
+                            fetched[key] = dict(source=target,data=remote,status='available')
+                        except CommanderError:
+                            fetched[key] = dict(source=target,data=None,status='unavailable',reason='remote_query_failed')
+                    value['remote_'+role] = fetched[key]
             return True,value
         finally:server.hardware_slots.release()
     if not path.startswith('/v1/benchmark/'):return False,None
-    # Normal token-free LAN operation is unchanged. Exclusive control is explicit and authenticated.
-    if not cfg.auth_enabled or not server.token:raise BenchmarkAuthenticationRequired()
+    # Authentication is handled uniformly by Handler._auth; token protection is optional.
     session=handler.headers.get(SESSION_HEADER)
     if not post and path=='/v1/benchmark/session':return True,cmd.benchmark_status(session)
     if not post and path.startswith('/v1/benchmark/jobs/'):

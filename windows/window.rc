@@ -1,8 +1,8 @@
 #include <windows.h>
 1 ICON "../assets/kienzledoku-record.ico"
 1 VERSIONINFO
- FILEVERSION 1,8,0,0
- PRODUCTVERSION 1,8,0,0
+ FILEVERSION 1,8,1,0
+ PRODUCTVERSION 1,8,1,0
  FILETYPE VFT_APP
 BEGIN
  BLOCK "StringFileInfo"
@@ -11,8 +11,8 @@ BEGIN
   BEGIN
    VALUE "FileDescription", "kienzledoku record"
    VALUE "ProductName", "kienzledoku record"
-   VALUE "FileVersion", "1.8"
-   VALUE "ProductVersion", "1.8"
+   VALUE "FileVersion", "1.8.1"
+   VALUE "ProductVersion", "1.8.1"
   END
  END
  BLOCK "VarFileInfo"

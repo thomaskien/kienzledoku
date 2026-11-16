@@ -2,7 +2,7 @@
 #import <WebKit/WebKit.h>
 #import "KienzledokuMenus.h"
 
-static NSString *const KienzledokuInstallerVersion = @"1.8";
+static NSString *const KienzledokuInstallerVersion = @"1.8.1";
 
 @interface KienzledokuInstallerDelegate : NSObject
     <NSApplicationDelegate, NSWindowDelegate, WKNavigationDelegate, WKScriptMessageHandler>

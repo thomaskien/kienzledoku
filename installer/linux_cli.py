@@ -17,7 +17,7 @@ import kienzledoku_config as client_config
 from kienzledoku_document import DOCUMENT_LABELS
 from kienzledoku_product_key import production_build
 from installer.linux_uninstall import Uninstaller
-VERSION='1.8'
+VERSION='1.8.1'
 GRADES=('basis','gruendlich','sehr_gruendlich')
 GRADE_LABELS={'basis':'Basis','gruendlich':'Gründlich','sehr_gruendlich':'Sehr gründlich'}
 DIARIZATION_MODES={'resident':'Immer geladen','with_asr':'Zusammen mit Whisper','serial':'Seriell – nach Whisper, vor dem LLM'}
@@ -51,7 +51,7 @@ def previous_server_tokens():
     tokens={}
     for line in read_server_file(SERVER_TOKENS).splitlines():
         key,separator,value=line.partition('=')
-        if separator and key in ('KIENZLEDOKU_COMMANDER_TOKEN','KIENZLEDOKU_REMOTE_LLM_TOKEN'):
+        if separator and key in ('KIENZLEDOKU_COMMANDER_TOKEN','KIENZLEDOKU_REMOTE_LLM_TOKEN','KIENZLEDOKU_REMOTE_DIAR_TOKEN'):
             if len(value)>4096 or any(c.isspace() for c in value):
                 raise ValueError('Vorhandene Token-Datei enthält eine ungültige Einstellung.')
             tokens[key]=value
@@ -134,38 +134,43 @@ def prompt_edit(value):
 def server_answers():
     previous=previous_server_settings()
     catalog=json.loads((ROOT/'server-windows/models.json').read_text())
-    print('\nLokaler Server: NVIDIA RTX 20 oder neuer, mindestens 8 GiB VRAM.')
+    print('\nLokaler Server: NVIDIA Turing (GTX 16 / RTX 20) oder neuer, ab 4 GB VRAM.')
+    role=ask('Serverdienste: full / asr / llm / llm_diar / diar',previous.get('ServerRole','full'))
+    if role not in ('full','asr','llm','llm_diar','diar'): raise ValueError('Ungültige Serverrolle.')
+    print('Commander-Adressen beispielsweise http://10.0.83.140:8185')
     rows=subprocess.check_output(['nvidia-smi','--query-gpu=index,name,memory.total','--format=csv,noheader,nounits'],text=True).strip().splitlines()
     print('\n'.join(rows))
     indices=[int(row.split(',')[0]) for row in rows]
     saved_gpu=previous.get('GpuIndex')
     gpu=int(ask('GPU-Index',saved_gpu if saved_gpu in indices else indices[0]))
     vram=int(next(row.rsplit(',',1)[1] for row in rows if int(row.split(',')[0])==gpu))
-    eligible={k:v for k,v in catalog.items() if v['serial_vram_mib']<=vram}
-    if not eligible: raise ValueError('Kein freigegebenes Modell für diese GPU.')
-    for key,m in eligible.items(): print(key+' — '+m['label']+' ('+GRADE_LABELS[m['grade']]+')')
-    previous_models=previous.get('Models')
-    selected_default=','.join(k for k in (previous_models if previous_models else DEFAULTS.values()) if k in eligible)
-    if not selected_default:selected_default=','.join(k for k in DEFAULTS.values() if k in eligible)
-    while True:
-        selected=[k.strip() for k in ask('Zu installierende Modelle, durch Komma getrennt',selected_default).split(',')]
-        if selected and len(set(selected))==len(selected) and all(k in eligible for k in selected): break
-        print('Bitte eindeutige Modell-IDs aus der Liste wählen.')
-    print('\nModelle den Verarbeitungsstufen zuordnen:')
-    print('Enter übernimmt das angezeigte Modell. Weitere installierte Modelle bleiben zum späteren Umschalten verfügbar.')
-    mapping={}
-    for grade in GRADES:
-        label=GRADE_LABELS[grade]
-        options=[k for k in selected if catalog[k]['grade']==grade]
-        if not options:
-            print(label+': nicht verfügbar — kein Modell dieser Stufe ausgewählt.')
-            continue
-        for key in options:print('  '+label+': '+key+' — '+catalog[key]['label'])
+    selected=[];mapping={}
+    if role in ('full','llm','llm_diar'):
+        eligible={k:v for k,v in catalog.items() if v['serial_vram_mib']<=vram}
+        if not eligible: raise ValueError('Kein freigegebenes Modell für diese GPU.')
+        for key,m in eligible.items(): print(key+' — '+m['label']+' ('+GRADE_LABELS[m['grade']]+')')
+        previous_models=previous.get('Models')
+        selected_default=','.join(k for k in (previous_models if previous_models else DEFAULTS.values()) if k in eligible)
+        if not selected_default:selected_default=','.join(k for k in DEFAULTS.values() if k in eligible)
         while True:
-            saved=previous.get('QualityModels',{}).get(grade,DEFAULTS[grade])
-            chosen=ask(label+' — aktives Modell ('+', '.join(options)+')',saved if saved in options else options[0])
-            if chosen in options: mapping[grade]=chosen;break
-            print('Bitte eine der oben für '+label+' angezeigten Modell-IDs wählen.')
+            selected=[k.strip() for k in ask('Zu installierende Modelle, durch Komma getrennt',selected_default).split(',')]
+            if selected and len(set(selected))==len(selected) and all(k in eligible for k in selected): break
+            print('Bitte eindeutige Modell-IDs aus der Liste wählen.')
+        print('\nModelle den Verarbeitungsstufen zuordnen:')
+        print('Enter übernimmt das angezeigte Modell. Weitere installierte Modelle bleiben zum späteren Umschalten verfügbar.')
+        mapping={}
+        for grade in GRADES:
+            label=GRADE_LABELS[grade]
+            options=[k for k in selected if catalog[k]['grade']==grade]
+            if not options:
+                print(label+': nicht verfügbar — kein Modell dieser Stufe ausgewählt.')
+                continue
+            for key in options:print('  '+label+': '+key+' — '+catalog[key]['label'])
+            while True:
+                saved=previous.get('QualityModels',{}).get(grade,DEFAULTS[grade])
+                chosen=ask(label+' — aktives Modell ('+', '.join(options)+')',saved if saved in options else options[0])
+                if chosen in options: mapping[grade]=chosen;break
+                print('Bitte eine der oben für '+label+' angezeigten Modell-IDs wählen.')
     parallel,on_demand=operating_answers(catalog,selected,vram,previous)
     old_fields=previous.get('EnabledFields',('anamnese','befund','therapie','prozedere'))
     fields=[f for f in FIELDS if yes('Feld '+DOCUMENT_LABELS[f]+' verwenden?',f in old_fields)]
@@ -179,6 +184,8 @@ def server_answers():
         diarization_mode=ask('Sprechertrennung: resident / with_asr / serial',old_diar if old_diar in DIARIZATION_MODES else 'serial')
         if diarization_mode in DIARIZATION_MODES: break
         print('Bitte resident, with_asr oder serial wählen.')
+    asr_model=ask('Whisper-Modell: large-v3 / turbo-int8',previous.get('AsrModel','turbo-int8' if vram<7936 else 'large-v3'))
+    if asr_model not in ('large-v3','turbo-int8'): raise ValueError('Ungültiges Whisper-Modell.')
     prompt=prompt_edit(previous.get('PromptText') or (ROOT/'prompt_documentation.txt').read_text())
     remote=ask('Anderer Commander für LLM (optional; - = entfernen)',previous.get('RemoteLlmUrl',''))
     if remote=='-':remote=''
@@ -186,12 +193,20 @@ def server_answers():
         from urllib.parse import urlsplit
         u=urlsplit(remote)
         if u.scheme not in ('http','https') or not u.hostname or not u.port or u.username or u.path not in ('','/') or u.query or u.fragment: raise ValueError('Ungültige LLM-Commander-Adresse.')
+    remote_diar=ask('Anderer Commander für Sprechertrennung (optional; - = entfernen)',previous.get('RemoteDiarUrl',''))
+    if remote_diar=='-':remote_diar=''
+    if remote_diar:
+        from urllib.parse import urlsplit
+        u=urlsplit(remote_diar)
+        if u.scheme not in ('http','https') or not u.hostname or not u.port or u.username or u.password or u.path not in ('','/') or u.query or u.fragment: raise ValueError('Ungültige Diarisierungs-Commander-Adresse.')
     auth=yes('Commander-Zugang mit Token schützen?',previous.get('AuthEnabled',False))
-    old_tokens=previous_server_tokens() if auth or remote else {}
+    old_tokens=previous_server_tokens() if auth or remote or remote_diar else {}
     token=token_answer('Commander-Token',old_tokens.get('KIENZLEDOKU_COMMANDER_TOKEN','')) if auth else ''
     old_remote=old_tokens.get('KIENZLEDOKU_REMOTE_LLM_TOKEN','') if remote==previous.get('RemoteLlmUrl') else ''
     remote_token=token_answer('LLM-Commander-Token',old_remote,optional=True) if remote else ''
-    for secret in (token,remote_token):
+    old_diar_token=old_tokens.get('KIENZLEDOKU_REMOTE_DIAR_TOKEN','') if remote_diar==previous.get('RemoteDiarUrl') else ''
+    remote_diar_token=token_answer('Diarisierungs-Commander-Token',old_diar_token,optional=True) if remote_diar else ''
+    for secret in (token,remote_token,remote_diar_token):
         if len(secret)>4096 or any(c.isspace() for c in secret): raise ValueError('Token darf keine Leerzeichen enthalten.')
     hf=os.environ.get('HF_TOKEN','')
     if not hf:
@@ -202,15 +217,16 @@ def server_answers():
         if yes('Vorhandenen Hugging-Face-Token verwenden?',True): pass
         else: hf=getpass.getpass('Hugging-Face-Read-Token (unsichtbar): ')
     else: hf=getpass.getpass('Hugging-Face-Read-Token (Whisper/pyannote, unsichtbar): ')
-    if not hf: raise ValueError('Hugging-Face-Token fehlt.')
+    # Cached models or ungated ASR/LLM downloads do not require a token.
+
     memory=os.sysconf('SC_PAGE_SIZE')*os.sysconf('SC_PHYS_PAGES')
     budget=max((n for n in (16,24,28,32) if memory/1024**3>=n+1),default=0)
     if not budget: raise ValueError('Für diesen Server mindestens 20 GiB Arbeitsspeicher einplanen.')
     if previous.get('WslRamGiB') in (16,24,28,32) and previous['WslRamGiB']<=budget:
         budget=previous['WslRamGiB']
     default_model=previous.get('DefaultModel')
-    if default_model not in mapping.values():default_model=next(iter(mapping.values()))
-    cfg=dict(Version=VERSION,Models=selected,DefaultModel=default_model,QualityModels=mapping,
+    if default_model not in mapping.values():default_model=next(iter(mapping.values()),'')
+    cfg=dict(Version=VERSION,ServerRole=role,AsrModel=asr_model,RemoteDiarUrl=remote_diar,Models=selected,DefaultModel=default_model,QualityModels=mapping,
         Profiles={k:dict(Mode='parallel' if k==parallel else 'serial') for k in selected},ParallelModel=parallel,AudioCache=previous.get('AudioCache','ram'),WslRamGiB=budget,
         GpuIndex=gpu,EnabledFields=fields,PromptText=prompt,AuthEnabled=auth,AsrOnDemand=on_demand,DiarizationMode=diarization_mode,RemoteLlmUrl=remote,
         VerifyModelFiles=previous.get('VerifyModelFiles',True),ForceModelVerification=False)
@@ -221,7 +237,7 @@ def server_answers():
     print('Whisper: '+('erst bei Bedarf laden' if on_demand else 'beim Dienststart laden'))
     print('Sprechertrennung: '+DIARIZATION_MODES[diarization_mode])
     for grade,key in mapping.items():print(GRADE_LABELS[grade]+': '+catalog[key]['label'])
-    return cfg,hf,token,remote_token
+    return cfg,hf,token,remote_token,remote_diar_token
 
 def configure_client(local,token):
     cfg=client_config.load()
@@ -230,7 +246,7 @@ def configure_client(local,token):
     cfg['connection']['ca_file']=ask('CA-Zertifikat, optional',cfg['connection']['ca_file'])
     cfg['connection']['allow_insecure_tls']=yes('Lokales T2med-Zertifikat ohne Prüfung akzeptieren?',cfg['connection']['allow_insecure_tls'])
     cfg['commander']['enabled']=True
-    cfg['commander']['url']='http://127.0.0.1:8185' if local else ask('Commander-Adresse',cfg['commander']['url'])
+    cfg['commander']['url']='http://127.0.0.1:8185' if local else ask('Commander-Adresse (z. B. http://10.0.83.140:8185)',cfg['commander']['url'])
     if not local:
         print('Ein leerer Token lässt einen vorhandenen privaten Token unverändert.')
         token=getpass.getpass('Commander-Token (optional, unsichtbar): ')
@@ -246,7 +262,7 @@ def self_test():
     subprocess.run(['bash','-n',str(ROOT/'linux/install_client.sh')],check=True)
     profile=(ROOT/'linux/kienzledoku.apparmor').read_text()
     assert 'userns,' in profile and 'apparmor_restrict_unprivileged_userns=0' not in profile
-    print('SELF-TEST OK — kienzledoku 1.8 Linux, ohne Systemänderungen')
+    print('SELF-TEST OK — kienzledoku 1.8.1 Linux, ohne Systemänderungen')
 
 def uninstall(choice,remove_models,remove_settings):
     options=Uninstaller.options(choice,remove_models,remove_settings)
@@ -262,7 +278,7 @@ def uninstall(choice,remove_models,remove_settings):
     if server:
         if os.geteuid()==0: local.execute(Uninstaller.options('server',remove_models,remove_settings))
         else: subprocess.run(['sudo',*helper],check=True)
-    print('\nKienzledoku 1.8 deinstalliert. Modelle: '+
+    print('\nKienzledoku 1.8.1 deinstalliert. Modelle: '+
           ('entfernt' if remove_models else 'beibehalten')+'; Einstellungen: '+
           ('entfernt.' if remove_settings else 'beibehalten.'))
 
@@ -307,16 +323,16 @@ def main():
               '; Einstellungen: '+('entfernen' if remove_settings else 'behalten')+'.')
         if not yes('Auswahl jetzt deinstallieren?',False): return
         uninstall(choice,remove_models,remove_settings);return
-    cfg=hf=token=remote_token=None
-    if server: cfg,hf,token,remote_token=server_answers()
+    cfg=hf=token=remote_token=remote_diar_token=None
+    if server: cfg,hf,token,remote_token,remote_diar_token=server_answers()
     if client: client_cfg,client_token=configure_client(server,token or '')
     if not yes('Auswahl jetzt installieren?',True): return
     if server:
         with tempfile.TemporaryDirectory(prefix='kienzledoku-install-') as temp:
             td=Path(temp);private_write(td/'config.json',json.dumps(cfg));private_write(td/'hf.token',hf)
-            private_write(td/'commander.token',token);private_write(td/'remote.token',remote_token)
+            private_write(td/'commander.token',token);private_write(td/'remote.token',remote_token);private_write(td/'remote-diar.token',remote_diar_token)
             privilege=[] if os.geteuid()==0 else ['sudo']
-            subprocess.run([*privilege,sys.executable,str(ROOT/'installer/linux_server.py'),'--source',str(ROOT),'--config',str(td/'config.json'),'--hf-token-file',str(td/'hf.token'),'--token-file',str(td/'commander.token'),'--remote-token-file',str(td/'remote.token')],check=True)
+            subprocess.run([*privilege,sys.executable,str(ROOT/'installer/linux_server.py'),'--source',str(ROOT),'--config',str(td/'config.json'),'--hf-token-file',str(td/'hf.token'),'--token-file',str(td/'commander.token'),'--remote-token-file',str(td/'remote.token'),'--remote-diar-token-file',str(td/'remote-diar.token')],check=True)
             # Generated tokens are read through sudo, never passed on the command line.
             if cfg['AuthEnabled'] and not token:
                 client_token=subprocess.check_output([*privilege,sys.executable,'-c',"from pathlib import Path;print(Path('/etc/kienzledoku-server/token.env').read_text().splitlines()[0].split('=',1)[1])"],text=True).strip()
@@ -338,7 +354,7 @@ def main():
         print(scheme+'://record?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}')
         print('\nAusführliche Anleitung: '+DOCS)
     private_write(client_config.config_dir()/'installer.json',json.dumps({'components':choice}))
-    print('\nkienzledoku 1.8 installiert.')
+    print('\nkienzledoku 1.8.1 installiert.')
 if __name__=='__main__':
     try: main()
     except ValueError as exc:

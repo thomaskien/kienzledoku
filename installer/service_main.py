@@ -17,7 +17,7 @@ def main():
         if info.st_mode & 0o077 or info.st_uid!=os.getuid():
             raise ValueError('Commander-Zugangsspeicher muss dem Benutzer gehören und privat sein.')
         for key,value in json.loads(credentials.read_text()).items():
-            if key not in ('KIENZLEDOKU_COMMANDER_TOKEN','KIENZLEDOKU_REMOTE_LLM_TOKEN') or not isinstance(value,str) or any(c.isspace() for c in value):
+            if key not in ('KIENZLEDOKU_COMMANDER_TOKEN','KIENZLEDOKU_REMOTE_LLM_TOKEN','KIENZLEDOKU_REMOTE_DIAR_TOKEN') or not isinstance(value,str) or any(c.isspace() for c in value):
                 raise ValueError('Ungültiger Commander-Zugangsspeicher.')
             # Explicit installer environment takes priority during candidate checks.
             if check: os.environ.setdefault(key,value)

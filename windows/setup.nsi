@@ -1,17 +1,17 @@
 Unicode true
 !include "x64.nsh"
-Name "kienzledoku 1.8"
+Name "kienzledoku 1.8.1"
 OutFile "${OUTPUT}"
 RequestExecutionLevel user
 ShowInstDetails show
 AutoCloseWindow true
 Page instfiles
-Caption "kienzledoku 1.8 — Vorbereitung"
+Caption "kienzledoku 1.8.1 — Vorbereitung"
 SetCompressor lzma
-VIProductVersion "1.8.0.0"
+VIProductVersion "1.8.1.0"
 VIAddVersionKey /LANG=1031 "ProductName" "kienzledoku"
-VIAddVersionKey /LANG=1031 "ProductVersion" "1.8"
-VIAddVersionKey /LANG=1031 "FileVersion" "1.8"
+VIAddVersionKey /LANG=1031 "ProductVersion" "1.8.1"
+VIAddVersionKey /LANG=1031 "FileVersion" "1.8.1"
 VIAddVersionKey /LANG=1031 "FileDescription" "Client und Server installieren"
 VIAddVersionKey /LANG=1031 "LegalCopyright" "kienzledoku"
 Section

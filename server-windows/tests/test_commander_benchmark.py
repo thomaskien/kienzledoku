@@ -192,9 +192,11 @@ class BenchmarkTests(unittest.TestCase):
         call('/v1/benchmark/session/end',{},sid=sid)
         self.finish(sid)
         self.cmd.settings=dataclasses.replace(self.cmd.settings,auth_enabled=False)
-        self.assertFalse(call('/v1/runtime/capabilities',token=False)['benchmark_control'])
-        with self.assertRaises(HTTPError) as error:call('/v1/benchmark/session',{'model_id':'chosen','mode':'serial'},token=False)
-        self.assertEqual(403,error.exception.code)
+        self.assertTrue(call('/v1/runtime/capabilities',token=False)['benchmark_control'])
+        self.assertEqual('none',call('/v1/runtime/capabilities',token=False)['benchmark_authentication'])
+        sid=call('/v1/benchmark/session',{'model_id':'chosen','mode':'serial'},token=False)['id']
+        call('/v1/benchmark/session/end',{},token=False,sid=sid)
+        self.finish(sid)
 
 
 if __name__=='__main__':unittest.main()

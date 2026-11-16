@@ -14,7 +14,7 @@ import tarfile
 import tempfile
 import zipfile
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='1.8'
+VERSION='1.8.1'
 sys.path.insert(0,str(ROOT))
 from installer.product_key_build import ProductKeyBuild
 def run(argv,**kw): subprocess.run(list(map(str,argv)),check=True,**kw)
@@ -44,7 +44,7 @@ def main():
         for name in ('LICENSE','prompt_documentation.txt','assets'): copy(ROOT/name,client/name)
         copy(ROOT/'LICENSE',payload/'LICENSE')
         for name in ('install.ps1','uninstall.ps1','install.cmd','installer_client.py','Update.ps1','ClientRuntime.ps1'): ps_copy(ROOT/'windows'/name,client/name)
-        for name in ('__init__.py','wizard.py','ui.html','windows_core.py','windows_launch.py'):
+        for name in ('__init__.py','wizard.py','ui.html','options.py','windows_core.py','windows_launch.py'):
             copy(ROOT/'installer'/name,client/'installer'/name)
         for name in ('WizardConfig.psm1','WizardBridge.ps1','UninstallUI.ps1'):
             ps_copy(ROOT/'windows'/name,payload/name)
@@ -84,12 +84,12 @@ def main():
         server=payload/'server';server.mkdir()
         copy(ROOT/'LICENSE',server/'LICENSE')
         ps_copy(ROOT/'server-windows/windows',server/'windows')
-        for name in ('VERSION','models.json','audio-files.json','ubuntu.json','README.md'):copy(ROOT/'server-windows'/name,server/('README.txt' if name=='README.md' else name))
+        for name in ('VERSION','models.json','audio-files.json','audio-turbo-files.json','ubuntu.json','README.md'):copy(ROOT/'server-windows'/name,server/('README.txt' if name=='README.md' else name))
         with tarfile.open(server/'linux-payload.tar','w') as tar:
             tar.add(ROOT/'LICENSE',arcname='LICENSE')
             for file in sorted((ROOT/'server-windows/linux').rglob('*')):
                 if file.is_file() and '__pycache__' not in file.parts and file.suffix!='.pyc':tar.add(file,arcname=str(file.relative_to(ROOT/'server-windows/linux')))
-            for name in ('VERSION','models.json','audio-files.json'):tar.add(ROOT/'server-windows'/name,arcname=name)
+            for name in ('VERSION','models.json','audio-files.json','audio-turbo-files.json'):tar.add(ROOT/'server-windows'/name,arcname=name)
         copy(ROOT/'windows/README.md',payload/'README.txt')
         exe=stage/artifacts[0].name
         run([args.makensis,'-V2','-DPAYLOAD='+str(payload),'-DOUTPUT='+str(exe),ROOT/'windows/setup.nsi'])

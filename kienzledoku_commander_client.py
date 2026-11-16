@@ -189,7 +189,7 @@ class CommanderClient:
                 "legacy": False}
 
     def runtime_status(self):
-        value = self.request("/v1/runtime/status", timeout=3)
+        value = self.request("/v1/runtime/status", timeout=12)
         allowed = {"loading", "standby", "ready", "busy", "error", "disabled"}
         try:
             raw = value["services"]
@@ -200,10 +200,46 @@ class CommanderClient:
                 message = item.get("message", "")
                 if state not in allowed or not isinstance(message, str) or len(message) > 2000:
                     raise ValueError()
-                result[name] = {"state": state, "message": message}
+                target = value.get('remote_'+name+'_url') or self.url
+                parsed = urlsplit(target)
+                if parsed.scheme not in ('http','https') or not parsed.hostname or parsed.username or parsed.password:
+                    target = self.url
+                result[name] = {"state": state, "message": message, "host": urlsplit(target).hostname}
             return result
         except (KeyError, TypeError, ValueError):
             raise RuntimeError("Commander liefert keinen gültigen Dienststatus.") from None
+
+    def gpu_temperatures(self):
+        """Current readings only. Forwarding stays at Commander; no client token sharing."""
+        from datetime import datetime, timezone
+        value = self.request('/v1/runtime/temperatures', timeout=14)
+        sources = [(self.url, value)]
+        for role in ('llm', 'diar'):
+            remote = value.get('remote_'+role) or {}
+            if remote.get('status') == 'available' and isinstance(remote.get('data'),dict):
+                sources.append((remote.get('source'),remote['data']))
+        result=[];seen=set()
+        for target, data in sources:
+            if not isinstance(target,str):continue
+            url=urlsplit(target)
+            if url.scheme not in ('http','https') or not url.hostname or url.username or url.password:continue
+            key=(url.scheme.lower(),url.hostname.lower(),url.port or (443 if url.scheme=='https' else 80))
+            if key in seen:continue
+            seen.add(key)
+            temperatures=[]
+            for sensor in data.get('sensors',[]):
+                if not isinstance(sensor,dict) or sensor.get('kind')!='gpu' or sensor.get('status')!='available':continue
+                t=sensor.get('value')
+                if type(t) not in (int,float) or not math.isfinite(t) or not -40<=t<=200:continue
+                try:
+                    age=(datetime.now(timezone.utc)-datetime.fromisoformat(sensor['measured_at'])).total_seconds()
+                    if not -5<=age<=30:continue
+                except (ValueError,TypeError,KeyError):continue
+                temperatures.append(t)
+            if temperatures:
+                result.append(dict(address=target.rstrip('/'),value=round(max(temperatures)),
+                    tooltip=target.rstrip('/')+' · höchste aktuelle GPU-Sensortemperatur'))
+        return result
 
     def profiles(self):
         value = self.request("/v1/runtime/profiles", timeout=3)

@@ -84,4 +84,4 @@ if (!$NoOpen) {
         throw 'Servereinrichtung wurde abgebrochen oder konnte nicht gestartet werden. Vorhandene Einstellungen bleiben erhalten. Bitte dieses Setup erneut ausfuehren.'
     }
 }
-Write-Host 'kienzledoku record 1.8 installiert. Einstellungen und Betriebsart bleiben bei Updates erhalten.'
+Write-Host 'kienzledoku record 1.8.1 installiert. Einstellungen und Betriebsart bleiben bei Updates erhalten.'

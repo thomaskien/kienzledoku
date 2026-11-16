@@ -15,6 +15,21 @@
     "kv": "q8_0"
   },
   {
+    "id": "gemma-e2b-qat-q4",
+    "label": "Gemma 4 E2B QAT Q4_0",
+    "quality": "basis",
+    "repository": "xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf",
+    "revision": "74b2c92c8f7f84d3d9c39e8026f6a28f62788255",
+    "filename": "gemma-4-E2B-it-q4_0-exact.gguf",
+    "bytes": 2620370912,
+    "sha256": "419db9a6bf3bc15d770c85ccf9216827aa88c64fe8f3d72fbe5674f48efe2dc8",
+    "min_ram_gib": 16,
+    "default": false,
+    "url": "https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf/resolve/74b2c92c8f7f84d3d9c39e8026f6a28f62788255/gemma-4-E2B-it-q4_0-exact.gguf",
+    "context": 8192,
+    "kv": "q8_0"
+  },
+  {
     "id": "9b-q4",
     "label": "Qwen_Qwen3.5-9B-Q4_K_M",
     "quality": "basis",

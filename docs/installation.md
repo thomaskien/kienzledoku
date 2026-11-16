@@ -2,7 +2,7 @@
 
 [Zur Übersicht](../README.md) · [T2med einrichten](../README.md#t2med-einrichten-und-verwenden)
 
-Diese Anleitung beschreibt die gemeinsame Installer-Ausgabe **1.8** für Windows,
+Diese Anleitung beschreibt die gemeinsame Installer-Ausgabe **1.8.1** für Windows,
 macOS und Linux. [Pakete und Quellcode](https://github.com/thomaskien/kienzledoku/releases)
 sind veröffentlicht. Ein Quellcode-ZIP ist kein Ersatz für die fertigen Installer
 mit eingebetteten Laufzeiten.
@@ -40,7 +40,7 @@ Die Modellverarbeitung läuft nach dem Download auf der eigenen Hardware.
 Setup enthalten. Fehlende WebView2- und Microsoft-Visual-C++-Laufzeiten richtet
 der neue Installer bei Bedarf ein; dafür kann eine Administratorfreigabe nötig sein.
 
-**Eigener KI-Server:** Windows 11 x64, unterstützte NVIDIA-GPU ab 8 GB VRAM,
+**Eigener KI-Server:** Windows 11 x64, unterstützte NVIDIA-GPU ab 4 GB VRAM,
 passender NVIDIA-Treiber und aktivierte CPU-Virtualisierung. WSL/Ubuntu und
 benötigte Linux-Komponenten werden eingerichtet. Für diesen Schritt sind
 Administratorrechte und gegebenenfalls ein Neustart erforderlich. RAM und
@@ -90,7 +90,7 @@ Voraussetzung ist, dass Sie der Downloadquelle vertrauen und die App unveränder
 ## Linux
 
 Vorgesehen für **Ubuntu 24.04 LTS x86_64**. Der lokale KI-Server benötigt eine
-unterstützte NVIDIA-GPU ab RTX 20 mit mindestens 8 GiB VRAM und 20 GiB RAM,
+unterstützte NVIDIA-GPU mit Compute Capability 7.5 oder neuer (z. B. GTX 1650, RTX 20) mit mindestens 4 GiB VRAM und 20 GiB RAM,
 einen funktionierenden NVIDIA-Treiber sowie Speicherplatz für die ausgewählten
 Modelle. Der Client benötigt eine Desktop-Sitzung und ein Mikrofon. Der
 Download-Starter benötigt `bash`, `wget` und `python3`.
@@ -178,3 +178,25 @@ nur nach gesonderter Auswahl entfernt. Beim Linux-Installer im entpackten Paket:
 
 Für `client` und `both` als Desktop-Benutzer starten. Offene Aufnahmen nicht durch
 eine Deinstallation beenden.
+
+### Verteilte Sprechertrennung und kleine Grafikkarten (1.8.1)
+
+Für die Sprechertrennung kann im Installer eine eigene **Commander-Adresse** mit
+optionalem Token angegeben werden, genau wie für die Dokumentation. Ohne Adresse
+bleibt sie lokal. Der Zielrechner kann die Rolle „Nur Sprechertrennung“ oder
+„Dokumentation und Sprechertrennung“ übernehmen. ASR-Audio wird unverändert mit
+seinen Pausen weitergereicht; die lokale Diarisierung wird dafür nicht geladen.
+
+Für 4 GB VRAM stehen **Gemma 4 E2B QAT Q4_0** (8.192 Kontexttoken) und das bereits
+vorhandene **Qwen3.5 4B Q4** (32.768 Kontexttoken) zur Wahl. Dazu **Whisper Large v3
+Turbo · 8 Bit**, **verschärft seriell** und **serielle Sprechertrennung** wählen.
+Andere GPU-Nutzer benötigen ebenfalls Speicher; die gesamte Kartenkapazität ist
+keine Zusage, dass neben anderen Anwendungen genügend Speicher frei bleibt.
+Vorhandene Installationen behalten ihre bisherige Whisper-Auswahl beim Update.
+
+Das Gemma-Paket entspricht dem [4-GB-Benchmark](https://kienzledoku.de/benchmarks/data/gemma-4gb-2026-11-09/gemma4-e2b-qat-q4-review.html):
+[Text-GGUF von xbill9](https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf).
+Linux/WSL nutzt [faster-whisper Turbo](https://huggingface.co/mobiuslabsgmbh/faster-whisper-large-v3-turbo)
+mit `int8_float32`; Apple Silicon die [MLX-8-Bit-Variante](https://huggingface.co/mlx-community/whisper-large-v3-turbo-8bit).
+Downloads sind auf feste Revisionen und Prüfsummen festgelegt. Audio bleibt bei
+Turbo im Speicher; der bisherige VAD- und Zeitstempelvertrag bleibt erhalten.

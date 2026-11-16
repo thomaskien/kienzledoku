@@ -45,6 +45,13 @@ class WindowsWizardTests(unittest.TestCase):
         self.assertEqual(cfg['prompt'],'CUSTOM PROMPT');self.assertEqual(cfg['parallel_model'],'gemma12-q8')
         self.assertEqual(cfg['hf_token'],'hf_synthetic');self.assertEqual(cfg['server_token'],'synthetic-commander')
         self.assertEqual(cfg['sources'],r'E:\Offline');self.assertEqual(cfg['diarization_mode'],'with_asr')
+    def test_disabled_diarization_and_split_turbo_config_are_preserved(self):
+        self.info['previous']={'ServerRole':'asr','Diarization':False,'AsrModel':'turbo-int8','RemoteDiarUrl':'http://diar:8185'}
+        cfg=win.defaults(win.hardware(self.info),self.base)
+        self.assertFalse(cfg['diarization'])
+        self.assertEqual('asr',cfg['server_role']);self.assertEqual('turbo-int8',cfg['asr_model'])
+        self.assertEqual('http://diar:8185',cfg['remote_diar_url'])
+
     def test_parallel_profile_is_one_supported_model(self):
         cfg=self.cfg;cfg.update(mode='combined',selected_models=['qwen4-q4','gemma12-q8','27b-q4'],quality_models={'basis':'qwen4-q4','gruendlich':'gemma12-q8','sehr_gruendlich':'27b-q4'},memory_mode='parallel',parallel_model='gemma12-q8')
         win.validate(cfg,self.hw)
@@ -110,7 +117,7 @@ class WindowsWizardTests(unittest.TestCase):
 
     def test_bootstrap_is_windows_and_preserves_no_gpu_client(self):
         b=win.bootstrap(self.hw,self.base)
-        self.assertEqual(b['platform'],'windows');self.assertEqual(b['version'],'1.8')
+        self.assertEqual(b['platform'],'windows');self.assertEqual(b['version'],'1.8.1')
         self.assertTrue(next(m for m in b['models'] if m['id']=='gemma12-q8')['parallel_supported'])
         (self.base/'fixture.json').write_text(json.dumps(b))
     def test_install_rejects_injected_or_incomplete_options(self):

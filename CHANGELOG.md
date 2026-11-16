@@ -1,5 +1,20 @@
 # Änderungsprotokoll
 
+## 1.8.1 — 16.11.2026
+
+- Benchmarksteuerung folgt dem normalen optionalen Commander-Tokenschutz;
+  keine zusätzliche Tokenpflicht mehr. Standardmäßig bleibt der Schutz aus.
+- Sprechertrennung wahlweise auf einem anderen Commander; ASR, Dokumentation
+  und Sprechertrennung lassen sich mit passenden Serverrollen verteilen.
+- Aktuelle GPU-Temperatur rechts in der Statusleiste, eine Anzeige pro Commander.
+  Gemeinsame Adressen werden zusammengefasst, fehlende/veraltete Werte ausgeblendet.
+  macOS liest verfügbare aktuelle CPU-/GPU-Sensoren über Apple SMC ohne Zusatzdienst.
+- Gemma 4 E2B QAT Q4_0 ergänzt; Qwen3.5 4B Q4 auch für 4-GB-Grafikkarten freigegeben.
+  Whisper Large v3 Turbo int8 ist auswählbar (auf Apple Silicon MLX 8 Bit).
+  Das 4-GB-Profil nutzt verschärft serielle Verarbeitung und serielle Diarisierung.
+- Alle Installer zeigen ein graues Commander-Adressbeispiel. Vorhandene
+  Modelleinstellungen, Verbindungen und freiwilliger Tokenschutz bleiben erhalten.
+
 ## 1.8 — 16.11.2026
 
 - Pyannote-Telemetrie vor Import, Modellvorbereitung und Workerstart deaktiviert.

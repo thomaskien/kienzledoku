@@ -1,4 +1,4 @@
-# Commander 1.8: Vorbereitung für Kienzlebench
+# Commander 1.8.1: Vorbereitung für Kienzlebench
 
 Diese Ausgabe erweitert ausschließlich die Commander-Schnittstelle. Testschleifen,
 Bericht, Zwischenablage, Temperaturverlauf und Kienzlebench-Programm folgen später.
@@ -19,8 +19,8 @@ ohne Token möglich. Daten betreffen den ausführenden Server, nicht den Browser
 | `/v1/runtime/temperatures` | Ausschließlich aktuelle CPU-/GPU-Sensorwerte mit Quelle und Zeitpunkt |
 
 Antworten enthalten `schema_version: 1` und `context` mit Rollen, Commander-Version
-und konfiguriertem GPU-Index. Bei einem anderen LLM-Commander enthält `remote_llm`
-dessen Quelle und eine getrennte Antwort oder `status: unavailable`. Eine
+und konfiguriertem GPU-Index. Andere Commander werden als `remote_llm` bzw.
+`remote_diar` mit Quelle und einer getrennten Antwort oder `status: unavailable` ausgegeben. Eine
 Weiterleitung wird nicht verkettet. Lokale und entfernte Messzeiten nicht mischen.
 Keine Zugangsdaten, Seriennummern oder Hardware-UUIDs werden ausgegeben.
 
@@ -41,10 +41,12 @@ RAM-Größe dürfen nicht addiert werden. macOS liefert keinen exakten mit Linux
 Temperaturen stehen in `sensors`: `kind`, `id`, `name`, `value`, `unit: celsius`,
 `source`, `measured_at`, `status`, `reason`. Fehlende Werte bleiben `null` mit Grund.
 Linux liest bekannte CPU-/GPU-hwmon-Sensoren und NVIDIA über `nvidia-smi`.
-WSL liefert nur tatsächlich zugängliche Sensoren. macOS hat in dieser Ausgabe
-keinen bestätigten Sensoradapter ohne Zusatzkomponente und meldet das ausdrücklich.
-Ein späterer Mac-Adapter kann diesen Vertrag ergänzen. Keine erhöhten Rechte,
-Treiberinstallation oder Sensorprogramme werden automatisch eingerichtet.
+WSL liefert nur tatsächlich zugängliche Sensoren. macOS fragt Apple-SMC-Sensoren
+lesend über IOKit ab (`source: apple-smc`); der Adapter wurde auf einem M4 geprüft.
+Nicht zugängliche Sensoren bleiben unbekannt. Keine erhöhten Rechte, Zusatzdienste
+oder Sensorprogramme werden eingerichtet. Pro Rechner zeigt Record den höchsten
+aktuellen GPU-Sensorwert, mit Commander-Adresse im Tooltip. Gleich konfigurierte
+Commander-Adressen erscheinen einmal, fehlende oder über 30 Sekunden alte Werte gar nicht.
 
 Die Sensorabfrage startet nur auf Anfrage, ohne Hintergrundthread, Verlauf oder
 alte Ersatzwerte. Externe Befehle haben höchstens zwei Sekunden Laufzeit;
@@ -66,12 +68,13 @@ Whisper auf Abruf und die unabhängige Diarisierungsstrategie. Die Benchmarkantw
 benennt zusätzlich den temporären Modus. Diarisierung wird nicht als versteckter
 Test ausgeführt; ihre vorhandene Residenzstrategie bleibt wirksam.
 
-## Authentifizierte, begrenzte Benchmarkkontrolle
+## Begrenzte Benchmarkkontrolle
 
-Die exklusive Benchmarksteuerung benötigt ausdrücklich aktivierten Commander-
-Tokenschutz. Ohne ihn bleiben Hardware-/Temperaturabfragen und der normale Betrieb
-verfügbar; `benchmark_control: false`, Grund `authentication_required`.
-Der Token wird wie bisher als `Authorization: Bearer …` übergeben, nicht in der URL.
+Die Benchmarksteuerung verwendet denselben optionalen Tokenschutz wie alle anderen
+Commander-Endpunkte. Ist der Schutz ausgeschaltet (Standard), ist kein Token
+erforderlich. Ist er eingeschaltet, wird der konfigurierte Token wie bisher als
+`Authorization: Bearer …` übergeben, nicht in der URL. Es gibt keinen separaten
+Benchmark-Token und keine zusätzliche Aktivierungspflicht.
 
 1. `POST /v1/benchmark/session`, JSON:
    `{"model_id":"<id aus inventory>","mode":"serial","lease_seconds":120}`.

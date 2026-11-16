@@ -89,14 +89,27 @@ function Get-OperationResult($Progress,[AllowNull()][Nullable[int]]$ExitCode,[st
         StderrPath=$StderrPath;StdoutPath=$StdoutPath}
 }
 function Get-Catalog([string]$Root) { Read-Json (Join-Path $Root 'models.json') }
-function Get-RequiredFiles([string]$Root, [string[]]$Models) {
+function Get-RequiredFiles([string]$Root, [string[]]$Models, $Config=$null) {
     $catalog = Get-Catalog $Root
     foreach ($key in $Models) {
         $property = $catalog.PSObject.Properties[$key]
         if (-not $property) { throw "Unbekanntes Modell: $key" }
         foreach ($file in $property.Value.files) { $file }
     }
-    foreach ($file in @(Read-Json (Join-Path $Root 'audio-files.json'))) { $file }
+    $role='full';$asr='large-v3';$remoteDiar='';$diar=$true
+    if($Config){
+        if($Config.PSObject.Properties['ServerRole']){$role=[string]$Config.ServerRole}
+        if($Config.PSObject.Properties['AsrModel']){$asr=[string]$Config.AsrModel}
+        if($Config.PSObject.Properties['RemoteDiarUrl']){$remoteDiar=[string]$Config.RemoteDiarUrl}
+        if($Config.PSObject.Properties['Diarization']){$diar=[bool]$Config.Diarization}
+    }
+    foreach ($file in @(Read-Json (Join-Path $Root 'audio-files.json'))) {
+        if($file.path -like 'pyannote/*' -and $role -ne 'llm' -and $diar -and -not $remoteDiar){$file}
+        if($file.path -like 'whisper/*' -and $role -in @('full','asr') -and $asr -eq 'large-v3'){$file}
+    }
+    if($role -in @('full','asr') -and $asr -eq 'turbo-int8'){
+        foreach($file in @(Read-Json (Join-Path $Root 'audio-turbo-files.json'))){$file}
+    }
 }
 function Get-ContainedPath([string]$Root, [string]$Relative) {
     if ([IO.Path]::IsPathRooted($Relative) -or $Relative -match '(^|[\\/])\.\.([\\/]|$)') {
@@ -327,7 +340,7 @@ function Get-ParallelModelChoices($Catalog,[string[]]$Models,[int]$VramMiB) {
 function Get-ProfilePlan($Catalog, [string[]]$Models, [string]$Default, [string]$Mode, [int]$VramMiB, [int]$RamGiB, [string]$AudioCache='ram', [string]$ParallelModel='') {
     if ($RamGiB -notin @(16,24,28,32)) { throw 'WSL-Speicher muss 16, 24, 28 oder 32 GiB betragen.' }
     if ($Mode -notin @('auto','serial','parallel','selected')) { throw 'Ungültige Betriebsart.' }
-    if ($Default -notin $Models) { throw 'Standardmodell muss ausgewählt sein.' }
+    if ($Models.Count -gt 0 -and $Default -notin $Models) { throw 'Standardmodell muss ausgewählt sein.' }
     if ($AudioCache -notin @('ram','disk')) { throw 'Ungültiger Audiocache.' }
     if($Mode -eq 'selected' -and $ParallelModel -and $ParallelModel -notin $Models){throw 'Parallelmodell muss zur Installation ausgewählt sein.'}
     $qualities=@{}

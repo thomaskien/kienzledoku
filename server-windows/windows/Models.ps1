@@ -23,7 +23,7 @@ function Read-WslModelState([object[]]$Files,[switch]$Validate) {
 function Initialize-ModelPlan {
     Progress 'models' 'Zuerst vorhandene WSL-Modelle und lokale Kopien prüfen.' 2
     if(-not $script:ModelOptions.VerifyModelFiles){Log 'Modell-Prüfsummenprüfung deaktiviert: nur Vorhandensein und Dateigröße kontrollieren.'}
-    $files=@(Get-RequiredFiles $script:Root $script:Cfg.Models)
+    $files=@(Get-RequiredFiles $script:Root $script:Cfg.Models $script:Cfg)
     $script:StorageProbe=Read-WslModelState $files -Validate
     $script:ProtectedPathCache=@{}
     $script:ModelPlan=@{};$groups=Get-ModelSourceGroups;$stage=Get-StageDirectory
@@ -58,7 +58,7 @@ function Copy-ModelFile([string]$Source,[string]$Destination,$File) {
 }
 function Ensure-InstallModels {
     $groups=Get-ModelSourceGroups;$hfChecked=$false
-    foreach($file in @(Get-RequiredFiles $script:Root $script:Cfg.Models)){
+    foreach($file in @(Get-RequiredFiles $script:Root $script:Cfg.Models $script:Cfg)){
         $item=$script:ModelPlan[$file.path]
         if($item.Kind -ne 'pending'){continue}
         Progress 'models' ('Benötigte Quelle im Modellarchiv suchen: '+$file.path) 15

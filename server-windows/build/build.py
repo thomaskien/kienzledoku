@@ -33,7 +33,7 @@ def main():
     payload=ROOT/'linux-payload.tar'
     files=[p for p in sorted((ROOT/'linux').rglob('*')) if p.is_file() and '__pycache__' not in p.parts and p.suffix!='.pyc']
     with tarfile.open(payload,'w',format=tarfile.PAX_FORMAT) as archive:
-        for path in files+[ROOT/'models.json',ROOT/'audio-files.json',ROOT/'VERSION']:
+        for path in files+[ROOT/'models.json',ROOT/'audio-files.json',ROOT/'audio-turbo-files.json',ROOT/'VERSION']:
             name=str(path.relative_to(ROOT/'linux')) if path.is_relative_to(ROOT/'linux') else path.name
             info=archive.gettarinfo(str(path),arcname=name)
             info.uid=info.gid=0;info.uname=info.gname='root';info.mtime=0;info.mode=0o644
@@ -62,7 +62,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='kienzledoku-exe-check-') as temporary:
         subprocess.run(['7z','x','-y','-o'+temporary,str(exe)],check=True,stdout=subprocess.PIPE)
         embedded=next(Path(temporary).rglob('linux-payload.tar')).parent
-        expected=['VERSION','models.json','audio-files.json','ubuntu.json','README.txt','linux-payload.tar']
+        expected=['VERSION','models.json','audio-files.json','audio-turbo-files.json','ubuntu.json','README.txt','linux-payload.tar']
         expected += ['windows/'+p.name for p in (ROOT/'windows').iterdir() if p.is_file()]
         for relative in expected:
             if (embedded/relative).read_bytes()!=(ROOT/relative).read_bytes():

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""kienzledoku record 1.8 <-> T2med FHIR client.
+"""kienzledoku record 1.8.1 <-> T2med FHIR client.
 
 Target: Python 3.9+ (macOS, Ubuntu 24.04 LTS) and bundled Python 3.12 (Windows).
 Platform-independent FHIR/UI core with optional compiled Connect transport.
@@ -67,7 +67,7 @@ from kienzledoku_speech import (
 )
 
 APP_NAME = "kienzledoku record"
-VERSION = "1.8"
+VERSION = "1.8.1"
 LINUX_NATIVE_WINDOW_PATH = "/usr/local/libexec/kienzledoku/kienzledoku_window_linux"
 
 # Public test/demo key from T2med's reference application (not a secret).
@@ -905,17 +905,22 @@ def start_initial_work(state):
     return start_patient_load(state)
 
 
-WINDOWS_STATUS_LAYOUT = sys.platform == 'win32'
+WINDOWS_STATUS_LAYOUT = True  # Common natural pills and adaptive no-wrap header on every platform.
 
 # Use the Mac/Linux pill styling on Windows too. Reclaim the byline's space
 # before shortening any status text; the service row must never wrap.
 WINDOWS_STATUS_CSS = """
 .topbar { align-items:center; flex-direction:row; gap:18px; }
 .topbar h1 { flex:0 0 auto; }
+.topbar.with-temperatures h1 { flex:0 1 auto; min-width:100px; }
+.topbar.with-temperatures .brand-link { overflow:hidden; text-overflow:ellipsis; }
+.topbar.measure-status h1 { flex-shrink:0; }
 .topbar.compact-brand h1 { gap:0; }
 .topbar.compact-brand .brand-byline { display:none; }
 .server-row { flex:0 1 auto; min-width:0; flex-wrap:nowrap; justify-content:flex-end; }
 .server-badge { min-width:0; }
+#gpu-temperatures { display:contents; }
+.gpu-temperature { flex:0 0 auto; font-variant-numeric:tabular-nums; }
 .server-dot, .server-label { flex-shrink:0; }
 .server-name { display:flex; gap:4px; min-width:3.5em; overflow:hidden; }
 .server-host { min-width:0; overflow:hidden; text-overflow:ellipsis; }
@@ -1407,7 +1412,7 @@ def page_html(state):
   <div class="primary-screen">
     <div class="record-heading"><div class="logo-slot"><img src="/logo.svg" alt="kienzledoku record"></div><div><header class="topbar"><h1><a class="brand-link" href="https://kienzledoku.de" rel="noopener noreferrer">kienzledoku record</a>
       <span class="brand-byline">v{version} · von Dr. Thomas Kienzle</span></h1>
-      <div class="server-row">{t2med_badge}{asr_badge}{diarization_badge}{llm_badge}</div></header>
+      <div class="server-row">{t2med_badge}{asr_badge}{diarization_badge}{llm_badge}<span id="gpu-temperatures">{temperature_badges}</span></div></header>
     <section class="patient-row"><div class="patient-name" id="patient-name">{patient_name}</div>
       <div class="patient-birth">Geburtsdatum: <strong id="patient-birth">{birth_date}</strong></div></section></div></div>
     <div class="notice err" id="patient-error" {patient_error_hidden}>{patient_error}</div>
@@ -1558,6 +1563,17 @@ def page_html(state):
       setServer('diarization-server', (services.diarization || {{}}).status || 'checking', (services.diarization || {{}}).host || '');
       setServer('llm-server', (services.llm || {{}}).status || 'checking', (services.llm || {{}}).host || '');
       setServer('t2med-server', data.t2med_status || 'checking', data.t2med_host || '');
+      document.querySelector('.topbar').classList.toggle('with-temperatures',Boolean((data.gpu_temperatures || []).length));
+      const temperatures = document.getElementById('gpu-temperatures');
+      temperatures.replaceChildren();
+      for (const item of data.gpu_temperatures || []) {{
+        if (!Number.isFinite(item.value)) continue;
+        const badge = document.createElement('span');
+        badge.className = 'server-badge gpu-temperature';
+        badge.textContent = 'GPU ' + Math.round(item.value) + ' °C';
+        badge.title = item.tooltip || item.address || '';
+        temperatures.append(badge);
+      }}
       {status_layout_update}
       const patient = data.patient || {{}};
       for (const [id, value] of Object.entries({{
@@ -1591,6 +1607,8 @@ def page_html(state):
         technical=technical,
         csrf=html.escape(state.csrf),
         csrf_json=json.dumps(state.csrf),
+        temperature_badges=''.join('<span class="server-badge gpu-temperature" title="%s">GPU %s °C</span>' %
+            (html.escape(v.get('tooltip','')),html.escape(str(v['value']))) for v in speech.get('gpu_temperatures',[])),
         initial_status=json.dumps(speech["status"]),
         initial_revision=int(state.document_revision),
         patient_error=html.escape(state.patient_error),
@@ -2284,7 +2302,7 @@ def main():
         print("kienzledoku record: %s" % exc, file=sys.stderr)
         if sys.platform == 'win32':
             import ctypes
-            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.8', 0x10)
+            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.8.1', 0x10)
         if not args.no_browser:
             notify_start_failure(exc)
         return 1

@@ -77,6 +77,9 @@ class Commander(BenchmarkMixin):
         return self._runtime_target(self._diar_policy(self._baseline_legacy()))
 
     def _runtime_target(self, desired):
+        for role in ('asr','diar','llm'):
+            if role not in self.settings.enabled_roles or (role=='diar' and self.settings.remote_diar_url) or (role=='llm' and self.settings.remote_llm_url):
+                desired[role] = None if role=='llm' else False
         if desired['llm']:
             desired['llm'] = self.settings.runtime_quality(desired['llm'])
         return desired
@@ -94,6 +97,9 @@ class Commander(BenchmarkMixin):
                 "llm": self.settings.baseline_llm}
 
     def _diar_policy(self, desired, role=None):
+        if self.settings.remote_diar_url:
+            desired["diar"] = False
+            return desired
         mode = self.settings.diarization_mode
         if mode is None:
             return desired
@@ -112,6 +118,8 @@ class Commander(BenchmarkMixin):
         return desired
 
     def _desired(self, job):
+        if job.role == "diar" and self.settings.remote_diar_url:
+            return dict(self._loaded)
         benchmark = self._benchmark_target(job)
         if benchmark is not None:
             return benchmark
@@ -224,7 +232,7 @@ class Commander(BenchmarkMixin):
                 elif (self._transition and self._change_target and self._change_target[role]
                       and (role in self._blocked or not self._loaded[role])):
                     state, message = "loading", "Modellwechsel läuft."
-                elif self._loaded[role] or (role == "llm" and self.settings.remote_llm_url):
+                elif self._loaded[role] or (role == "llm" and self.settings.remote_llm_url) or (role == "diar" and self.settings.remote_diar_url):
                     state, message = "ready", "Dienst ist bereit."
                 elif self._last_error and self._uncertain:
                     state, message = "error", "Dienst konnte technisch nicht bereitgestellt werden."
@@ -240,6 +248,8 @@ class Commander(BenchmarkMixin):
                 "active": dict(Counter(j.role for j in self._active.values())),
                 "last_error": self._last_error,
                 "services": services,
+                "remote_llm_url": self.settings.remote_llm_url,
+                "remote_diar_url": self.settings.remote_diar_url,
             }
 
     def wait_ready(self, timeout=10):
@@ -253,7 +263,7 @@ class Commander(BenchmarkMixin):
         return self.settings.asr_parallel if job.role == "asr" else self.settings.diar_parallel
 
     def _available(self, job):
-        remote = job.role == "llm" and self.settings.remote_llm_url
+        remote = (job.role == "llm" and self.settings.remote_llm_url) or (job.role == "diar" and self.settings.remote_diar_url)
         if job.role in self._blocked or (not remote and not self._loaded[job.role]):
             return False
         if job.role == "llm" and not remote and (self._loaded["llm"] != self.settings.runtime_quality(job.quality) or self._llm_fault):
@@ -380,11 +390,11 @@ class Commander(BenchmarkMixin):
             self._publish("llm", None)
             loaded["llm"] = None
         for role in ("asr", "diar"):
-            if role in self.settings.enabled_roles and not desired[role] and (loaded[role] or force):
+            if role in self.settings.enabled_roles and not (role == "diar" and self.settings.remote_diar_url) and not desired[role] and (loaded[role] or force):
                 measured(role, 'unload', lambda: self._worker_change(role, "park", False))
                 loaded[role] = False
         for role in ("asr", "diar"):
-            if role in self.settings.enabled_roles and desired[role] and (not loaded[role] or force):
+            if role in self.settings.enabled_roles and not (role == "diar" and self.settings.remote_diar_url) and desired[role] and (not loaded[role] or force):
                 measured(role, 'load', lambda: self._worker_change(role, "load", True))
                 loaded[role] = True
         if desired["llm"] and loaded["llm"] != desired["llm"]:
@@ -439,6 +449,8 @@ class Commander(BenchmarkMixin):
         managed = set(self.settings.enabled_roles)
         if self.settings.remote_llm_url:
             managed.discard("llm")
+        if self.settings.remote_diar_url:
+            managed.discard("diar")
         affected = {role for role in managed if self._loaded[role] != desired[role] or force}
         if self._llm_fault and "llm" in managed:
             affected.add("llm")

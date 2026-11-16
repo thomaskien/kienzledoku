@@ -5,7 +5,7 @@
     "grade": "basis",
     "repository": "unsloth/Qwen3.5-4B-GGUF",
     "revision": "e87f176479d0855a907a41277aca2f8ee7a09523",
-    "min_vram_mib": 7936,
+    "min_vram_mib": 3840,
     "min_ram_bytes": 20000000000,
     "files": [
       {
@@ -24,10 +24,10 @@
       "backend": "llama.cpp",
       "gpu_layers": 999
     },
-    "serial_vram_mib": 7936,
+    "serial_vram_mib": 3840,
     "parallel_vram_mib": null,
     "recommended_wsl_gib": 16,
-    "description": "Basis: Qwen3.5 4B Q4, seriell ab 8 GiB Grafikspeicher.",
+    "description": "Basis: 32k Kontext, verschärft seriell ab 4 GB VRAM.",
     "fallbacks": []
   },
   "9b-q4": {
@@ -213,5 +213,36 @@
     "description": "Gemma 4 mit 26B Gesamt- und ca. 4B aktiven Parametern. Seriell ab 20 GiB VRAM; parallel ab 24 GiB (RTX 3090/4090).",
     "fallbacks": [],
     "grade": "gruendlich"
+  },
+  "gemma-e2b-qat-q4": {
+    "label": "Gemma 4 E2B QAT Q4_0",
+    "quality": "gemma_e2b_qat_q4",
+    "grade": "basis",
+    "repository": "xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf",
+    "revision": "74b2c92c8f7f84d3d9c39e8026f6a28f62788255",
+    "min_vram_mib": 3840,
+    "min_ram_bytes": 20000000000,
+    "files": [
+      {
+        "filename": "gemma-4-E2B-it-q4_0-exact.gguf",
+        "bytes": 2620370912,
+        "sha256": "419db9a6bf3bc15d770c85ccf9216827aa88c64fe8f3d72fbe5674f48efe2dc8",
+        "path": "gemma-e2b-qat-q4/gemma-4-E2B-it-q4_0-exact.gguf",
+        "url": "https://huggingface.co/xbill9/gemma-4-E2B-it-qat-q4_0-exact-gguf/resolve/74b2c92c8f7f84d3d9c39e8026f6a28f62788255/gemma-4-E2B-it-q4_0-exact.gguf",
+        "gated": false
+      }
+    ],
+    "profile": {
+      "context": 8192,
+      "slots": 1,
+      "kv": "q8_0",
+      "backend": "llama.cpp",
+      "gpu_layers": 999
+    },
+    "serial_vram_mib": 3840,
+    "parallel_vram_mib": null,
+    "recommended_wsl_gib": 16,
+    "description": "Basis: geprüfter Community-Textbuild, 8k Kontext, verschärft seriell ab 4 GB VRAM.",
+    "fallbacks": []
   }
 }

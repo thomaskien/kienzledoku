@@ -1,6 +1,6 @@
-# kienzledoku 1.8 für Windows x64
+# kienzledoku 1.8.1 für Windows x64
 
-`kienzledoku-1.8-windows-x64-setup.exe` öffnen und **Client**, **Server** oder
+`kienzledoku-1.8.1-windows-x64-setup.exe` öffnen und **Client**, **Server** oder
 **Client und Server** wählen. Die Vorbereitung wird sofort sichtbar angezeigt;
 anschließend führt derselbe Wizard-Aufbau wie auf dem Mac durch Komponenten,
 Verbindungen, Modelle, Dokumentation und Zusammenfassung. Erst danach beginnt
@@ -17,7 +17,7 @@ Anschließend prüft es die tatsächliche VAD-Ausführung, bevor eine Serverinst
 oder ein Clientaustausch beginnt. Fehlermeldungen enthalten die ursprüngliche Ursache.
 Ein erforderlicher Neustart wird ausdrücklich angezeigt. Die Python-Abhängigkeiten
 werden beim Build einschließlich Windows-spezifischer Anforderungen geprüft.
-Server: Windows 11 x64, WSL2, NVIDIA RTX 20 oder neuer mit mindestens 8 GiB VRAM,
+Server: Windows 11 x64, WSL2, NVIDIA mit Compute Capability 7.5 oder neuer, mindestens 4 GiB VRAM,
 ausreichend RAM und Speicherplatz. Die KI-Modelle werden nur nach Auswahl geladen.
 
 Der Assistent verwendet das mit Windows gelieferte Windows PowerShell 5.1 und
@@ -89,3 +89,7 @@ gelöscht. Windows' WSL-Funktion und andere Distributionen werden nicht deinstal
 
 Sprechertrennung: immer geladen, mit Whisper oder seriell. Aufnahmeabschnitte
 enden nach maximal zwei Stunden kontrolliert; anschließend ist Fortsetzen möglich.
+
+Für 4-GB-GPUs Gemma E2B QAT Q4 oder Qwen3.5 4B Q4 mit Whisper Turbo 8 Bit,
+verschärft serieller Verarbeitung und serieller Sprechertrennung wählen.
+LLM und Sprechertrennung können optional je einen anderen Commander nutzen.

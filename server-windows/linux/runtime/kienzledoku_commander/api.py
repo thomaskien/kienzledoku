@@ -261,8 +261,6 @@ class Handler(BaseHTTPRequestHandler):
             hop = self.headers.get("X-Kienzledoku-Commander-Hop")
             if hop not in (None, "1"):
                 raise InvalidRequest("Ungültiger Commander-Hop.")
-            if hop and self.server.commander.settings.remote_llm_url:
-                raise BackendFailure("Eine Commander-Weiterleitung darf nicht verkettet werden.")
             if not post and url.path == "/health" and not url.query:
                 state = self.server.commander.status()
                 healthy = self.server.commander.wait_ready(0)
@@ -279,7 +277,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if not post and url.path == "/v1/runtime/status":
                 value = self.server.commander.status()
-                if self.server.commander.settings.remote_llm_url:
+                if self.server.commander.settings.remote_llm_url and not hop:
                     try:
                         remote = self.server.commander.runtime.remote_get("/v1/runtime/status")
                     except CommanderError:
@@ -287,12 +285,24 @@ class Handler(BaseHTTPRequestHandler):
                     value["services"]["llm"] = remote.get("services", {}).get("llm", {
                         "state": "error", "message": "Remote-Status ist unvollständig."})
                     value["remote_llm"] = {"services": remote.get("services", {}), "phase": remote.get("phase")}
+                if self.server.commander.settings.remote_diar_url and not hop:
+                    try:
+                        remote = self.server.commander.runtime.remote_get("/v1/runtime/status", role="diar")
+                    except CommanderError:
+                        remote = {}
+                    value["services"]["diar"] = remote.get("services", {}).get("diar", {
+                        "state": "error", "message": "Diarisierungs-Commander ist nicht erreichbar."})
+                    value["remote_diar"] = {"services": remote.get("services", {}), "phase": remote.get("phase")}
             elif not post and url.path == "/v1/documentation/settings":
+                if hop and self.server.commander.settings.remote_llm_url:
+                    raise BackendFailure("Eine Commander-Weiterleitung darf nicht verkettet werden.")
                 self.server.refresh_remote()
                 value = {"fields": list(self.server.fields), "prompt": self.server.prompt,
                          "prompt_template": self.server.prompt_template,
                          "default_quality": getattr(self.server.commander.runtime, "remote_default", self.server.commander.settings.default)}
             elif not post and url.path in ("/v1/models", "/v1/runtime/profiles"):
+                if hop and self.server.commander.settings.remote_llm_url:
+                    raise BackendFailure("Eine Commander-Weiterleitung darf nicht verkettet werden.")
                 self.server.refresh_remote()
                 cfg = self.server.commander.settings
                 if self.server.profiles is not None:
@@ -314,6 +324,8 @@ class Handler(BaseHTTPRequestHandler):
                 value = self._llm(self._json(), url.path.endswith("/extract"))
             elif post and url.path in ("/v1/asr/final-block", "/v1/diarize"):
                 role = "asr" if url.path.endswith("final-block") else "diar"
+                if role == "diar" and hop and self.server.commander.settings.remote_diar_url:
+                    raise BackendFailure("Eine Commander-Weiterleitung darf nicht verkettet werden.")
                 if role == "diar" and self.headers.get(FINALIZED_HEADER) != "true":
                     raise RecordingNotFinalized()
                 mime = self.headers.get_content_type()
@@ -331,6 +343,7 @@ class Handler(BaseHTTPRequestHandler):
                 if role == 'diar': validate_audio_duration(body)
                 payload = {"body": body, "content_type": self.headers.get("Content-Type", ""),
                     "query": "?" + urlencode(query, doseq=True) if query else ""}
+                if role == "diar": payload["hop"] = bool(hop)
                 job = self.server.commander.submit(role, payload, request_id=self._id())
                 value = job.future.result()
             else:

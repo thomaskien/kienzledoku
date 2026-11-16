@@ -1,0 +1,20 @@
+[
+  {
+    "filename": "config.json",
+    "bytes": 341,
+    "sha256": "f79a081378ac52606707abdfdae4a9cc41410f47ffc2ad2cd582dc8cc8e29e6f",
+    "url": "https://huggingface.co/mlx-community/whisper-large-v3-turbo-8bit/resolve/62103fc276a35fdc76e318f314d8ff47987fba89/config.json"
+  },
+  {
+    "filename": "weights.safetensors",
+    "bytes": 863659156,
+    "sha256": "1dffa280543756dcdd5324250c811c2a1ba8654c363d7d0b1a5da2b1563629df",
+    "url": "https://huggingface.co/mlx-community/whisper-large-v3-turbo-8bit/resolve/62103fc276a35fdc76e318f314d8ff47987fba89/model.safetensors"
+  },
+  {
+    "filename": "multilingual.tiktoken",
+    "bytes": 816730,
+    "sha256": "b34b360dbb493e781e479794586d661700670d65564001f23024971d1f2fa126",
+    "url": "https://huggingface.co/mlx-community/whisper-large-v3-turbo-8bit/resolve/62103fc276a35fdc76e318f314d8ff47987fba89/multilingual.tiktoken"
+  }
+]

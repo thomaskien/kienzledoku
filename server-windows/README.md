@@ -1,7 +1,7 @@
-# kienzledoku Serverkomponenten 1.8
+# kienzledoku Serverkomponenten 1.8.1
 
-Die Serverkomponenten gehören jetzt zur gemeinsamen Version **1.8**. Unter
-Windows das gemeinsame `kienzledoku-1.8-windows-x64-setup.exe` öffnen und
+Die Serverkomponenten gehören jetzt zur gemeinsamen Version **1.8.1**. Unter
+Windows das gemeinsame `kienzledoku-1.8.1-windows-x64-setup.exe` öffnen und
 Server oder Client und Server wählen. Es richtet eine eigene Ubuntu-24.04-WSL2-
 Umgebung mit Whisper large-v3, pyannote Community-1, llama.cpp und Commander ein.
 Die vorherige separate Serverausgabe hieß 1.13; sie bleibt unverändert erhalten.
@@ -14,7 +14,7 @@ enthalten; öffentliche Quellen enthalten kein produktives Schlüsselmaterial.
 
 ## Start
 
-`kienzledoku-1.8-windows-x64-setup.exe` unter Windows 11 x64 öffnen.
+`kienzledoku-1.8.1-windows-x64-setup.exe` unter Windows 11 x64 öffnen.
 Alternativ das gleichnamige ZIP entpacken und die EXE darin starten.
 Der Assistent nutzt Windows PowerShell 5.1 und Windows Forms; Python muss auf
 Windows nicht vorinstalliert sein. Das Setup ist nicht digital signiert.
@@ -43,6 +43,8 @@ erneuter Hugging-Face-Zugriff verlangt.
 
 | Modell | Seriell, volle GPU-Auslagerung | Parallel mit Audio geladen |
 |---|---:|---:|
+| Gemma 4 E2B QAT Q4_0 | 4 GiB, Turbo int8 / verschärft seriell | Nicht freigegeben |
+| Qwen3.5 4B Q4 | 4 GiB, Turbo int8 / verschärft seriell | Nicht freigegeben |
 | Qwen3.5-9B Q4_K_M | 8 GiB VRAM | 16 GiB VRAM |
 | Qwen3.5-9B Q6_K | 12 GiB VRAM | 20 GiB VRAM; 24-GB-Karte empfohlen |
 | Qwen3.8-27B UD-Q4_K_M | 20 GiB VRAM; 24-GB-Karte empfohlen | Nicht freigegeben |
@@ -353,7 +355,7 @@ auf das Prozessende. Ein fehlender Exitcode wird nicht mehr in 0 umgewandelt; ei
 expliziter Fehlerstatus bleibt eine konkrete Fehlermeldung und wird nicht nochmals
 als fehlender Abschluss bezeichnet.
 
-Das vom Benutzer am **04.11.2026** gelieferte Windows-Protokoll belegt für **1.8**:
+Das vom Benutzer am **04.11.2026** gelieferte Windows-Protokoll belegt für **1.8.1**:
 18 erfolgreiche synthetische Audioketten über alle sechs Modelle ohne Fallback,
 Rückkehr zu Gemma 12B Q8 parallel mit Whisper und pyannote sowie einen Kontextlauf
 mit 24.282 Eingabetoken. Erst danach wurde die Administratoranforderung für die
@@ -364,7 +366,7 @@ der hier korrigierten erneuten Vollplatzforderung. Der Nachweis ist als
 sich um das Benutzerprotokoll, keine eigene Windows-Ausführung des Build-Agenten.
 
 
-Version **1.8** ergänzt drei Gemma-4-Modelle zusätzlich zu allen drei bisherigen
+Version **1.8.1** ergänzt drei Gemma-4-Modelle zusätzlich zu allen drei bisherigen
 Qwen-Modellen. Downloadquellen, Revisionen, Größen und SHA256 sind fest
 hinterlegt; die öffentlichen Hugging-Face-Metadaten wurden erneut geprüft.
 Alle drei Gemma-Dateien waren bei dieser Prüfung ohne HF-Zugriffssperre

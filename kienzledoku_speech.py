@@ -230,6 +230,7 @@ class SpeechRecognitionManager(object):
         self.diarization_url = self.service_urls["diarization"]
         self.llm_url = self.service_urls["llm"]
         self.services = {}
+        self.gpu_temperatures = []
         for name, definition in SERVICE_DEFINITIONS.items():
             url = self.service_urls[name]
             self.services[name] = {
@@ -306,6 +307,7 @@ class SpeechRecognitionManager(object):
                 "used_quality_label": profile_label(self.used_quality, self.quality_profiles) if self.used_quality else '',
                 "active_fields": list(self.active_fields),
                 "active_prompt": self.active_prompt,
+                "gpu_temperatures": [dict(v) for v in self.gpu_temperatures],
                 "services": {
                     name: dict(details) for name, details in self.services.items()
                 },
@@ -711,17 +713,26 @@ class SpeechRecognitionManager(object):
                 with self.lock:
                     for details in self.services.values():
                         details['status'], details['message'] = 'error', str(exc)
+                    self.gpu_temperatures = []
                     self.service_status, self.service_message = 'error', str(exc)
                 return
             with self.lock:
                 mapping = {'asr': 'asr', 'diarization': 'diar', 'llm': 'llm'}
                 for local_name, remote_name in mapping.items():
                     item = runtime[remote_name]
+                    if item.get('host'): self.services[local_name]['host'] = item['host']
                     self.services[local_name]['status'] = item['state']
                     self.services[local_name]['message'] = item['message']
                 self.service_status = 'ok' if all(
                     item['state'] not in ('error', 'disabled') for item in runtime.values()) else 'error'
                 self.service_message = 'Commander-Dienststatus aktualisiert.'
+            try:
+                temperatures = self.commander.gpu_temperatures()
+                if not isinstance(temperatures,list): temperatures=[]
+            except Exception:
+                temperatures = []
+            with self.lock:
+                self.gpu_temperatures = temperatures
             return
         llm_base = self.llm_url.rstrip("/")
         llm_models_url = (

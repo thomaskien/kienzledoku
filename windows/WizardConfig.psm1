@@ -17,6 +17,9 @@ function New-WizardServerConfig($InputConfig,$Previous,$Hardware,[string]$State,
     $cfg.CleanupModelStaging=[bool]$ui.cleanup_staging;$cfg.ForceModelVerification=($ui.verify_models -and $ui.recheck_models)
     $cfg.AuthEnabled=[bool]$ui.auth_enabled;$cfg.AsrOnDemand=([bool]$ui.asr_on_demand -and $ui.memory_mode -eq 'serial')
     $cfg.DiarizationMode=[string]$ui.diarization_mode;$cfg.RemoteLlmUrl=[string]$ui.remote_llm_url
+    $cfg.ServerRole=if($ui.server_role){[string]$ui.server_role}else{'full'};$cfg.AsrModel=if($ui.asr_model){[string]$ui.asr_model}else{'large-v3'};$cfg.Diarization=if($null -ne $ui.diarization){[bool]$ui.diarization}else{$true}
+    $cfg.RemoteDiarUrl=[string]$ui.remote_diar_url;$cfg.RemoteDiarTokenFile=Join-Path $State 'remote-diar.token'
+    if($ui.server_role -in @('asr','diar') -or $ui.remote_llm_url){$cfg.Models=@();$cfg.DefaultModel='';$cfg.ParallelModel=''}
     $cfg.RemoteLlmTokenFile=Join-Path $State 'remote-llm.token'
     $cfg.CommanderTokenFile=Join-Path $State 'installer-commander.token'
     $cfg.EnabledFields=@($ui.fields);$cfg.QualityModels=$ui.quality_models;$cfg.PromptText=[string]$ui.prompt

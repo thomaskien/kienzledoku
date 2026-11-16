@@ -115,7 +115,7 @@ class LinuxInstaller144Tests(unittest.TestCase):
         run = mock.Mock()
         patches = self.cli_context(["--components", "server"], 0)
         with patches[0], patches[1], patches[2], patches[3], patches[4], \
-                mock.patch.object(linux_cli, "server_answers", return_value=(cfg, "hf_test", "", "")), \
+                mock.patch.object(linux_cli, "server_answers", return_value=(cfg, "hf_test", "", "", "")), \
                 mock.patch.object(linux_cli, "yes", return_value=True), \
                 mock.patch.object(linux_cli, "private_write"), \
                 mock.patch.object(linux_cli.subprocess, "run", run):
@@ -130,7 +130,7 @@ class LinuxInstaller144Tests(unittest.TestCase):
         run = mock.Mock()
         patches = self.cli_context(["--components", "server"], 1000)
         with patches[0], patches[1], patches[2], patches[3], patches[4], \
-                mock.patch.object(linux_cli, "server_answers", return_value=(cfg, "hf_test", "", "")), \
+                mock.patch.object(linux_cli, "server_answers", return_value=(cfg, "hf_test", "", "", "")), \
                 mock.patch.object(linux_cli, "yes", return_value=True), \
                 mock.patch.object(linux_cli, "private_write"), \
                 mock.patch.object(linux_cli.subprocess, "run", run):
@@ -201,7 +201,7 @@ class LinuxInstaller144Tests(unittest.TestCase):
                 mock.patch.object(linux_cli.Path, "home", return_value=self.root / "empty-home"), \
                 mock.patch.dict(os.environ, {"HF_TOKEN": ""}), \
                 mock.patch.object(linux_cli.os, "sysconf", side_effect=(4096, 8 * 1024 * 1024)):
-            cfg, hf, token, remote = linux_cli.server_answers()
+            cfg, hf, token, remote, remote_diar = linux_cli.server_answers()
         self.assertEqual(0, cfg["GpuIndex"])
         self.assertEqual(["qwen4-q4"], cfg["Models"])
         self.assertEqual(["anamnese"], cfg["EnabledFields"])

@@ -90,7 +90,7 @@ class ModelImport(unittest.TestCase):
 
     def test_archive_has_only_required_audio_assets_and_pinned_model_revisions(self):
         audio=json.loads((ROOT/'audio-files.json').read_text())
-        self.assertEqual({'qwen4-q4','9b-q4','9b-q6','27b-q4','gemma12-qat-q4','gemma12-q8','gemma26-qat-q4'},set(CATALOG))
+        self.assertEqual({'qwen4-q4','9b-q4','9b-q6','27b-q4','gemma12-qat-q4','gemma12-q8','gemma26-qat-q4','gemma-e2b-qat-q4'},set(CATALOG))
         for entry in audio:
             self.assertTrue(entry.get('sha256') or entry.get('git_blob_sha1'))
             self.assertGreater(entry['bytes'],0)

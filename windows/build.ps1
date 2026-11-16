@@ -3,7 +3,7 @@ param([string]$Python, [string]$Go = 'go', [switch]$SkipInstaller)
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path $PSScriptRoot -Parent
 $Build = Join-Path $Root 'build/windows'
-$Package = Join-Path $Build 'kienzledoku-record-1.8'
+$Package = Join-Path $Build 'kienzledoku-record-1.8.1'
 New-Item -ItemType Directory -Force $Build, $Package | Out-Null
 function Run-Checked([string]$Program, [string[]]$Arguments) {
     & $Program @Arguments
@@ -58,7 +58,7 @@ try {
     Run-Checked (Join-Path $Runtime 'python.exe') @('-c', "import sys,unittest;sys.path.insert(0,sys.argv[1]);r=unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.discover(sys.argv[1]+'/tests'));sys.exit(not r.wasSuccessful())", $Root)
     Run-Checked (Join-Path $Runtime 'python.exe') @((Join-Path $Package 'kienzledoku.py'), '--self-test')
 } finally { Pop-Location; $env:KIENZLEDOKU_CONFIG_DIR = $PreviousConfig; $env:KIENZLEDOKU_TEST_CONNECT = $PreviousConnect }
-Compress-Archive -Path $Package -DestinationPath (Join-Path $Build 'kienzledoku-record-1.8-windows-x64.zip') -Force
+Compress-Archive -Path $Package -DestinationPath (Join-Path $Build 'kienzledoku-record-1.8.1-windows-x64.zip') -Force
 if (!$SkipInstaller) {
     $Iscc = (Get-Command 'ISCC.exe' -ErrorAction SilentlyContinue).Source
     if (!$Iscc) {
@@ -69,8 +69,8 @@ if (!$SkipInstaller) {
     Run-Checked $Iscc @("/DPackageDir=$Package", "/DOutputDir=$Build", (Join-Path $PSScriptRoot 'installer.iss'))
 }
 Write-Host "Build fertig: $Build"
-Write-Host "Programm-ZIP: $(Join-Path $Build 'kienzledoku-record-1.8-windows-x64.zip')"
+Write-Host "Programm-ZIP: $(Join-Path $Build 'kienzledoku-record-1.8.1-windows-x64.zip')"
 if (!$SkipInstaller) {
-    Write-Host "Installer: $(Join-Path $Build 'kienzledoku-record-1.8-windows-x64-setup.exe')"
+    Write-Host "Installer: $(Join-Path $Build 'kienzledoku-record-1.8.1-windows-x64-setup.exe')"
     Write-Host 'Zur Installation die oben genannte setup.exe starten.'
 }

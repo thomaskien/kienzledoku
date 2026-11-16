@@ -43,6 +43,13 @@ class LinuxModeTests(unittest.TestCase):
             with mock.patch.dict(os.environ,{'KIENZLEDOKU_COMMANDER_TOKEN':'synthetic'}):runtime.validate()
         return cfg,runtime,prompts,output.getvalue(),result[1:]
 
+    def test_remote_diar_and_turbo_survive_native_wizard(self):
+        cfg,runtime,_,_,_=self.ask_server(responses={
+            'Anderer Commander für Sprechertrennung':'http://192.0.2.3:8185',
+            'Whisper-Modell':'turbo-int8'})
+        self.assertEqual('http://192.0.2.3:8185',runtime.remote_diar_url)
+        self.assertEqual('turbo-int8',cfg['AsrModel'])
+
     def test_new_install_can_choose_normal_serial_instead_of_hardcoded_cold_start(self):
         cfg,runtime,prompts,output,_=self.ask_server(responses={
             'Modellbetrieb:':'seriell','Whisper erst bei Bedarf':'n'})
@@ -91,7 +98,7 @@ class LinuxModeTests(unittest.TestCase):
                  RemoteLlmUrl='http://192.0.2.1:8185')
         cfg,_,_,output,secrets=self.ask_server(old,tokens='KIENZLEDOKU_COMMANDER_TOKEN=local_synthetic\nKIENZLEDOKU_REMOTE_LLM_TOKEN=remote_synthetic\n')
         for key in old:self.assertEqual(old[key],cfg[key],key)
-        self.assertEqual(('hf_synthetic','local_synthetic','remote_synthetic'),secrets)
+        self.assertEqual(('hf_synthetic','local_synthetic','remote_synthetic',''),secrets)
         self.assertNotIn('local_synthetic',output);self.assertNotIn('remote_synthetic',output)
         self.assertIn('Vorhandener Commander-Token erkannt',output)
 

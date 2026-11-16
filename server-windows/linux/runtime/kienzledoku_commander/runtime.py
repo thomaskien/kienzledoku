@@ -181,12 +181,13 @@ class Runtime:
             # Backend errors can echo a prompt, filename or transcript. Never expose them.
             raise BackendFailure() from None
 
-    def remote_get(self, path):
-        if not self.settings.remote_llm_url:
+    def remote_get(self, path, role="llm"):
+        target = getattr(self.settings, "remote_" + role + "_url", "")
+        if not target:
             raise BackendFailure()
-        return self._http(self.settings.remote_llm_url.rstrip("/") + path,
+        return self._http(target.rstrip("/") + path,
                           timeout=self.settings.metadata_timeout,
-                          token=os.environ.get(self.settings.remote_llm_token_env),
+                          token=os.environ.get(getattr(self.settings, "remote_" + role + "_token_env")),
                           extra_headers={"X-Kienzledoku-Commander-Hop": "1"})
 
     def _remote_post(self, path, value):
@@ -278,6 +279,14 @@ class Runtime:
         if job.role == "asr":
             return self._http(self.settings.asr_url + "/v1/asr/final-block", job.payload["body"],
                 job.payload["content_type"], token=os.environ.get("KIENZLEDOKU_COMMANDER_ASR_TOKEN"))
+        if job.role == "diar" and self.settings.remote_diar_url:
+            if job.payload.get("hop"):
+                raise BackendFailure("Eine Commander-Weiterleitung darf nicht verkettet werden.")
+            return self._http(self.settings.remote_diar_url.rstrip("/") + "/v1/diarize" + job.payload.get("query", ""),
+                job.payload["body"], job.payload["content_type"],
+                token=os.environ.get(self.settings.remote_diar_token_env),
+                extra_headers={"X-Kienzledoku-Commander-Hop": "1",
+                    "X-Kienzledoku-Recording-Finalized": "true", "Idempotency-Key": job.id})
         if job.role == "diar":
             return self._http(self.settings.diar_url + "/v1/diarize" + job.payload.get("query", ""),
                 job.payload["body"], job.payload["content_type"])

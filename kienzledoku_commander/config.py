@@ -65,6 +65,8 @@ class Settings:
     enabled_fields: tuple = DEFAULT_DOCUMENT_FIELDS
     remote_llm_url: str = ""
     remote_llm_token_env: str = "KIENZLEDOKU_REMOTE_LLM_TOKEN"
+    remote_diar_url: str = ""
+    remote_diar_token_env: str = "KIENZLEDOKU_REMOTE_DIAR_TOKEN"
     gpu_index: int = 0
     diar_allocator_mib: int = 2048
     max_pending: int = 128
@@ -94,7 +96,7 @@ class Settings:
         times = ("remember_seconds", "backend_timeout", "load_timeout", "control_timeout", "queue_timeout", "metadata_timeout")
         if any(type(getattr(self, key)) not in (int, float) for key in times):
             raise ValueError("Numerische Zeitgrenze erwartet.")
-        strings = ("default_quality", "host", "token_env", "asr_url", "diar_url", "llm_url", "llama_binary", "control_dir", "prompt_path", "platform", "remote_llm_token_env")
+        strings = ("default_quality", "host", "token_env", "asr_url", "diar_url", "llm_url", "llama_binary", "control_dir", "prompt_path", "platform", "remote_llm_token_env", "remote_diar_token_env")
         if any(not isinstance(getattr(self, key), str) or not getattr(self, key) for key in strings):
             raise ValueError("Texteinstellung erwartet.")
         if type(self.auth_enabled) is not bool or type(self.asr_on_demand) is not bool:
@@ -119,10 +121,14 @@ class Settings:
                 raise ValueError("Interne Backends müssen lokale HTTP-Adressen mit Port sein.")
         if self.llm_url.rstrip("/") in (self.asr_url.rstrip("/"), self.diar_url.rstrip("/")) or urlsplit(self.llm_url).port == self.port:
             raise ValueError("Commander und Backends benötigen getrennte Ports.")
-        if self.remote_llm_url:
-            u = urlsplit(self.remote_llm_url)
+        for remote in (self.remote_llm_url, self.remote_diar_url):
+            if not isinstance(remote, str):
+                raise ValueError("Remote-Adresse muss Text sein.")
+            if not remote:
+                continue
+            u = urlsplit(remote)
             if u.scheme not in ("http", "https") or not u.hostname or not u.port or u.username or u.password or u.query or u.fragment or u.path not in ("", "/"):
-                raise ValueError("remote_llm.url benötigt ein explizites HTTP(S)-Ziel mit Port.")
+                raise ValueError("Remote-Commander benötigt ein explizites HTTP(S)-Ziel mit Port.")
             if u.port == self.port and u.hostname in (self.host, "127.0.0.1", "localhost", "::1", "0.0.0.0", "::"):
                 raise ValueError("Der Commander darf sich nicht selbst als Remote-Ziel verwenden.")
         if not 1 <= self.port <= 65535 or not Path(self.control_dir).is_absolute():
@@ -138,6 +144,8 @@ class Settings:
                 raise ValueError("Worker-Kommandos benötigen absolute Python- und Scriptpfade.")
         if self.platform == "macos" and self.memory_mode is not None:
             for role, command, model_path in (("asr", self.asr_command, self.asr_model_path), ("diar", self.diar_command, self.diar_model_path)):
+                if role == "diar" and self.remote_diar_url:
+                    continue
                 if role in roles and (not command or not model_path or not Path(model_path).is_absolute()):
                     raise ValueError("Aktivierte macOS-Worker benötigen Kommando und absoluten Modellpfad.")
         if self.gpu_index < 0 or not 256 <= self.diar_allocator_mib <= 6144:
@@ -261,7 +269,7 @@ def detect_tier(index):
 
 def load_settings(path):
     with open(path, "rb") as f: data = tomllib.load(f)
-    if set(data) - {"server", "gpu", "policy", "backends", "models", "remote_llm", "benchmark_models"}:
+    if set(data) - {"server", "gpu", "policy", "backends", "models", "remote_llm", "remote_diar", "benchmark_models"}:
         raise ValueError("Unbekannter Konfigurationsabschnitt.")
     mapping = {
         "server": {k: k for k in ("host", "port", "token_env", "auth_enabled")},
@@ -269,6 +277,7 @@ def load_settings(path):
         "policy": {k: k for k in ("default_quality", "memory_mode", "diarization_mode", "asr_on_demand", "enabled_roles", "enabled_fields", "max_pending", "max_remembered", "max_payload_mib", "remember_seconds", "backend_timeout", "load_timeout", "control_timeout", "queue_timeout", "metadata_timeout", "asr_parallel", "diar_parallel")},
         "backends": {k: k for k in ("platform", "asr_url", "diar_url", "llm_url", "llama_binary", "control_dir", "diar_control_dir", "prompt_path", "asr_command", "diar_command", "asr_model_path", "diar_model_path")},
         "remote_llm": {"url": "remote_llm_url", "token_env": "remote_llm_token_env"},
+        "remote_diar": {"url": "remote_diar_url", "token_env": "remote_diar_token_env"},
     }
     values = {}
     if 'benchmark_models' in data:

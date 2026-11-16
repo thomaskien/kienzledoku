@@ -9,7 +9,7 @@ import uuid
 
 from .errors import BackendFailure, Busy, Conflict, InvalidRequest
 
-VERSION = '1.8'
+VERSION = '1.8.1'
 
 
 def choices(settings, loaded=None):

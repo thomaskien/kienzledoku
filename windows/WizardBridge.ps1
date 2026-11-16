@@ -79,6 +79,7 @@ try {
         [IO.Directory]::CreateDirectory($state)|Out-Null
         Save-Secret $cfg.TokenFile $ui.hf_token
         Save-Secret $cfg.RemoteLlmTokenFile $ui.remote_llm_token
+        Save-Secret $cfg.RemoteDiarTokenFile $ui.remote_diar_token
         Save-Secret $cfg.CommanderTokenFile $ui.server_token
         $pending=Join-Path $state 'pending-install.json'
         Write-Json $pending $cfg;Set-PrivateFile $pending
@@ -106,7 +107,7 @@ try {
     Write-Json $ResultPath $outcome;Set-PrivateFile $ResultPath
 } catch {
     $message=$_.Exception.Message
-    if($ui){foreach($name in @('hf_token','server_token','remote_llm_token','commander_token')){if($ui.PSObject.Properties[$name] -and $ui.$name){$message=$message.Replace($ui.$name,'[Token ausgelassen]')}}}
+    if($ui){foreach($name in @('hf_token','server_token','remote_llm_token','remote_diar_token','commander_token')){if($ui.PSObject.Properties[$name] -and $ui.$name){$message=$message.Replace($ui.$name,'[Token ausgelassen]')}}}
     if($ResultPath){Write-Json $ResultPath @{done=$false;error=$message}}
     exit 1
 } finally {if($held){$mutex.ReleaseMutex()};if($mutex){$mutex.Dispose()}}

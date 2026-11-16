@@ -21,10 +21,11 @@ ROOT = Path(__file__).resolve().parents[1]
 PAYLOAD = ROOT.parent if (ROOT.parent/'server/models.json').exists() else ROOT
 SERVER = PAYLOAD/'server' if (PAYLOAD/'server').exists() else ROOT/'server-windows'
 BRIDGE = PAYLOAD/'WizardBridge.ps1' if (PAYLOAD/'WizardBridge.ps1').exists() else ROOT/'windows/WizardBridge.ps1'
-VERSION = '1.8'
+VERSION = '1.8.1'
+from installer.options import SERVER_ROLES, ASR_MODELS, local_role
 CATALOG = json.loads((SERVER/'models.json').read_text(encoding='utf-8-sig'))
 GRADES = dict(basis='Basis', gruendlich='Gründlich', sehr_gruendlich='Sehr gründlich')
-SECRETS = ('commander_token', 'server_token', 'remote_llm_token', 'hf_token')
+SECRETS = ('commander_token', 'server_token', 'remote_llm_token', 'remote_diar_token', 'hf_token')
 DOCS = 'https://github.com/thomaskien/kienzledoku#t2med-einrichten-und-verwenden'
 
 
@@ -63,10 +64,10 @@ def address(value):
 def hardware(info):
     h = info.get('hardware') or {}
     gpus = h.get('Gpus') or []
-    gpu = next((g for g in gpus if g.get('Index') == (info.get('previous') or {}).get('GpuIndex') and g.get('VramMiB',0)>=7936), next((g for g in gpus if g.get('VramMiB',0)>=7936),gpus[0] if gpus else {}))
+    gpu = next((g for g in gpus if g.get('Index') == (info.get('previous') or {}).get('GpuIndex') and g.get('VramMiB',0)>=3840), next((g for g in gpus if g.get('VramMiB',0)>=3840),gpus[0] if gpus else {}))
     ram = h.get('RamBytes', 0) / 2**30
     return dict(platform='win32', arch=h.get('Architecture', 'AMD64'), ram_gib=round(ram,1),
-                server_supported=h.get('Build',0) >= 22000 and h.get('Architecture') == 'AMD64' and gpu.get('VramMiB',0) >= 7936 and ram >= 19.5,
+                server_supported=h.get('Build',0) >= 22000 and h.get('Architecture') == 'AMD64' and gpu.get('VramMiB',0) >= 3840 and ram >= 19.5,
                 vram_mib=gpu.get('VramMiB',0), gpu_index=gpu.get('Index',0), gpus=gpus,
                 lan_addresses=[a['IPAddress'] for a in h.get('Addresses',[])], info=info)
 
@@ -96,15 +97,15 @@ def defaults(hw, support):
     info = hw.get('info', {})
     from kienzledoku_commander_client import configured_client
     commander_token=configured_client(cc['commander']).token
-    cfg = dict(mode='combined' if info.get('client') and old else 'server' if old else 'client', server_role='full',
+    cfg = dict(mode='combined' if info.get('client') and old else 'server' if old else 'client', server_role=old.get('ServerRole','full'),
                connection_mode=cc['connection']['mode'], t2med_url=cc['connection']['target'], t2med_insecure=cc['connection']['allow_insecure_tls'],
                commander_url=cc['commander']['url'], commander_token=commander_token,
                network=old.get('NetworkMode','local'), listen_host=old.get('NetworkAddress') or next(iter(hw['lan_addresses']),''),
-               auth_enabled=old.get('AuthEnabled',False), server_token='', remote_llm_url=old.get('RemoteLlmUrl',''), remote_llm_token='',
+               auth_enabled=old.get('AuthEnabled',False), server_token='', remote_llm_url=old.get('RemoteLlmUrl',''), remote_llm_token='',remote_diar_url=old.get('RemoteDiarUrl',''),remote_diar_token='',asr_model=old.get('AsrModel','turbo-int8' if hw['vram_mib']<7936 else 'large-v3'),
                selected_models=old.get('Models',['qwen4-q4']), quality_models=old.get('QualityModels',{}),
                memory_mode='parallel' if old.get('ParallelModel') else 'serial', parallel_model=old.get('ParallelModel',''),
                default_model=old.get('DefaultModel','qwen4-q4'), diarization_mode=old.get('DiarizationMode') or ('resident' if old.get('ParallelModel') else 'serial'),
-               asr_on_demand=old.get('AsrOnDemand',True), diarization=True, hf_token='',
+               asr_on_demand=old.get('AsrOnDemand',True), diarization=old.get('Diarization',True), hf_token='',
                fields=old.get('EnabledFields',list(DEFAULT_DOCUMENT_FIELDS)), prompt=restored_prompt(old.get('PromptText')),
                wsl_ram_gib=old.get('WslRamGiB', next((n for n in (32,28,24,16) if hw['ram_gib']-n >= 3.5),16)),
                gpu_index=hw['gpu_index'], cache_directory=old.get('CacheDirectory',str(Path.home()/'Downloads/kienzledoku-modelle')),
@@ -117,7 +118,7 @@ def defaults(hw, support):
             if mid in CATALOG: cfg['quality_models'].setdefault(CATALOG[mid]['grade'],mid)
     state = Path(os.environ.get('LOCALAPPDATA',''))/'kienzledoku-server'
     for key, path in [('hf_token',Path(old.get('TokenFile') or state/'hf.token')),
-                      ('server_token',state/'client.token'),('remote_llm_token',state/'remote-llm.token')]:
+                      ('server_token',state/'client.token'),('remote_llm_token',state/'remote-llm.token'),('remote_diar_token',state/'remote-diar.token')]:
         try: cfg[key] = path.read_text(encoding='utf-8-sig').strip()
         except OSError: pass
     if not cfg['hf_token']:
@@ -151,7 +152,7 @@ def bootstrap(hw=None, support=None):
 
 def validate(cfg, hw):
     if not isinstance(cfg,dict) or set(cfg)!=set(defaults(hw,None)): raise ValueError('Unvollständige oder unbekannte Einstellungen.')
-    for key, choices in dict(mode=('client','server','combined'),server_role=('full',),connection_mode=('direct','connect'),network=('local','lan'),memory_mode=('serial','parallel'),diarization_mode=('resident','with_asr','serial'),audio_cache=('ram','disk')).items():
+    for key, choices in dict(mode=('client','server','combined'),server_role=tuple(SERVER_ROLES),asr_model=ASR_MODELS,connection_mode=('direct','connect'),network=('local','lan'),memory_mode=('serial','parallel'),diarization_mode=('resident','with_asr','serial'),audio_cache=('ram','disk')).items():
         if cfg[key] not in choices: raise ValueError('Ungültige Auswahl: '+key)
     for key in ('t2med_insecure','auth_enabled','asr_on_demand','diarization','autostart','verify','verify_models','cleanup_staging','recheck_models'):
         if type(cfg[key]) is not bool: raise ValueError('Ungültige Einstellung: '+key)
@@ -159,29 +160,33 @@ def validate(cfg, hw):
         if not isinstance(cfg[key],str) or len(cfg[key])>4096 or any(c.isspace() for c in cfg[key]): raise ValueError('Ungültiges Token.')
     address(cfg['commander_url'])
     if cfg['remote_llm_url']: address(cfg['remote_llm_url'])
+    if cfg['remote_diar_url']: address(cfg['remote_diar_url'])
     c=client.defaults(); c['connection'].update(target=cfg['t2med_url'],mode=cfg['connection_mode'],allow_insecure_tls=cfg['t2med_insecure']); client.validate(c)
     if list(validate_fields(cfg['fields']))!=cfg['fields']: raise ValueError('Ungültige Dokumentationsfelder.')
     if not isinstance(cfg['prompt'],str) or not cfg['prompt'].strip() or len(cfg['prompt'])>65536: raise ValueError('Prompt fehlt oder ist zu lang.')
     if cfg['mode']=='client': return cfg
-    if not hw['server_supported']: raise ValueError('Lokaler Server benötigt Windows 11 x64, NVIDIA ab 8 GB VRAM und mindestens 20 GB RAM. Nur Client benötigt dies nicht.')
+    if not hw['server_supported']: raise ValueError('Lokaler Server benötigt Windows 11 x64, NVIDIA ab 4 GB VRAM und mindestens 20 GB RAM. Nur Client benötigt dies nicht.')
     gpu=next((g for g in hw['gpus'] if g['Index']==cfg['gpu_index']),None)
     if not gpu: raise ValueError('NVIDIA-GPU auswählen.')
     if cfg['wsl_ram_gib'] not in (16,24,28,32) or hw['ram_gib']-cfg['wsl_ram_gib']<3.5: raise ValueError('Mindestens 4 GB RAM für Windows freihalten.')
     models=cfg['selected_models']
-    if not isinstance(models,list) or not models or len(set(models))!=len(models) or any(m not in CATALOG for m in models): raise ValueError('Mindestens ein gültiges Modell auswählen.')
+    if not isinstance(models,list) or (local_role(cfg,'llm') and not models) or len(set(models))!=len(models) or any(m not in CATALOG for m in models): raise ValueError('Mindestens ein gültiges Modell auswählen.')
     for mid in models:
         m=CATALOG[mid]
         if gpu['VramMiB']<m['serial_vram_mib']: raise ValueError(m['label']+': zu wenig VRAM.')
         if cfg['wsl_ram_gib']<m.get('ram_audio_min_wsl_gib',0) and cfg['audio_cache']!='disk': raise ValueError(m['label']+': Whisper-SSD-Sparmodus oder mehr WSL-RAM erforderlich.')
     mapping=cfg['quality_models']
-    if not isinstance(mapping,dict) or not mapping: raise ValueError('Aktive Qualitätsstufe auswählen.')
+    if not isinstance(mapping,dict) or (local_role(cfg,'llm') and not mapping): raise ValueError('Aktive Qualitätsstufe auswählen.')
     for grade,mid in mapping.items():
         if grade not in GRADES or mid not in models or CATALOG[mid]['grade']!=grade: raise ValueError('Ungültige Modellzuordnung.')
-    if cfg['default_model'] not in mapping.values(): raise ValueError('Standardmodell muss einer aktiven Qualitätsstufe zugeordnet sein.')
+    if local_role(cfg,'llm') and cfg['default_model'] not in mapping.values(): raise ValueError('Standardmodell muss einer aktiven Qualitätsstufe zugeordnet sein.')
     if cfg['memory_mode']=='parallel':
         mid=cfg['parallel_model']
         if mid not in models or not CATALOG[mid]['parallel_vram_mib'] or gpu['VramMiB']<CATALOG[mid]['parallel_vram_mib']: raise ValueError('Für diese GPU freigegebenes Parallelmodell auswählen.')
-    if not cfg['diarization']: raise ValueError('Der Windows-Server verwendet Sprechertrennung; den Speichermodus separat auswählen.')
+    if gpu['VramMiB']<7936:
+        if cfg['memory_mode']!='serial' or not cfg['asr_on_demand'] or cfg['diarization_mode']!='serial':
+            raise ValueError('Unter 8 GB VRAM verschärft seriell und serielle Sprechertrennung wählen.')
+        if local_role(cfg,'asr') and cfg['asr_model']!='turbo-int8': raise ValueError('Für diese GPU Whisper Turbo 8 Bit auswählen.')
     if cfg['network']=='lan' and cfg['listen_host'] not in hw['lan_addresses']: raise ValueError('Eine vorhandene LAN-IP auswählen.')
     for key in ('cache_directory','install_directory'):
         import ntpath
@@ -203,6 +208,8 @@ def plan(cfg, hw=None):
                 'Commander-Token: '+('aktiviert' if cfg['auth_enabled'] else 'ausgeschaltet')]
         lines += [GRADES[g]+': '+CATALOG[m]['label'] for g,m in cfg['quality_models'].items()]
         if cfg['remote_llm_url']: lines+=['LLM über anderen Commander: '+cfg['remote_llm_url']]
+        if cfg['remote_diar_url']: lines+=['Sprechertrennung über '+cfg['remote_diar_url']]
+        if local_role(cfg,'asr'):lines+=['Whisper-Modell: '+cfg['asr_model']]
     return dict(summary=lines,download_bytes=sum(f['bytes'] for m in cfg['selected_models'] for f in CATALOG[m]['files']) if cfg['mode']!='client' else 0)
 
 

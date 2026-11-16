@@ -7,9 +7,9 @@ function Assert($Value,[string]$Message){if(-not $Value){throw $Message}}
 function Case([string]$Name,[scriptblock]$Body){& $Body;$script:Passed++;Write-Output ('PASS '+$Name)}
 $models=@($catalog.PSObject.Properties | ForEach-Object {$_.Name})
 $gemma=@('gemma12-qat-q4','gemma12-q8','gemma26-qat-q4')
-Case 'Seven catalogue models include Qwen 4B, the original Qwen models and three Gemma models' {
-    Assert ($models.Count -eq 7) 'Incorrect catalogue size.'
-    foreach($id in @('qwen4-q4','9b-q4','9b-q6','27b-q4')+$gemma){Assert ($id -in $models) ('Missing '+$id)}
+Case 'Eight catalogue models include Qwen 4B, the original Qwen models and four Gemma models' {
+    Assert ($models.Count -eq 8) 'Incorrect catalogue size.'
+    foreach($id in @('qwen4-q4','9b-q4','9b-q6','27b-q4','gemma-e2b-qat-q4')+$gemma){Assert ($id -in $models) ('Missing '+$id)}
 }
 Case '16-GiB GPU offers the QAT 12B parallel selection only among the Gemma entries' {
     $choices=@(Get-ParallelModelChoices $catalog $gemma 16384)
@@ -26,9 +26,9 @@ Case '24-GiB GPU offers all three Gemma entries with exactly one explicit reside
         Assert (@($plan.Values | Where-Object {$_.Mode -eq 'parallel'}).Count -eq 1) 'Multiple resident models.'
     }
 }
-Case 'All seven models can be configured serially on a 24-GiB GPU' {
+Case 'All eight models can be configured serially on a 24-GiB GPU' {
     $plan=Get-ProfilePlan $catalog $models 'gemma12-q8' selected 24576 32 ram ''
-    Assert (@($plan.Values | Where-Object {$_.Mode -eq 'serial'}).Count -eq 7) 'Serial model omitted.'
+    Assert (@($plan.Values | Where-Object {$_.Mode -eq 'serial'}).Count -eq 8) 'Serial model omitted.'
 }
 Case 'Download preparation includes only selected Gemma weights and shared audio' {
     $files=@(Get-RequiredFiles $root $gemma)

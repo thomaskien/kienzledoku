@@ -33,13 +33,14 @@ let phase = 'startup';
     for (const scale of [1,1.25,1.5]) {
       const context = await browser.newContext({deviceScaleFactor:scale});
       const page = await context.newPage();
-      let status = 'ready', host = '10.0.83.140';
+      let status = 'ready', host = '10.0.83.140', temperatureCount=0;
       const errors = [];
       page.on('pageerror',() => errors.push('script'));
       await page.route('**/status',async route => {
         const response = await route.fetch(), data = await response.json();
         for (const service of Object.values(data.services)) {service.status=status;service.host=host;}
         data.t2med_status=status;data.t2med_host=host;
+        data.gpu_temperatures=Array.from({length:temperatureCount},(_,i)=>({address:`http://192.0.2.${i+1}:8185`,value:44+i,tooltip:`http://192.0.2.${i+1}:8185 · GPU`}));
         await route.fulfill({response,json:data});
       });
       await page.goto(url);
@@ -99,7 +100,7 @@ let phase = 'startup';
       for (const width of [820,980,1280,1440]) {
         await page.setViewportSize({width,height:960});
         const fits=await page.locator('.server-row').evaluate(row => {
-          const r=row.getBoundingClientRect(),badges=[...row.children].map(el=>el.getBoundingClientRect());
+          const r=row.getBoundingClientRect(),badges=[...row.querySelectorAll(".server-badge")].map(el=>el.getBoundingClientRect());
           return badges.every(b=>Math.abs(b.y-badges[0].y)<0.5 && b.right<=r.right+0.5);
         });
         assert.ok(fits,'Long hosts must not wrap or overflow');
@@ -120,6 +121,18 @@ let phase = 'startup';
         await page.locator('.record-heading').screenshot({path:process.argv[3]+'.wide.png'});
         await page.setViewportSize({width:820,height:960});
         await page.locator('.record-heading').screenshot({path:process.argv[3]+'.narrow.png'});
+      }
+      for(const count of [1,3,0]) {
+        temperatureCount=count;
+        await page.waitForFunction(n=>document.querySelectorAll('.gpu-temperature').length===n,count);
+        for(const width of [820,980,1280,1440]) {
+          await page.setViewportSize({width,height:960});await page.waitForTimeout(40);
+          const boxes=await page.locator('.server-badge').evaluateAll(nodes=>nodes.map(el=>({top:el.getBoundingClientRect().top,right:el.getBoundingClientRect().right,bottom:el.getBoundingClientRect().bottom})));
+          assert(boxes.every(b=>Math.abs(b.top-boxes[0].top)<.5),'Temperature badges wrap');
+          assert(boxes.every(b=>b.right<=width),'Temperature badge overflows');
+          assert.equal(await page.locator('.gpu-temperature').count(),count);
+          if(process.argv[3] && scale===1 && count===3 && width===1280)await page.locator('.record-heading').screenshot({path:process.argv[3]+'.temperatures.png'});
+        }
       }
       await context.close();
     }

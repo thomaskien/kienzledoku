@@ -36,7 +36,7 @@ def stage(output, llvm, key_file=None, go='/usr/local/bin/go'):
                  'build_connect.sh', 'start_kienzledoku_asr.sh', 'requirements-asr-client.txt',
                  'prompt_documentation.txt', 'config.example.toml', 'installer/linux_cli.py',
                  'installer/linux_server.py', 'installer/linux_uninstall.py', 'installer/models.json',
-                 'server-windows/linux', 'server-windows/models.json', 'server-windows/audio-files.json',
+                 'server-windows/linux', 'server-windows/models.json', 'server-windows/audio-files.json', 'server-windows/audio-turbo-files.json',
                  'server-windows/VERSION', 'connect'):
         copy(ROOT/name, payload/name)
     copy(ROOT/'linux/README.md', payload/'README.md')

@@ -117,7 +117,15 @@ class HardwareProbe:
                     label = self._read(prefix.replace('_input','_label')) or chip
                     sensors.append(self._sensor(kind, chip+':'+directory.name+':'+sensor.stem,
                                                 label, number(self._read(prefix), .001), 'linux-hwmon'))
-        sensors.extend(self._nvidia(deadline, temperature=True))
+        if self.system == 'Darwin':
+            rows = self._json([sys.executable, str(Path(__file__).with_name('mac_sensors.py'))], deadline)
+            if isinstance(rows, list):
+                for row in rows[:256]:
+                    if isinstance(row, dict) and row.get('kind') in ('cpu', 'gpu'):
+                        sensors.append(self._sensor(row['kind'], str(row.get('id','smc')), str(row.get('name','SMC')),
+                            number(row.get('value')), 'apple-smc'))
+        else:
+            sensors.extend(self._nvidia(deadline, temperature=True))
         for kind in ('cpu','gpu'):
             if not any(s['kind']==kind for s in sensors):
                 reason = 'no_supported_unprivileged_sensor' if self.system == 'Darwin' else 'sensor_not_exposed'

@@ -17,11 +17,12 @@ http=urllib.request.build_opener(urllib.request.ProxyHandler({}))
 def expected_baseline(cfg):
     resident=cfg.get('resident_quality')
     if resident is None:
-        resident=cfg['default_quality'] if cfg['profiles'][cfg['default_quality']].get('mode','serial')=='parallel' else ''
+        resident=cfg['default_quality'] if cfg['profiles'].get(cfg['default_quality'],{}).get('mode','serial')=='parallel' else ''
     if cfg.get('remote_llm_url'): resident = ''
-    asr = not cfg.get('asr_on_demand',False)
+    asr = 'asr' in cfg.get('enabled_roles',('asr','diar','llm')) and not cfg.get('asr_on_demand',False)
     mode = cfg.get('diarization_mode')
     diar = True if mode == 'resident' else asr if mode == 'with_asr' else False if mode == 'serial' else bool(resident)
+    if cfg.get('remote_diar_url') or 'diar' not in cfg.get('enabled_roles',('asr','diar','llm')):diar=False
     return {'asr':asr,'diar':diar,'llm':(('@' if cfg.get('quality_models') else '')+resident) if resident else None}
 
 def main():
@@ -43,7 +44,7 @@ def main():
         while time.monotonic()<deadline:
             try:
                 s=get('/v1/runtime/status')
-                if ((s['asr_ready'] or cfg.get('asr_on_demand',False)) and all(s['loaded'][key]==value for key,value in wanted_baseline.items() if key!='asr' or not cfg.get('asr_on_demand',False) or not wanted_baseline['llm'])
+                if ((s['asr_ready'] or cfg.get('asr_on_demand',False) or 'asr' not in cfg.get('enabled_roles',('asr','diar','llm'))) and all(s['loaded'][key]==value for key,value in wanted_baseline.items() if key!='asr' or not cfg.get('asr_on_demand',False) or not wanted_baseline['llm'])
                     and not s['transition_running'] and not s['pending'] and not s['active'] and not s['last_error']):
                     return s
             except (OSError,ValueError):pass
@@ -57,12 +58,31 @@ def main():
         assert result['ok'] is True
         return result['state']
     before=baseline()
+    roles=set(cfg.get('enabled_roles',('asr','diar','llm')))
+    if roles!={'asr','diar','llm'} or cfg.get('remote_diar_url') or cfg.get('remote_llm_url'):
+        import io,wave
+        from install_server import save
+        stream=io.BytesIO()
+        with wave.open(stream,'wb') as wav:
+            wav.setnchannels(1);wav.setsampwidth(2);wav.setframerate(16000);wav.writeframes(b'\0\0'*16000)
+        audio=stream.getvalue()
+        if 'asr' in roles:
+            body=b'--verify\r\nContent-Disposition: form-data; name="file"; filename="synthetic.wav"\r\nContent-Type: audio/wav\r\n\r\n'+audio+b'\r\n--verify--\r\n'
+            assert isinstance(get('/v1/asr/final-block',body,'multipart/form-data; boundary=verify').get('text'),str)
+        if 'diar' in roles:get('/v1/diarize?num_speakers=1',audio,'audio/wav',True)
+        if 'llm' in roles:
+            value=get('/v1/documentation/extract',json.dumps({'transcript':'Synthetischer Funktionstest. Es wurden keine Beschwerden berichtet.','recording_finalized':True}).encode(),final=True)
+            assert isinstance(value.get('documentation'),dict)
+        baseline()
+        save('verification.json',dict(ok=True,synthetic_only=True,roles=sorted(roles),time=time.time()))
+        installed=json.loads((STATE/'installed.json').read_text());installed['verified']=True;save('installed.json',installed)
+        print('Ausgewählte Dienste einschließlich Commander-Weiterleitungen geprüft.');return
     group=subprocess.check_output(['systemctl','show','kienzledoku-ai.slice','-p','ControlGroup','--value'],text=True).strip()
     cgroup=Path('/sys/fs/cgroup')/group.lstrip('/')
     memory_events_before=dict(line.split() for line in (cgroup/'memory.events').read_text().splitlines())
     original=worker('whisper.sock',cfg['control_dir'])
     profiles=get('/v1/runtime/profiles')
-    assert all(p['context_per_slot']==32768 and p['slots']==1 for p in profiles['data'])
+    assert all(p['context_per_slot'] in (8192,32768) and p['slots']==1 for p in profiles['data'])
     if cfg.get('auth_enabled',True):
         try:get('/v1/runtime/status',auth=False)
         except HTTPError as exc:assert exc.code==401

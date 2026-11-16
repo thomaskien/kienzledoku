@@ -69,13 +69,43 @@ def file_valid(path, entry):
 def catalog():
     return json.loads((ROOT / 'models.json').read_text())
 
+def enabled_roles(cfg):
+    roles=list({'full':('asr','diar','llm'),'asr':('asr','diar'),'llm':('llm',),
+                'llm_diar':('llm','diar'),'diar':('diar',)}[cfg.get('ServerRole','full')])
+    if not cfg.get('Diarization',True) and 'diar' in roles: roles.remove('diar')
+    if cfg.get('RemoteLlmUrl') and 'llm' not in roles: roles.append('llm')
+    return roles
+
+def local_role(cfg,role):
+    return role in enabled_roles(cfg) and not cfg.get({'llm':'RemoteLlmUrl','diar':'RemoteDiarUrl'}.get(role,''))
+
+def selected_units(cfg):
+    return [UNITS[0]]+([UNITS[1]] if local_role(cfg,'asr') else [])+([UNITS[2]] if local_role(cfg,'diar') else [])
+
+def audio_files(cfg):
+    entries=json.loads((ROOT/'audio-files.json').read_text())
+    result=[e for e in entries if e['path'].startswith('pyannote/') and local_role(cfg,'diar')]
+    if local_role(cfg,'asr'):
+        if cfg.get('AsrModel','large-v3')=='turbo-int8':
+            result+=json.loads((ROOT/'audio-turbo-files.json').read_text())
+        else:result += [e for e in entries if e['path'].startswith('whisper/')]
+    return result
+
 def validate_config(cfg, vram_mib):
     choices = catalog()
     if cfg['WslRamGiB'] not in (16,24,28,32): raise ValueError('Ungültiges RAM-Limit.')
-    if cfg['DefaultModel'] not in cfg['Models']: raise ValueError('Standardmodell fehlt.')
+    if local_role(cfg,'llm') and cfg['DefaultModel'] not in cfg['Models']: raise ValueError('Standardmodell fehlt.')
     if cfg['AudioCache'] not in ('ram','disk'): raise ValueError('Ungültiger Audiocache.')
+    if cfg.get('ServerRole','full') not in ('full','asr','llm','llm_diar','diar'): raise ValueError('Ungültige Serverrolle.')
+    if cfg.get('AsrModel','large-v3') not in ('large-v3','turbo-int8'): raise ValueError('Ungültiges Whisper-Modell.')
+    if not enabled_roles(cfg): raise ValueError('Mindestens ein Dienst muss aktiv sein.')
+    if vram_mib < 7936:
+        if cfg.get('ParallelModel') or not cfg.get('AsrOnDemand',False) or cfg.get('DiarizationMode')!='serial':
+            raise ValueError('Unter 8 GB VRAM verschärft seriell mit serieller Sprechertrennung wählen.')
+        if local_role(cfg,'asr') and cfg.get('AsrModel')!='turbo-int8':
+            raise ValueError('Unter 8 GB VRAM Whisper large-v3-turbo int8 wählen.')
     if cfg.get('DiarizationMode') not in (None,'resident','with_asr','serial'): raise ValueError('Ungültige Speichernutzung der Sprechertrennung.')
-    if not cfg['Models'] or len(cfg['Models']) != len(set(cfg['Models'])): raise ValueError('Ungültige Modellauswahl.')
+    if (local_role(cfg,'llm') and not cfg['Models']) or len(cfg['Models']) != len(set(cfg['Models'])): raise ValueError('Ungültige Modellauswahl.')
     if len({choices[key]['quality'] for key in cfg['Models']}) != len(cfg['Models']): raise ValueError('Modell-IDs müssen eindeutig sein.')
     if 'ParallelModel' in cfg:
         parallel=cfg['ParallelModel']
@@ -126,7 +156,7 @@ def prepare_host():
 def import_models(cfg):
     source=Path(cfg['LinuxModelSource'])
     entries=[f for key in cfg['Models'] for f in catalog()[key]['files']]
-    entries+=json.loads((ROOT/'audio-files.json').read_text())
+    entries+=audio_files(cfg)
     for entry in entries:
         relative=Path(entry['path'])
         if relative.is_absolute() or '..' in relative.parts: raise ValueError('Ungültiger Modellpfad.')
@@ -224,18 +254,18 @@ def runtime_settings(cfg,hw):
                                       parallel_vram_mib=item['parallel_vram_mib'],fallbacks=item.get('fallbacks',
                                       {'basis':[],'gruendlich':['basis'],'sehr_gruendlich':['gruendlich','basis']}.get(item['quality'],[])))
     server=dict(tier=round(hw['vram_mib']/1024),host='127.0.0.1',port=8185,gpu_index=cfg['GpuIndex'],
-                default_quality=catalog()[cfg['DefaultModel']]['quality'],llama_binary=str(BASE/'bin/llama-server'),
+                default_quality=catalog()[cfg['DefaultModel']]['quality'] if local_role(cfg,'llm') else 'auto',llama_binary=str(BASE/'bin/llama-server'),
                 profiles=profiles,prompt_path=str(CONFIG/'prompt_documentation.txt'),control_dir='/run/kienzledoku-commander',
                 diar_control_dir='/run/kienzledoku-commander-diar',max_pending=4,max_remembered=8,max_payload_mib=512,
                 load_timeout=600,backend_timeout=7200,queue_timeout=1800)
     if 'ParallelModel' in cfg:
         server['resident_quality']=catalog()[cfg['ParallelModel']]['quality'] if cfg['ParallelModel'] else ''
-    server.update(asr_model_path=str(BASE/'models/whisper'),diar_model_path=str(BASE/'models/pyannote'))
+    server.update(asr_model_path=str(BASE/'models'/('whisper-turbo' if cfg.get('AsrModel')=='turbo-int8' else 'whisper')),diar_model_path=str(BASE/'models/pyannote'))
     server.update(auth_enabled=cfg.get('AuthEnabled', True), asr_on_demand=cfg.get('AsrOnDemand', False),
                   diarization_mode=cfg.get('DiarizationMode'),
                   enabled_fields=cfg.get('EnabledFields', ['anamnese','befund','therapie','prozedere']),
-                  remote_llm_url=cfg.get('RemoteLlmUrl', ''))
-    if 'QualityModels' in cfg:
+                  remote_llm_url=cfg.get('RemoteLlmUrl', ''),remote_diar_url=cfg.get('RemoteDiarUrl',''),enabled_roles=enabled_roles(cfg))
+    if 'QualityModels' in cfg and local_role(cfg,'llm'):
         mapping={q:catalog()[key]['quality'] for q,key in cfg['QualityModels'].items() if key in cfg['Models']}
         if not mapping: raise ValueError('Keine aktive Modellstufe gewählt.')
         server['quality_models']=mapping
@@ -260,6 +290,11 @@ def configure(cfg,hw):
         if len(secret)>4096 or any(c.isspace() for c in secret): raise ValueError('Ungültiger Remote-Token.')
         original=token_file.read_text().splitlines()[0]
         write(token_file,original+'\n'+('KIENZLEDOKU_REMOTE_LLM_TOKEN='+secret+'\n' if secret else ''),0o600)
+    if cfg.get('LinuxRemoteDiarTokenFile'):
+        secret=Path(cfg['LinuxRemoteDiarTokenFile']).read_text().strip()
+        if len(secret)>4096 or any(c.isspace() for c in secret): raise ValueError('Ungültiger Diarisierungs-Token.')
+        lines=[line for line in token_file.read_text().splitlines() if not line.startswith('KIENZLEDOKU_REMOTE_DIAR_TOKEN=')]
+        write(token_file,'\n'.join(lines)+'\n'+('KIENZLEDOKU_REMOTE_DIAR_TOKEN='+secret+'\n' if secret else ''),0o600)
     server=runtime_settings(cfg,hw)
     write(CONFIG/'prompt_documentation.txt',cfg.get('PromptText') or (APP/'prompt_documentation.txt').read_text())
     write(CONFIG/'installer.json',json.dumps(server,indent=2)+'\n')
@@ -306,28 +341,37 @@ RuntimeDirectoryMode=0700
 ExecStart={BASE}/python/diarization-venv/bin/python {BASE}/scripts/diarization_server.py
 ExecStartPost=/usr/bin/python3 {APP}/wait_worker.py /run/kienzledoku-commander-diar/diarization.sock
 '''
+    asr_after=UNITS[2] if local_role(cfg,'diar') else 'network.target'
+    asr_requires=UNITS[2] if local_role(cfg,'diar') else ''
+    asr_exec=(f'{BASE}/python/asr-venv/bin/python {APP}/turbo_asr.py' if cfg.get('AsrModel')=='turbo-int8' else f'{BASE}/python/asr-venv/bin/wlk --backend faster-whisper --backend-policy simulstreaming --language de --host 127.0.0.1 --port 8179 --frame-threshold 25 --pcm-input --model-path {BASE}/models/whisper')
     asr=f'''[Unit]
 Description=Kienzledoku Whisper worker
-After={UNITS[2]}
-Requires={UNITS[2]}
+After={asr_after}
+Requires={asr_requires}
 [Service]
-{shared}Environment=KIENZLEDOKU_SERIAL_ASR_CPU_STAGE=1
+{shared}Environment=KIENZLEDOKU_SERIAL_ASR_CPU_STAGE={0 if cfg.get('AsrModel')=='turbo-int8' else 1}
+Environment=KIENZLEDOKU_WHISPER_MODEL={BASE}/models/whisper-turbo
 Environment=KIENZLEDOKU_COMMANDER_CONTROL_DIR=/run/kienzledoku-commander
 RuntimeDirectory=kienzledoku-commander
 RuntimeDirectoryMode=0700
-ExecStart={BASE}/python/asr-venv/bin/wlk --backend faster-whisper --backend-policy simulstreaming --language de --host 127.0.0.1 --port 8179 --frame-threshold 25 --pcm-input --model-path {BASE}/models/whisper
+ExecStart={asr_exec}
 ExecStartPost=/usr/bin/python3 {APP}/wait_worker.py /run/kienzledoku-commander/whisper.sock
 '''
+    dependencies=' '.join(selected_units(cfg)[1:])
     commander=f'''[Unit]
 Description=kienzledoku Server {VERSION}
-After={UNITS[1]} {UNITS[2]}
-Requires={UNITS[1]} {UNITS[2]}
+After=network.target {dependencies}
+Requires={dependencies}
 [Service]
 {shared}WorkingDirectory={APP}
 EnvironmentFile={token_file}
 ExecStart=/usr/bin/python3 {APP}/serial_server.py --config {CONFIG}/installer.json
 '''
     for name,unit in zip(UNITS,[commander,asr,diar]):
+        if name not in selected_units(cfg):
+            subprocess.run(['systemctl','disable','--now',name],check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            Path('/etc/systemd/system/'+name).unlink(missing_ok=True)
+            continue
         if 'NativeBind' in cfg:
             unit+='\n[Install]\nWantedBy=multi-user.target\n'
         write('/etc/systemd/system/'+name,unit)

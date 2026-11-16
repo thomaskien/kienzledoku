@@ -56,9 +56,9 @@ class GemmaModels(unittest.TestCase):
                    not commander.status()['transition_running'])
         return commander, runtime
 
-    def test_all_seven_models_have_distinct_public_ids_and_verified_sources(self):
-        self.assertEqual(7, len(CATALOG))
-        self.assertEqual(7, len({x['quality'] for x in CATALOG.values()}))
+    def test_all_eight_models_have_distinct_public_ids_and_verified_sources(self):
+        self.assertEqual(8, len(CATALOG))
+        self.assertEqual(8, len({x['quality'] for x in CATALOG.values()}))
         proof = json.loads((ROOT/'evidence/gemma-publisher-verification-1.8.json').read_text())
         for row in proof['models']:
             item = CATALOG[row['key']]
@@ -91,7 +91,7 @@ class GemmaModels(unittest.TestCase):
         cfg = runtime_config(configuration())
         self.assertIsNone(cfg.baseline_llm)
         self.assertFalse(any(cfg.persistent(q) for q in cfg.allowed))
-        self.assertEqual(7, len(cfg.allowed))
+        self.assertEqual(8, len(cfg.allowed))
 
     def test_serial_gemma_request_restores_explicit_gemma_resident_and_status(self):
         cfg = runtime_config(configuration('gemma12-qat-q4'))

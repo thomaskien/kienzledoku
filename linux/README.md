@@ -1,4 +1,4 @@
-# kienzledoku 1.8 für Ubuntu 24.04 x86_64
+# kienzledoku 1.8.1 für Ubuntu 24.04 x86_64
 
 Das Archiv entpacken, ein Terminal im entpackten Ordner öffnen und ausführen:
 
@@ -27,7 +27,7 @@ eine eigene Python-Umgebung werden eingerichtet. Der Ubuntu-Schutz für
 Benutzernamensräume bleibt erhalten; nur das native Aufnahmefenster erhält das
 gezielte AppArmor-Profil. Die Aufnahme läuft ohne lokale Entwurfsablage.
 
-Server: NVIDIA RTX 20 oder neuer, mindestens 8 GiB VRAM und 20 GiB RAM;
+Server: NVIDIA mit Compute Capability 7.5 oder neuer (z. B. GTX 1650, RTX 20 oder neuer), mindestens 4 GiB VRAM und 20 GiB RAM;
 größere Modelle benötigen mehr Speicher. Ein funktionierender NVIDIA-Treiber
 wird vorausgesetzt. Der Installer zeigt die passenden Modelle, erlaubt mehrere
 Installationen und fragt aktive Stufen, Felder und Prompt ab. Der Prompt lässt
@@ -43,7 +43,7 @@ vorgeladen. Der Commander läuft als systemd-Dienst. Status:
 T2med-Aktivierung: **Drittanbieter-Zugriffe verwalten → Per Produktcode aktivieren →
 Produktcode `kienzledoku` eingeben und bestätigen**. Danach erscheint
 **Dr. Thomas Kienzle - KienzleDoku** mit einem **grünen Statuspunkt**.
-Das Linux-Paket 1.8 enthält den endgültigen Hersteller-Key in kompilierten
+Das Linux-Paket 1.8.1 enthält den endgültigen Hersteller-Key in kompilierten
 Binärdateien. Für die URL den aktivierten **KienzleDoku**-Eintrag verwenden.
 Öffentliche Quellcode-Builds ohne privaten Build-Eingang verwenden weiterhin den Demo-Key. Die verlinkte GitHub-Anleitung zeigt alle Schritte mit Bildern.
 

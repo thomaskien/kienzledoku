@@ -173,7 +173,7 @@ function Get-OwnDistroDirectory {
 }
 function Assert-InstallationSpace {
     Progress 'space' 'Zusätzlichen Platzbedarf prüfen; vorhandene geprüfte Modelle berücksichtigen.' 1
-    $files=@(Get-RequiredFiles $script:Root $script:Cfg.Models)
+    $files=@(Get-RequiredFiles $script:Root $script:Cfg.Models $script:Cfg)
     [long]$total=($files | Measure-Object -Property bytes -Sum).Sum
     $directory=Get-OwnDistroDirectory
     $script:StorageProbe=[pscustomobject]@{AdditionalBytes=$total;ReusedBytes=0;ReusedFiles=0;RuntimeReady=$false;RequiredPaths=@($files | ForEach-Object {$_.path});FreeBytes=$null}
@@ -334,7 +334,7 @@ function Ensure-ModelFiles {
     if($Action -eq 'Install'){Ensure-InstallModels;return}
     Progress 'models' 'Modellarchiv für den reinen Download vorbereiten.' 3
     $hfChecked=$false
-    $files=@(Get-RequiredFiles $script:Root $script:Cfg.Models)
+    $files=@(Get-RequiredFiles $script:Root $script:Cfg.Models $script:Cfg)
     $groups=Get-ModelSourceGroups
     $sources=@((Get-StageDirectory))+$groups.Local+$groups.Remote
     $cacheSpace=Get-ModelTargetSpace $script:Cfg.CacheDirectory $files
@@ -376,7 +376,7 @@ function Ensure-ModelFiles {
 function Install-App {
     $app=Join-Path $script:Cfg.InstallDirectory 'app'
     if([IO.Path]::GetFullPath($app) -ne [IO.Path]::GetFullPath($script:Root)){
-        $script:CodeUpdate=Start-CodeUpdate $script:Root $app 'VERSION' @('windows','VERSION','models.json','audio-files.json','ubuntu.json','linux-payload.tar','README.txt')
+        $script:CodeUpdate=Start-CodeUpdate $script:Root $app 'VERSION' @('windows','VERSION','models.json','audio-files.json','audio-turbo-files.json','ubuntu.json','linux-payload.tar','README.txt')
     } else {Assert-CodeInventory $app}
     $installedConfig=Join-Path $script:Cfg.InstallDirectory 'config.json'
     Write-Json $installedConfig $script:Cfg
@@ -518,6 +518,7 @@ try {
             Set-LinuxModelSources
             $linuxConfig=Join-Path $script:Cfg.StateDirectory 'linux-install.json'
             if($script:Cfg.PSObject.Properties['RemoteLlmTokenFile'] -and $script:Cfg.RemoteLlmTokenFile){$script:Cfg | Add-Member -Force -NotePropertyName LinuxRemoteTokenFile -NotePropertyValue (Wsl-Path $script:Cfg.RemoteLlmTokenFile)}
+            if($script:Cfg.PSObject.Properties['RemoteDiarTokenFile'] -and $script:Cfg.RemoteDiarTokenFile){$script:Cfg | Add-Member -Force -NotePropertyName LinuxRemoteDiarTokenFile -NotePropertyValue (Wsl-Path $script:Cfg.RemoteDiarTokenFile)}
             if($script:Cfg.PSObject.Properties['CommanderTokenFile'] -and $script:Cfg.CommanderTokenFile){$script:Cfg | Add-Member -Force -NotePropertyName LinuxCommanderTokenFile -NotePropertyValue (Wsl-Path $script:Cfg.CommanderTokenFile)}
             Write-Json $linuxConfig $script:Cfg
             Progress 'server' 'Serverlaufzeiten und Modelle in der eigenen WSL-Umgebung installieren. Dieser Schritt kann länger dauern.' 58
@@ -570,7 +571,7 @@ try {
                 $folder=if($name -eq 'config.json'){$script:Cfg.InstallDirectory}else{$script:Cfg.StateDirectory}
                 Remove-Item -LiteralPath (Join-Path $folder $name) -Force -ErrorAction SilentlyContinue
             }
-            foreach($name in @('TokenFile','HuggingFaceTokenFile','RemoteLlmTokenFile','CommanderTokenFile')){
+            foreach($name in @('TokenFile','HuggingFaceTokenFile','RemoteLlmTokenFile','RemoteDiarTokenFile','CommanderTokenFile')){
                 # Only remove known token files inside this installer's own state directory.
                 $property=$script:Cfg.PSObject.Properties[$name]
                 if($property -and $property.Value -and ([IO.Path]::GetDirectoryName([IO.Path]::GetFullPath($property.Value)) -eq [IO.Path]::GetFullPath($script:Cfg.StateDirectory))){Remove-Item -LiteralPath $property.Value -Force -ErrorAction SilentlyContinue}

@@ -34,7 +34,7 @@ class SerialSettings(Settings):
 
     @property
     def allowed(self):
-        return tuple(self.quality_models or self.profiles) if not self.remote_llm_url else ()
+        return tuple(self.quality_models or self.profiles) if not self.remote_llm_url and "llm" in self.enabled_roles else ()
 
     @property
     def default(self):
@@ -42,7 +42,7 @@ class SerialSettings(Settings):
 
     @property
     def baseline_llm(self):
-        if self.remote_llm_url: return None
+        if self.remote_llm_url or 'llm' not in self.enabled_roles: return None
         if self.resident_quality is not None:
             return (("@" if self.quality_models else "") + self.resident_quality) if self.resident_quality else None
         return self.default if self.persistent(self.default) else None
@@ -82,14 +82,14 @@ class SerialSettings(Settings):
                            model_id=self.profile_id(quality),label=p['label'],backend=p['backend'],gpu_layers=p['gpu_layers'],run_config=p.get('run_config',''))
 
     def validate(self):
-        if type(self.tier) is not int or not 7 <= self.tier <= 128:
+        if type(self.tier) is not int or not 4 <= self.tier <= 128:
             raise ValueError('Ungültiger physischer VRAM-Wert.')
         # Preserve all original transport, queue, path and timeout checks.
         common = {f.name:getattr(self,f.name) for f in fields(Settings)}
         common.update(tier=8,default_quality='auto')
         Settings(**common).validate()
         ipaddress.ip_address(self.host)
-        if not self.profiles or (not self.remote_llm_url and self.profile_id(self.default) not in self.profiles):
+        if 'llm' in self.enabled_roles and not self.remote_llm_url and (not self.profiles or self.profile_id(self.default) not in self.profiles):
             raise ValueError('Standardmodell fehlt.')
         if self.resident_quality is not None:
             if not isinstance(self.resident_quality,str) or (self.resident_quality and self.resident_quality not in self.profiles):
@@ -102,8 +102,8 @@ class SerialSettings(Settings):
         for quality,p in self.profiles.items():
             if not isinstance(quality,str) or not quality.replace('_','').isalnum():
                 raise ValueError('Ungültige Modell-ID.')
-            if not Path(p['path']).is_absolute() or p['context'] != 32768 or p['slots'] != 1:
-                raise ValueError('Nur hinterlegte 32k/Ein-Slot-Profile verwenden.')
+            if not Path(p['path']).is_absolute() or p['context'] not in (8192,32768) or p['slots'] != 1:
+                raise ValueError('Nur hinterlegte 8k-/32k-Ein-Slot-Profile verwenden.')
             if p['backend'] not in ('llama.cpp','strata') or p['kv'] not in ('q8_0','int8'):
                 raise ValueError('Unbekanntes Backend oder KV-Format.')
             if type(p['gpu_layers']) is not int or not 0 <= p['gpu_layers'] <= 999:
@@ -198,7 +198,7 @@ class SerialRuntime(Runtime):
                     if (health.get('status')=='ok' and
                         Path(props.get('model_path','')).resolve()==Path(spec.path).resolve() and
                         props.get('total_slots')==1 and
-                        props.get('default_generation_settings',{}).get('n_ctx')==32768):
+                        props.get('default_generation_settings',{}).get('n_ctx')==spec.context):
                         self.model=quality
                         return
                 except BackendFailure:

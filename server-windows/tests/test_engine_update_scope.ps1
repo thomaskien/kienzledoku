@@ -17,7 +17,7 @@ try {
     $destination=Join-Path $base 'installed'
     $null=[IO.Directory]::CreateDirectory((Join-Path $script:Root 'windows'))
     Copy-Item (Join-Path $testRepository 'server-windows/windows/Update.ps1') (Join-Path $script:Root 'windows/Update.ps1')
-    foreach($name in @('VERSION','models.json','audio-files.json','ubuntu.json','linux-payload.tar','README.txt')){Set-Content (Join-Path $script:Root $name) 'synthetic payload'}
+    foreach($name in @('VERSION','models.json','audio-files.json','audio-turbo-files.json','ubuntu.json','linux-payload.tar','README.txt')){Set-Content (Join-Path $script:Root $name) 'synthetic payload'}
     $null=[IO.Directory]::CreateDirectory((Join-Path $destination 'app'))
     Set-Content (Join-Path $destination 'app/VERSION') 'old version'
     Set-Content (Join-Path $destination 'app/obsolete.txt') 'old code'

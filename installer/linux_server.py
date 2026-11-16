@@ -36,7 +36,7 @@ def model_request(entry,token):
     if not huggingface and not (entry.get('path')=='whisper/large-v3.pt' and url==whisper_url
                                 and len(sha)==64 and all(c in '0123456789abcdef' for c in sha)):
         raise ValueError('Unerwartete Modellquelle.')
-    headers={'User-Agent':'kienzledoku-installer/1.8'}
+    headers={'User-Agent':'kienzledoku-installer/1.8.1'}
     if huggingface and token:headers['Authorization']='Bearer '+token
     return urllib.request.Request(url,headers=headers)
 
@@ -72,10 +72,10 @@ def download(entry,target,token):
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--source',type=Path,required=True)
-    for name in ('config','hf-token-file','token-file','remote-token-file'): parser.add_argument('--'+name,type=Path,required=True)
+    for name in ('config','hf-token-file','token-file','remote-token-file','remote-diar-token-file'): parser.add_argument('--'+name,type=Path,required=True)
     args=parser.parse_args()
     if os.geteuid()!=0 or os.environ.get('WSL_DISTRO_NAME'): raise ValueError('Nur über den nativen Ubuntu-Installer mit sudo starten.')
-    cfg=json.loads(args.config.read_text());hf=args.hf_token_file.read_text().strip();token=args.token_file.read_text().strip();remote=args.remote_token_file.read_text().strip()
+    cfg=json.loads(args.config.read_text());hf=args.hf_token_file.read_text().strip();token=args.token_file.read_text().strip();remote=args.remote_token_file.read_text().strip();remote_diar=args.remote_diar_token_file.read_text().strip()
     release=Path('/etc/os-release').read_text()
     if 'ID=ubuntu' not in release or 'VERSION_ID="24.04"' not in release: raise ValueError('Ubuntu 24.04 erforderlich.')
     source=args.source/'server-windows'
@@ -88,13 +88,13 @@ def main():
         with tempfile.TemporaryDirectory(prefix='kienzledoku-server-payload-') as directory:
             staged=Path(directory)/'installer'
             shutil.copytree(source/'linux',staged)
-            for name in ('models.json','audio-files.json','VERSION'): shutil.copy2(source/name,staged/name)
+            for name in ('models.json','audio-files.json','audio-turbo-files.json','VERSION'): shutil.copy2(source/name,staged/name)
             shutil.copy2(source.parent/'LICENSE',staged/'LICENSE')
             replace_tree(staged,target,'install_server.py')
         sys.path.insert(0,str(target));import install_server as engine
         hw=engine.hardware(str(cfg['GpuIndex']));engine.validate_config(cfg,hw['vram_mib'])
         entries=[entry for key in cfg['Models'] for entry in engine.catalog()[key]['files']]
-        entries+=json.loads((target/'audio-files.json').read_text())
+        entries+=engine.audio_files(cfg)
         for entry in entries:
             relative=Path(entry['path'])
             if relative.is_absolute() or '..' in relative.parts: raise ValueError('Ungültiger Modellpfad.')
@@ -112,9 +112,10 @@ def main():
         engine.write(existing,'KIENZLEDOKU_COMMANDER_TOKEN='+token+'\n',0o600)
         engine.configure(cfg,hw)
         if remote: engine.write(existing,existing.read_text()+'KIENZLEDOKU_REMOTE_LLM_TOKEN='+remote+'\n',0o600)
+        if remote_diar: engine.write(existing,existing.read_text()+'KIENZLEDOKU_REMOTE_DIAR_TOKEN='+remote_diar+'\n',0o600)
         runtime=engine.CONFIG/'installer.json';settings=json.loads(runtime.read_text());settings['host']=cfg['NativeBind']
         engine.write(runtime,json.dumps(settings,indent=2)+'\n')
-        subprocess.run(['systemctl','enable',*engine.UNITS],check=True)
+        subprocess.run(['systemctl','enable',*engine.selected_units(cfg)],check=True)
         from systemd_start import start_unit
         start_unit(engine.UNITS[0],restart=True)
         subprocess.run([sys.executable,str(target/'control.py'),'start'],check=True)

@@ -12,7 +12,7 @@ import urllib.request
 
 ROOT=Path(__file__).resolve().parent
 sys.path.insert(0,str(ROOT))
-from install_server import BASE,STATE,CONFIG,UNITS,hardware,validate_config,check_memory
+from install_server import BASE,STATE,CONFIG,UNITS,hardware,validate_config,check_memory,selected_units
 from systemd_start import start_unit
 
 def execute(action):
@@ -33,7 +33,7 @@ def execute(action):
             try:
                 with opener.open(request,timeout=5) as response: status=json.load(response)
                 if (status.get('phase') in ('asr_ready','processing')
-                    and (status['asr_ready'] or json.loads((CONFIG/'installer.json').read_text()).get('asr_on_demand',False))
+                    and (status['asr_ready'] or cfg.get('AsrOnDemand',False) or cfg.get('ServerRole','full') not in ('full','asr'))
                     and not status['transition_running'] and not status['last_error']):
                     break
             except (OSError,ValueError): pass
@@ -44,8 +44,10 @@ def execute(action):
         finalize(BASE)
         print('SERVER_READY');return
     elif action=='stop':
-        subprocess.run(['systemctl','stop',*UNITS],check=True)
-        for unit in UNITS:
+        cfg=json.loads((STATE/'windows-config.json').read_text())
+        units=selected_units(cfg)
+        subprocess.run(['systemctl','stop',*units],check=True)
+        for unit in units:
             if subprocess.run(['systemctl','is-active','--quiet',unit]).returncode==0:
                 raise ValueError('Dienst blieb aktiv: '+unit)
         print('SERVER_STOPPED')

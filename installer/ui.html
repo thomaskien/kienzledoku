@@ -185,6 +185,8 @@
             <label><input type="radio" name="server_role" value="full"> Vollständig</label>
             <label><input type="radio" name="server_role" value="asr"> Nur Spracherkennung</label>
             <label><input type="radio" name="server_role" value="llm"> Nur Dokumentation</label>
+            <label><input type="radio" name="server_role" value="llm_diar"> Dokumentation und Sprechertrennung</label>
+            <label><input type="radio" name="server_role" value="diar"> Nur Sprechertrennung</label>
           </div>
         </div>
         <div id="windows-requirements" class="notice hidden"></div>
@@ -206,7 +208,7 @@
           </div>
           <div class="panel" id="external-commander-panel">
             <h2 style="margin-top:0">Verarbeitungsserver (Commander)</h2>
-            <label class="field"><span>Commander-Adresse</span><input type="url" id="commander_url" autocomplete="off" spellcheck="false"></label>
+            <label class="field"><span>Commander-Adresse</span><input placeholder="z. B. http://10.0.83.140:8185" type="url" id="commander_url" autocomplete="off" spellcheck="false"></label>
             <label class="field"><span>Token <span class="hint" style="display:inline">(optional)</span></span><input type="password" id="commander_token" autocomplete="new-password" spellcheck="false"></label>
           </div>
         </div>
@@ -227,7 +229,7 @@
           <div class="panel" id="remote-llm-panel">
             <h2 style="margin-top:0">Zweiter Dokumentationsserver (LLM-Commander) <span class="hint" style="display:inline">(optional)</span></h2>
             <p class="hint">Nur ausfüllen, wenn die Dokumentation von einem anderen Commander übernommen werden soll.</p>
-            <label class="field"><span>Commander-Adresse</span><input type="url" id="remote_llm_url" autocomplete="off" spellcheck="false"></label>
+            <label class="field"><span>Commander-Adresse</span><input placeholder="z. B. http://10.0.83.140:8185" type="url" id="remote_llm_url" autocomplete="off" spellcheck="false"></label>
             <label class="field"><span>Token <span class="hint" style="display:inline">(optional)</span></span><input type="password" id="remote_llm_token" autocomplete="new-password" spellcheck="false"></label>
           </div>
         </div>
@@ -253,8 +255,14 @@
           <label class="field"><span>Standardstufe für neue Aufnahmen</span><select id="default_model"></select></label>
           <label class="field" id="parallel-model-field"><span>Parallel vorgehaltenes LLM</span><select id="parallel_model"></select><small>Dieses Modell bleibt geladen. Andere installierte Modelle werden bei Bedarf seriell verwendet.</small></label>
         </div>
+        <div class="panel" id="remote-diar-panel">
+          <h2 style="margin-top:0">Anderer Commander für Sprechertrennung <span class="hint">(optional)</span></h2>
+          <label class="field"><span>Commander-Adresse</span><input type="url" id="remote_diar_url" placeholder="z. B. http://10.0.83.140:8185" autocomplete="off" spellcheck="false"><small>Leer lassen, um die Sprechertrennung auf diesem Rechner auszuführen.</small></label>
+          <label class="field"><span>Token (optional)</span><input type="password" id="remote_diar_token" autocomplete="new-password"></label>
+        </div>
         <div class="panel" id="speech-options">
           <h2 style="margin-top:0">Sprache</h2>
+          <label class="field" id="asr-model-field"><span>Whisper-Modell</span><select id="asr_model"><option value="large-v3">Whisper Large v3</option><option value="turbo-int8">Whisper Large v3 Turbo · 8 Bit</option></select><small>Für 4-GB-Grafikkarten: Turbo int8, verschärft seriell und serielle Sprechertrennung. Auf dem Mac verwendet Turbo die 8-Bit-MLX-Variante.</small></label>
           <div class="switch-line" id="asr-demand-row"><div><strong>Verschärfter serieller Modus</strong><small>Whisper lädt mit dem ersten Audioblock und bleibt nach dem Entladen aus. Die Sprechertrennung folgt ihrer eigenen Auswahl unten.</small></div><label class="check-line"><input type="checkbox" id="asr_on_demand"><span>Aktiv</span></label></div>
           <div class="switch-line"><div><strong>Sprechertrennung</strong><small>Kennzeichnet unterschiedliche Sprecher im Transkript.</small></div><label class="check-line"><input type="checkbox" id="diarization"><span>Aktiv</span></label></div>
           <label class="field" id="diarization-mode-field"><span>Speichernutzung der Sprechertrennung</span><select id="diarization_mode"><option value="resident">Immer geladen</option><option value="with_asr">Zusammen mit Whisper</option><option value="serial">Seriell – nach Whisper, vor dem LLM</option></select><small>Immer geladen vermeidet erneutes Laden. Zusammen mit Whisper folgt dessen Lade- und Entladezeitpunkt. Seriell gibt den Speicher zwischen den Schritten frei. Bei serieller Sprechertrennung folgt sie auch im verschärft seriellen Modus direkt auf die abgeschlossenen Whisper-Blöcke.</small><small id="mac-diarization-memory">Mac-Richtwert: ca. 0,6 GB frisch geladen; im kurzen M4-Test bis 5,2 GB während der Verarbeitung. Etwa 6 GB Arbeitsreserve einplanen; längere Gespräche können mehr benötigen.</small></label>
@@ -419,8 +427,8 @@
   function setRadio(name, value) { const element = document.querySelector('input[name="' + name + '"][value="' + CSS.escape(value) + '"]'); if (element) element.checked = true; }
   function includesClient() { return config.mode === 'combined' || config.mode === 'client'; }
   function includesServer() { return config.mode === 'combined' || config.mode === 'server'; }
-  function localLLM() { return includesServer() && !config.remote_llm_url.trim() && (config.server_role === 'full' || config.server_role === 'llm'); }
-  function centralConfig() { return config.mode === 'client' || Boolean(config.remote_llm_url.trim()) || (includesServer() && config.server_role === 'asr'); }
+  function localLLM() { return includesServer() && !config.remote_llm_url.trim() && ['full','llm','llm_diar'].includes(config.server_role); }
+  function centralConfig() { return config.mode === 'client' || Boolean(config.remote_llm_url.trim()) || (includesServer() && ['asr','diar'].includes(config.server_role)); }
   function nativeMessage(message) {
     try {
       const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.installer;
@@ -458,8 +466,9 @@
     config.connection_mode = selected('connection_mode') || config.connection_mode;
     config.network = selected('network') || config.network;
     config.memory_mode = selected('memory_mode') || config.memory_mode;
+    config.asr_model = $('#asr_model').value;
     config.diarization_mode = $('#diarization_mode').value || config.diarization_mode;
-    for (const id of ['t2med_url','commander_url','commander_token','listen_host','server_token','remote_llm_url','remote_llm_token','hf_token','prompt']) {
+    for (const id of ['t2med_url','commander_url','commander_token','listen_host','server_token','remote_llm_url','remote_llm_token','remote_diar_url','remote_diar_token','hf_token','prompt']) {
       config[id] = $('#' + id).value;
     }
     for (const id of ['t2med_insecure','auth_enabled','asr_on_demand','diarization']) config[id] = $('#' + id).checked;
@@ -470,7 +479,7 @@
 
   function applyVisibility() {
     if (!config) return;
-    show('#server-role-panel', includesServer() && bootstrap.platform !== 'windows');
+    show('#server-role-panel', includesServer());
     show('#client-connections', includesClient());
     show('#server-connections', includesServer());
     show('#t2med-url-field', includesClient());
@@ -478,14 +487,16 @@
     show('#t2med-insecure-field', includesClient());
     show('#server-token-area', config.auth_enabled);
     show('#remote-llm-panel', includesServer() && config.server_role !== 'llm');
-    show('#no-local-models', !localLLM() && !(bootstrap.platform === 'windows' && includesServer()));
-    show('#local-model-area', localLLM() || (bootstrap.platform === 'windows' && includesServer()));
+    show('#no-local-models', !localLLM());
+    show('#local-model-area', localLLM());
     show('#speech-options', includesServer() && config.server_role !== 'llm');
-    show('#asr-demand-row', config.memory_mode === 'serial');
-    show('#windows-model-options', bootstrap.platform === 'windows' && includesServer());
+    show('#remote-diar-panel', includesServer() && config.server_role !== 'llm' && config.diarization);
+    show('#asr-model-field', includesServer() && ['full','asr'].includes(config.server_role));
+    show('#asr-demand-row', config.memory_mode === 'serial' && ['full','asr'].includes(config.server_role));
+    show('#windows-model-options', bootstrap.platform === 'windows' && localLLM());
     show('#windows-advanced', bootstrap.platform === 'windows' && includesServer());
     show('#parallel-model-field', config.memory_mode === 'parallel');
-    show('#diarization-mode-field', config.diarization && config.server_role !== 'llm');
+    show('#diarization-mode-field', config.diarization && config.server_role !== 'llm' && !config.remote_diar_url);
     show('#remote-config', centralConfig());
     show('#prompt-encoding-notice', Boolean(bootstrap.prompt_encoding_repaired) && includesServer() && !centralConfig());
     $('#prompt').readOnly = centralConfig();
@@ -578,8 +589,9 @@
 
   function readInitialValues() {
     setRadio('mode', config.mode); setRadio('server_role', config.server_role); setRadio('connection_mode', config.connection_mode); setRadio('network', config.network); setRadio('memory_mode', config.memory_mode);
+    $('#asr_model').value = config.asr_model || 'large-v3';
     $('#diarization_mode').value = config.diarization_mode || (config.memory_mode === 'parallel' ? 'resident' : 'serial');
-    for (const id of ['t2med_url','commander_url','commander_token','listen_host','server_token','remote_llm_url','remote_llm_token','hf_token','prompt']) $('#' + id).value = config[id] || '';
+    for (const id of ['t2med_url','commander_url','commander_token','listen_host','server_token','remote_llm_url','remote_llm_token','remote_diar_url','remote_diar_token','hf_token','prompt']) $('#' + id).value = config[id] || '';
     for (const id of ['t2med_insecure','auth_enabled','asr_on_demand','diarization']) $('#' + id).checked = Boolean(config[id]);
   }
 
@@ -783,12 +795,13 @@
     $$('input[name="uninstall_mode"], #keep-models, #keep-settings, #confirm-uninstall').forEach(element => element.addEventListener('change', renderUninstallSummary));
     $$('input[name="mode"], input[name="server_role"], input[name="connection_mode"], input[name="network"], input[name="memory_mode"]').forEach(element => element.addEventListener('change', () => { syncConfig(); applyVisibility(); renderFields(); validated = false; }));
     ['t2med_insecure','auth_enabled','asr_on_demand','diarization','diarization_mode'].forEach(id => $('#' + id).addEventListener('change', () => { syncConfig(); applyVisibility(); show('#hf-token-field', config.diarization); validated = false; }));
-    $$('input[type="text"], input[type="url"], input[type="password"], textarea, select').forEach(element => element.addEventListener('input', () => { if (config) { syncConfig(); if(element.id==='remote_llm_url'){ applyVisibility();renderFields(); } validated = false; } }));
+    $$('input[type="text"], input[type="url"], input[type="password"], textarea, select').forEach(element => element.addEventListener('input', () => { if (config) { syncConfig(); if(['remote_llm_url','remote_diar_url'].includes(element.id)){ applyVisibility();renderFields(); } validated = false; } }));
     $('#generate-token').addEventListener('click', async () => {
       try { const result = await api('/api/token', { method: 'POST', body: {} }); config.server_token = result.token; $('#server_token').value = result.token; validated = false; }
       catch (error) { setText('#footer-status', error.message); }
     });
     $$('#quality-basis,#quality-gruendlich,#quality-sehr_gruendlich').forEach(select=>select.addEventListener('change',()=>{syncConfig();if(bootstrap.platform==='windows')renderWindowsModelOptions();}));
+    $('#remote_diar_url').addEventListener('input',()=>{$('#remote_diar_token').value='';});
     $('#remote_llm_url').addEventListener('input',()=>{$('#remote_llm_token').value='';});
     $('#commander_url').addEventListener('input',()=>{$('#commander_token').value='';});
     $('#reset-prompt').addEventListener('click', () => { const activeFields = [...config.fields]; config.prompt = bootstrap.default_prompt; $('#prompt').value = bootstrap.default_prompt; config.fields = activeFields; validated = false; });
@@ -821,7 +834,7 @@
         setText('#windows-requirements','Client: Windows 10/11 x64, WebView2 und Mikrofon. Lokaler Server: Windows 11, NVIDIA ab 8 GB VRAM, WSL2/Virtualisierung und mindestens 20 GB RAM. WSL-Einrichtung kann Administratorrechte und einen Neustart benötigen. '+(bootstrap.hardware.server_supported ? 'GPU und Arbeitsspeicher erkannt.' : 'Auf diesem Rechner ist derzeit nur der Client verfügbar; Servervoraussetzungen fehlen.'));
         for(const input of $$('input[name="mode"]')) if(input.value!=='client') input.disabled=!bootstrap.hardware.server_supported;
         show('#mac-diarization-memory',false);
-        $('#diarization').disabled=true;
+        $('#diarization').disabled=false;
         $('#listen_host').nextElementSibling.textContent='Für LAN eine IP dieses Rechners wählen: '+bootstrap.hardware.lan_addresses.join(', ');
         for(const gpu of bootstrap.hardware.gpus) { const option=document.createElement('option');option.value=gpu.Index;option.textContent=gpu.Name+' · '+Math.round(gpu.VramMiB/1024)+' GB VRAM';$('#gpu_index').append(option); }
         for(const id of ['gpu_index','wsl_ram_gib','audio_cache','cache_directory','install_directory','sources']) $('#'+id).value=config[id];

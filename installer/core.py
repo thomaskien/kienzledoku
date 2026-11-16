@@ -27,7 +27,8 @@ from kienzledoku_document import DEFAULT_DOCUMENT_FIELDS, DOCUMENT_FIELDS, DOCUM
 from kienzledoku_product_key import production_build
 from kienzledoku_config import DEFAULT_COMMANDER_URL
 
-VERSION = '1.8'
+VERSION = '1.8.1'
+from installer.options import SERVER_ROLES, ASR_MODELS, roles, local_role
 GRADES = ('basis', 'gruendlich', 'sehr_gruendlich')
 GRADE_LABELS = dict(zip(GRADES, ('Basis', 'Gründlich', 'Sehr gründlich')))
 DIARIZATION_MODES = {'resident':'Immer geladen', 'with_asr':'Zusammen mit Whisper', 'serial':'Seriell'}
@@ -38,7 +39,7 @@ WHISPER_REV = '49e6aa286ad60c14352c404340ded53710378a11'
 WHISPER_FILES = {'weights.npz': '05ff791ce3630fae47e7c51004e9666204d786246ec07cac6110af768099b40d', 'config.json': '34982ce6ae286095000f82ae9583b3431639e8b092bf60c961f203745e6500e3'}
 PYANNOTE_REPO = 'pyannote/speaker-diarization-community-1'
 PYANNOTE_REV = '3533c8cf8e369892e6b79ff1bf80f7b0286a54ee'
-SECRET_FIELDS = ('commander_token', 'server_token', 'remote_llm_token', 'hf_token')
+SECRET_FIELDS = ('commander_token', 'server_token', 'remote_llm_token', 'remote_diar_token', 'hf_token')
 
 
 def support_dir():
@@ -93,7 +94,7 @@ def defaults(hw=None, support=None):
                connection_mode='connect', t2med_url='https://127.0.0.1:16567/aps/fhir/api/r4',
                t2med_insecure=False, commander_url=DEFAULT_COMMANDER_URL, commander_token='',
                network='local', listen_host='0.0.0.0', auth_enabled=False, server_token='',
-               remote_llm_url='', remote_llm_token='', selected_models=chosen,
+               remote_llm_url='', remote_llm_token='', remote_diar_url='', remote_diar_token='', asr_model='large-v3', selected_models=chosen,
                quality_models={m['quality']: m['id'] for m in CATALOG if m['id'] in chosen},
                memory_mode='serial', diarization_mode='serial', asr_on_demand=True, diarization=True, hf_token='',
                fields=list(DEFAULT_DOCUMENT_FIELDS), prompt=(ROOT/'prompt_documentation.txt').read_text())
@@ -148,7 +149,7 @@ def validate(cfg, hw=None):
     if not isinstance(cfg,dict): raise ValueError('Installationsauswahl fehlt.')
     allowed=set(defaults(hw,Path('/nonexistent')))
     if set(cfg)!=allowed: raise ValueError('Unvollständige oder unbekannte Installationseinstellungen.')
-    for field,choices in [('mode',('client','server','combined')),('server_role',('full','asr','llm')),('connection_mode',('direct','connect')),('network',('local','lan')),('memory_mode',('serial','parallel')),('diarization_mode',tuple(DIARIZATION_MODES))]:
+    for field,choices in [('mode',('client','server','combined')),('server_role',tuple(SERVER_ROLES)),('asr_model',ASR_MODELS),('connection_mode',('direct','connect')),('network',('local','lan')),('memory_mode',('serial','parallel')),('diarization_mode',tuple(DIARIZATION_MODES))]:
         if cfg[field] not in choices: raise ValueError('Ungültige Auswahl: '+field)
     for field in ('t2med_insecure','auth_enabled','asr_on_demand','diarization'):
         if type(cfg[field]) is not bool: raise ValueError('Ungültige Einstellung: '+field)
@@ -157,6 +158,7 @@ def validate(cfg, hw=None):
         if not isinstance(token,str) or len(token)>4096 or any(c.isspace() for c in token): raise ValueError('Ungültiges Token.')
     address(cfg['commander_url'])
     if cfg['remote_llm_url']: address(cfg['remote_llm_url'])
+    if cfg['remote_diar_url']: address(cfg['remote_diar_url'])
     import kienzledoku_config as client
     c=client.defaults(); c['connection'].update(target=cfg['t2med_url'],mode=cfg['connection_mode'],allow_insecure_tls=cfg['t2med_insecure']); client.validate(c)
     fields=validate_fields(cfg['fields'])
@@ -167,7 +169,7 @@ def validate(cfg, hw=None):
     if any(m not in models for m in cfg['selected_models']): raise ValueError('Unbekanntes Modell.')
     if not isinstance(cfg['quality_models'],dict) or set(cfg['quality_models'])-set(GRADES): raise ValueError('Ungültige Stufenzuordnung.')
     server=cfg['mode']!='client'
-    local_llm=server and cfg['server_role']!='asr' and not cfg['remote_llm_url']
+    local_llm=server and local_role(cfg,'llm')
     if server:
         mac_version=platform.mac_ver()[0] if sys.platform=='darwin' else ''
         if mac_version and tuple(map(int,mac_version.split('.')[:2])) < (14,0):
@@ -183,9 +185,9 @@ def validate(cfg, hw=None):
             if hw['ram_gib']<models[mid]['min_ram_gib']: raise ValueError(models[mid]['label']+': zu wenig gemeinsamer Arbeitsspeicher.')
         for grade,mid in cfg['quality_models'].items():
             if mid not in cfg['selected_models'] or models[mid]['quality']!=grade: raise ValueError('Jede Stufe benötigt ein installiertes Modell dieser Stufe.')
-            audio=cfg['server_role']!='llm'
+            audio=local_role(cfg,'asr')
             reserve=4 if audio and cfg['memory_mode']=='parallel' else 0
-            if audio and cfg['diarization'] and (cfg['diarization_mode']=='resident' or
+            if local_role(cfg,'diar') and (cfg['diarization_mode']=='resident' or
                     cfg['diarization_mode']=='with_asr' and cfg['memory_mode']=='parallel'):
                 reserve+=6
             if hw['ram_gib']<models[mid]['min_ram_gib']+reserve:
@@ -196,7 +198,7 @@ def validate(cfg, hw=None):
 def plan(cfg,hw=None):
     validate(cfg,hw)
     server=cfg['mode']!='client'; client=cfg['mode']!='server'
-    llm=server and cfg['server_role']!='asr' and not cfg['remote_llm_url']
+    llm=server and local_role(cfg,'llm')
     lines=[]
     if client: lines += ['kienzledoku record und Connect installieren', 'T2med: '+cfg['t2med_url']]
     if server:
@@ -204,10 +206,12 @@ def plan(cfg,hw=None):
                   'Zugangstoken: '+('aktiviert' if cfg['auth_enabled'] else 'ausgeschaltet'),
                   'Modellbetrieb: '+('seriell' if cfg['memory_mode']=='serial' else 'parallel'),
                   'Whisper: '+('erst bei Bedarf laden' if cfg['asr_on_demand'] else 'beim Start laden')]
-        if cfg['server_role']!='llm' and cfg['diarization']:
+        if local_role(cfg,'diar'):
             lines += ['Sprechertrennung: '+DIARIZATION_MODES[cfg['diarization_mode']],
                       'Sprechertrennung auf dem Mac: ca. 6 GB Arbeitsreserve einplanen (Richtwert, abhängig vom Gespräch).']
         if cfg['remote_llm_url']: lines += ['LLM über '+cfg['remote_llm_url']]
+        if cfg['remote_diar_url']: lines += ['Sprechertrennung über '+cfg['remote_diar_url']]
+        if local_role(cfg,'asr'): lines += ['Whisper: '+('Large v3 Turbo · 8 Bit (MLX)' if cfg['asr_model']=='turbo-int8' else 'Large v3')]
     if llm:
         by_id={m['id']:m for m in CATALOG}
         lines += [GRADE_LABELS[g]+': '+by_id[m]['label'] for g,m in cfg['quality_models'].items()]
@@ -239,7 +243,7 @@ def download(url,destination,expected,progress=lambda text:None,cancel=None):
     partial=destination.with_name(destination.name+'.part')
     progress('Download: '+destination.name)
     try:
-        with urlopen(Request(url,headers={'User-Agent':'kienzledoku-installer/1.8'}),timeout=60) as response, open(partial,'wb') as target:
+        with urlopen(Request(url,headers={'User-Agent':'kienzledoku-installer/1.8.1'}),timeout=60) as response, open(partial,'wb') as target:
             total=int(response.headers.get('Content-Length') or 0); received=0; last=0
             while True:
                 if cancel and cancel.is_set(): raise InterruptedError('Installation abgebrochen.')
@@ -277,36 +281,35 @@ def require_closed_record(support):
 
 def commander_toml(cfg,version_root,support):
     q=lambda s:json.dumps(str(s),ensure_ascii=False)
-    roles=[]
-    if cfg['server_role']!='llm': roles+=['asr']+(['diar'] if cfg['diarization'] else [])
-    if cfg['server_role']!='asr' or cfg['remote_llm_url']: roles+=['llm']
+    enabled=roles(cfg)
     memory=hardware()['ram_gib']; tier=24 if memory>=32 else (16 if memory>=24 else 8)
     data=['[server]','host = '+q('127.0.0.1' if cfg['network']=='local' else cfg['listen_host']),'port = 8185',
           'auth_enabled = '+str(cfg['auth_enabled']).lower(),'token_env = "KIENZLEDOKU_COMMANDER_TOKEN"',
           '', '[gpu]', 'vram_gib = '+str(tier), '', '[policy]', 'memory_mode = '+q(cfg['memory_mode']),
           'diarization_mode = '+q(cfg['diarization_mode']),
-          'asr_on_demand = '+str(cfg['asr_on_demand']).lower(),'enabled_roles = '+json.dumps(roles),
+          'asr_on_demand = '+str(cfg['asr_on_demand']).lower(),'enabled_roles = '+json.dumps(enabled),
           'enabled_fields = '+json.dumps(cfg['fields']),
-          'default_quality = '+q(next((g for g in GRADES if g in cfg['quality_models']), 'auto') if not cfg['remote_llm_url'] and cfg['server_role']!='asr' else 'auto'),
+          'default_quality = '+q(next((g for g in GRADES if g in cfg['quality_models']), 'auto') if local_role(cfg,'llm') else 'auto'),
           'load_timeout = 600', 'backend_timeout = 7200', 'queue_timeout = 3600',
           '', '[backends]', 'platform = "macos"', 'prompt_path = '+q(support/'commander/prompt.txt'),
           'control_dir = '+q(support/'commander/run'), 'llama_binary = '+q(version_root/'llama/llama-server'),
           'asr_url = "http://127.0.0.1:8179"','diar_url = "http://127.0.0.1:8183"','llm_url = "http://127.0.0.1:8086"',
           'asr_command = '+json.dumps([str(version_root/'asr-venv/bin/python'),str(version_root/'local-ai-macos/asr_server_mlx.py')]),
           'diar_command = '+json.dumps([str(version_root/'diar-venv/bin/python'),str(version_root/'local-ai-macos/diarization_server_mps.py')]),
-          'asr_model_path = '+q(support/'models/whisper-large-v3-mlx'),'diar_model_path = '+q(support/'models/pyannote-community-1'),
-          '', '[remote_llm]', 'url = '+q(cfg['remote_llm_url']), 'token_env = "KIENZLEDOKU_REMOTE_LLM_TOKEN"']
+          'asr_model_path = '+q(support/'models'/('whisper-turbo-8bit-mlx' if cfg['asr_model']=='turbo-int8' else 'whisper-large-v3-mlx')),'diar_model_path = '+q(support/'models/pyannote-community-1'),
+          '', '[remote_llm]', 'url = '+q(cfg['remote_llm_url']), 'token_env = "KIENZLEDOKU_REMOTE_LLM_TOKEN"',
+          '', '[remote_diar]', 'url = '+q(cfg['remote_diar_url']), 'token_env = "KIENZLEDOKU_REMOTE_DIAR_TOKEN"']
     models={m['id']:m for m in CATALOG}
-    if not cfg['remote_llm_url'] and cfg['server_role']!='asr':
+    if local_role(cfg,'llm'):
         for grade,mid in cfg['quality_models'].items():
             m=models[mid]
             data += ['', '[models.'+grade+']', 'path = '+q(support/'models'/mid/m['filename']), 'model_id = '+q(mid),
-                     'label = '+q(m['label']), 'context = 32768','slots = 1','kv = "q8_0"']
+                     'label = '+q(m['label']), 'context = '+str(m['context']),'slots = 1','kv = "q8_0"']
         for mid in cfg['selected_models']:
             m=models[mid]
             reserve=8 if cfg['diarization_mode']=='resident' else 6
             data += ['', '[benchmark_models.'+q(mid)+']', 'path = '+q(support/'models'/mid/m['filename']),
-                     'label = '+q(m['label']), 'context = 32768', 'slots = 1', 'kv = "q8_0"',
+                     'label = '+q(m['label']), 'context = '+str(m['context']), 'slots = 1', 'kv = "q8_0"',
                      'parallel_available = '+str(memory >= m['min_ram_gib']+reserve).lower()]
     return '\n'.join(data)+'\n'
 
@@ -340,7 +343,7 @@ class Installer:
         asr='asr' in roles and not policy.get('asr_on_demand',False)
         required=set()
         if asr:required.add('asr')
-        if 'diar' in roles and (diar_mode=='resident' or diar_mode=='with_asr' and asr):required.add('diar')
+        if 'diar' in roles and not data.get('remote_diar',{}).get('url') and (diar_mode=='resident' or diar_mode=='with_asr' and asr):required.add('diar')
         if 'llm' in roles and parallel and not data.get('remote_llm',{}).get('url'):required.add('llm')
         # Each sequential cold start has its own configured limit.
         deadline=time.monotonic()+30+max(1,len(required))*policy.get('load_timeout',600)
@@ -393,7 +396,7 @@ class Installer:
     def start(self,cfg):
         validate(cfg,self.hw)
         require_closed_record(self.support)
-        if cfg["mode"] != "client" and cfg["server_role"] != "llm" and cfg["diarization"] and not cfg["hf_token"]:
+        if cfg["mode"] != "client" and local_role(cfg,"diar") and not cfg["hf_token"]:
             marker=self.support/"models/pyannote-community-1/.kienzledoku-revision"
             if not marker.is_file() or marker.read_text().strip()!=PYANNOTE_REV:
                 raise ValueError("Für die Sprechertrennung bitte zuerst das Hugging-Face-Token eingeben und die Modellbedingungen bestätigen, oder Sprechertrennung abwählen.")
@@ -430,8 +433,8 @@ class Installer:
                 for name in client_files:
                     if not (ROOT/name).is_file():
                         raise RuntimeError('Installationspaket unvollständig: '+name+' fehlt. Bitte einen korrigierten Installer verwenden.')
-            llm=server and cfg['server_role']!='asr' and not cfg['remote_llm_url']
-            asr=server and cfg['server_role']!='llm'
+            llm=server and local_role(cfg,'llm')
+            asr=server and local_role(cfg,'asr')
             size=plan(cfg,self.hw)['download_bytes']+(5*2**30 if asr else 0)+3*2**30
             existing=0
             if llm:
@@ -480,9 +483,14 @@ class Installer:
                 self.run([python,'-m','venv',version/'asr-venv'])
                 from installer.locked_dependencies import install_locked
                 install_locked(version/'asr-venv/bin/python', ROOT/'installer/dependency-locks/macos-asr-py312.txt', version/'asr-dependencies.json', self.run)
-                for name,digest in WHISPER_FILES.items():
-                    download('https://huggingface.co/mlx-community/whisper-large-v3-mlx/resolve/'+WHISPER_REV+'/'+name,self.support/'models/whisper-large-v3-mlx'/name,digest,self.report,self.cancel)
-            if asr and cfg['diarization']:
+                if cfg['asr_model']=='turbo-int8':
+                    info=json.loads((ROOT/'installer/asr-turbo-mlx.json').read_text())
+                    for entry in info:
+                        download(entry['url'],self.support/'models/whisper-turbo-8bit-mlx'/entry['filename'],entry['sha256'],self.report,self.cancel)
+                else:
+                    for name,digest in WHISPER_FILES.items():
+                        download('https://huggingface.co/mlx-community/whisper-large-v3-mlx/resolve/'+WHISPER_REV+'/'+name,self.support/'models/whisper-large-v3-mlx'/name,digest,self.report,self.cancel)
+            if server and local_role(cfg,'diar'):
                 self.report('Sprechertrennung einrichten',60)
                 self.run([python,'-m','venv',version/'diar-venv'])
                 from installer.locked_dependencies import install_locked
@@ -526,7 +534,12 @@ class Installer:
             cfg['server_token']=cfg['server_token'] or credentials.get('KIENZLEDOKU_COMMANDER_TOKEN') or secrets.token_urlsafe(32)
             credentials['KIENZLEDOKU_COMMANDER_TOKEN']=cfg['server_token']
         else: credentials.pop('KIENZLEDOKU_COMMANDER_TOKEN',None)
-        if cfg['remote_llm_token']: credentials['KIENZLEDOKU_REMOTE_LLM_TOKEN']=cfg['remote_llm_token']
+        previous=json.loads((self.support/'installer.json').read_text()) if (self.support/'installer.json').exists() else {}
+        for role in ('llm','diar'):
+            key='KIENZLEDOKU_REMOTE_'+role.upper()+'_TOKEN'
+            if previous.get('remote_'+role+'_url')!=cfg['remote_'+role+'_url']: credentials.pop(key,None)
+            if cfg['remote_'+role+'_token']: credentials[key]=cfg['remote_'+role+'_token']
+            if not cfg['remote_'+role+'_url']: credentials.pop(key,None)
         if not cfg['remote_llm_url']: credentials.pop('KIENZLEDOKU_REMOTE_LLM_TOKEN',None)
         # Build apps before publishing new settings.
         pending=[]
@@ -572,7 +585,7 @@ class Installer:
                 self.run(['/bin/launchctl','bootstrap',domain,plist])
                 self.run(['/bin/launchctl','kickstart',domain+'/'+label])
                 self._wait_commander()
-            if server and cfg['server_role'] != 'llm' and cfg['diarization']:
+            if server and local_role(cfg,'diar'):
                 # Installation credential only: separate private file, never
                 # in installer.json, Commander settings, plist or logs.
                 replace(self.support/'huggingface.token',cfg['hf_token'])
