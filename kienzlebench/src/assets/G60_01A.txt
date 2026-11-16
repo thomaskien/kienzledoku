@@ -1,0 +1,11 @@
+[SPEAKER_00] Wir schauen heute auf Ihren Blutdruck. Im alten Plan steht Ramipril 5 mg morgens und abends. Ist das noch richtig?
+[SPEAKER_01] Nein, das war schon beim letzten Mal falsch. Ich nehme eine halbe Fünfer morgens, also 2,5 mg einmal am Tag. Abends nehme ich davon nichts. Bitte schreiben Sie nicht wieder zweimal täglich auf.
+[SPEAKER_00] Danke, ich berichtige die Einnahme auf 2,5 mg nur morgens. Haben Sie Schwindel, eine Ohnmacht oder Schmerzen in der Brust bemerkt?
+[SPEAKER_01] Keines davon. Wenn ich schnell aufstehe, bin ich auch nicht schwindelig. Meine Frau hatte eine Ohnmacht, aber ich nicht. Zu Hause messe ich meistens um 132 zu 82. Die Liste habe ich dabei. Die hohen Werte letzte Woche waren die von meiner Frau, sie hatte ihre Spalte daneben geschrieben.
+[SPEAKER_00] Ihre mitgebrachte Liste zeigt 128 bis 136 systolisch und 78 bis 84 diastolisch. Hier messe ich heute 138 zu 84 mmHg, Puls 70 pro Minute. Ich verändere die Dosis heute nicht.
+[SPEAKER_01] Dann bleibt es bei der halben Tablette morgens. Ich will nicht selbst mehr nehmen. Was soll ich mit der Liste machen?
+[SPEAKER_00] Führen Sie Ihre eigene Spalte weiter. In zwei Wochen besprechen wir die Werte erneut. Eine Blutabnahme machen wir heute nicht; das ist für diesen Termin auch nicht veranlasst.
+[SPEAKER_01] Gut. Dann bringe ich die Liste ohne die Werte meiner Frau mit und komme in zwei Wochen wieder.
+[SPEAKER_00] Wir ergänzen die Dokumentation um die folgenden ausdrücklich besprochenen Punkte. Das mitgebrachte Blutdruckgerät haben wir heute nicht mit unserem Gerät verglichen. Die Urinprobe für den Albumin-Kreatinin-Quotienten ist erst für nächste Woche geplant. Einen 24-Stunden-Blutdruck haben wir noch nicht angeordnet. Sie stimmen dem Ausdruck des heute abgeglichenen Medikamentenplans zu; der Ausdruck ist Ihnen jetzt ausgehändigt.
+[SPEAKER_01] Bitte halten Sie bei den neuen Angaben fest, was nur besprochen oder geplant wurde und was tatsächlich schon erfolgt ist. Angaben zu meinen Angehörigen gehören weiter zu deren eigener Geschichte.
+[SPEAKER_00] Ja, wir unterscheiden die tatsächlich bestätigten Angaben von früheren oder fremden Notizen. Ungeklärtes wird dadurch nicht automatisch gesichert.

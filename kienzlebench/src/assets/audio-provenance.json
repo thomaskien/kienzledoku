@@ -1,0 +1,17 @@
+{
+  "source_url": "https://www.hoertexte-deutsch.at/mp3/husten.mp3",
+  "source_title": "Der Husten geht nicht weg",
+  "source_attribution": "Hörtexte Deutsch",
+  "reference_url": "https://www.hoertexte-deutsch.at/doc/husten.pdf",
+  "license_as_documented_in_original_protocol": "CC BY-NC-ND3.0AT",
+  "mp3_sha256": "69875a775815687f9c43721557019a5d2be682cdb183adfceb233c9373bef62d",
+  "wav_sha256": "d1afb910775c976619a43dc04ab38decbc1abbcadf13e345a65501cd24a8207a",
+  "pcm_sha256": "38f620f4549bbd4820e229e03fac4462fb076e1fa4e84a4a55424eaf9438db8a",
+  "channels": 1,
+  "sample_width_bytes": 2,
+  "sample_rate_hz": 16000,
+  "frames": 1810560,
+  "duration_seconds": 113.16,
+  "ffmpeg_version": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+  "pcm_identical_to_xtx_reference": true
+}

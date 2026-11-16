@@ -1,0 +1,106 @@
+[
+  {
+    "id": 1,
+    "physical_start": 0.0,
+    "physical_end": 9.86,
+    "pad_tail": 0.0,
+    "core_start": 0.0,
+    "core_end": 9.16
+  },
+  {
+    "id": 2,
+    "physical_start": 8.46,
+    "physical_end": 16.43,
+    "pad_tail": 0.0,
+    "core_start": 9.16,
+    "core_end": 15.73
+  },
+  {
+    "id": 3,
+    "physical_start": 15.03,
+    "physical_end": 17.78,
+    "pad_tail": 0.0,
+    "core_start": 15.73,
+    "core_end": 17.080000000000002
+  },
+  {
+    "id": 4,
+    "physical_start": 16.38,
+    "physical_end": 37.81,
+    "pad_tail": 0.0,
+    "core_start": 17.080000000000002,
+    "core_end": 37.11
+  },
+  {
+    "id": 5,
+    "physical_start": 36.41,
+    "physical_end": 40.34,
+    "pad_tail": 0.0,
+    "core_start": 37.11,
+    "core_end": 39.64
+  },
+  {
+    "id": 6,
+    "physical_start": 38.94,
+    "physical_end": 45.35,
+    "pad_tail": 0.0,
+    "core_start": 39.64,
+    "core_end": 44.65
+  },
+  {
+    "id": 7,
+    "physical_start": 43.95,
+    "physical_end": 49.46,
+    "pad_tail": 0.0,
+    "core_start": 44.65,
+    "core_end": 48.76
+  },
+  {
+    "id": 8,
+    "physical_start": 48.06,
+    "physical_end": 54.470000000000006,
+    "pad_tail": 0.0,
+    "core_start": 48.76,
+    "core_end": 53.77
+  },
+  {
+    "id": 9,
+    "physical_start": 53.07,
+    "physical_end": 61.07000000000001,
+    "pad_tail": 0.0,
+    "core_start": 53.77,
+    "core_end": 60.370000000000005
+  },
+  {
+    "id": 10,
+    "physical_start": 59.67,
+    "physical_end": 73.22,
+    "pad_tail": 0.0,
+    "core_start": 60.370000000000005,
+    "core_end": 72.52
+  },
+  {
+    "id": 11,
+    "physical_start": 71.82,
+    "physical_end": 82.78999999999999,
+    "pad_tail": 0.0,
+    "core_start": 72.52,
+    "core_end": 82.08999999999999
+  },
+  {
+    "id": 12,
+    "physical_start": 81.39,
+    "physical_end": 102.79,
+    "pad_tail": 0.0,
+    "core_start": 82.08999999999999,
+    "core_end": 102.09
+  },
+  {
+    "id": 13,
+    "physical_start": 101.39,
+    "physical_end": 113.16,
+    "pad_tail": 0.7,
+    "core_start": 102.09,
+    "core_end": 113.16
+  }
+]

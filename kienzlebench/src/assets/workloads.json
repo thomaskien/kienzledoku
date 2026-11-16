@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "source_corpus_sha256": "4cf9c39162037777875a76e8b943a09deb2cdc06383c14efdd5d03eedc48bfd8",
+  "prompt_sha256": "c402ac6a9e8e8111ab5b0405cf53f6009a9fdb4ac1d12fd83e97e5cf9b72a153",
+  "cases": [
+    {
+      "id": "G60_01A",
+      "label": "5 Minuten Kontakt",
+      "nominal_contact_minutes": 5,
+      "minutes_are_approximate": true,
+      "transcript_file": "fixtures/G60_01A.txt",
+      "sha256": "ddd201525e3560279765c14bc6713f90777bb4004880411896837fe15ae0c232",
+      "spoken_words": 323,
+      "words_with_speaker_labels": 334,
+      "expected_input_tokens": 858
+    },
+    {
+      "id": "G60_30B",
+      "label": "20 Minuten Kontakt",
+      "nominal_contact_minutes": 20,
+      "minutes_are_approximate": true,
+      "transcript_file": "fixtures/G60_30B.txt",
+      "sha256": "60119716b2a8f7f321df3c4b4b974303dfeae0958837ffd9e060a9a4d32258b1",
+      "spoken_words": 1523,
+      "words_with_speaker_labels": 1559,
+      "expected_input_tokens": 2824
+    }
+  ],
+  "measurement": "serial: continuous LLM load begin -> complete streamed answer; excludes ASR, unloading and Whisper restoration",
+  "nominal_contact_duration_note": "Gerundete Bezeichnungen der Hardwarematrix; keine 300-/1200-Sekunden-Audiodateien.",
+  "source_files": {
+    "results/hardware-matrix-2026-10-28/Hardwarematrix_mit_Zeiten.md": "e7a48962473f23c39fab20774bf074ef9273cfe2028f66aa63ea5a8bf033daa9",
+    "results/hardware-matrix-2026-10-28/timing-metrics.json": "b4ce9d3d0ceb699329a48f3dcb224ed2033f6dde5d2683d2168c8dca69ac5979",
+    "results/contact-comparison-2026-10-30-21/runs/9q4-p16/evidence/corpus/cases.json": "4cf9c39162037777875a76e8b943a09deb2cdc06383c14efdd5d03eedc48bfd8",
+    "results/contact-comparison-2026-10-30-21/runs/9q4-p16/evidence/scripts/profile_run.py": "26bc57fb590af5d66c5ed3f6ab55e0bb6baf2ebaf428a72e4e4649d2b8f1488b"
+  }
+}

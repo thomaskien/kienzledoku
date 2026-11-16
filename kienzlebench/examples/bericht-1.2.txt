@@ -1,0 +1,145 @@
+FIKTIVE BEISPIELDATEN – KEINE TATSÄCHLICHE HARDWAREMESSUNG
+
+KIENZLEBENCH 1.2 — ERGEBNISBERICHT
+────────────────────────────────────────────────────────────────────────────
+Status          Abgeschlossen · FIKTIVES BEISPIEL
+Beginn          16.11.2026 14:00:00 CET (UTC+01:00)
+Ende            16.11.2026 14:35:03 CET (UTC+01:00)
+
+01 ZIELSYSTEM & HARDWARE
+────────────────────────────────────────────────────────────────────────────
+Rechner         http://beispiel-server:8185 · ASR + LLM
+Betriebssystem  Ubuntu · 24.04 LTS · x86_64 · nativ
+CPU             AMD Ryzen 9 5900X · 12 Kerne / 24 Threads
+RAM             64,00 GiB DDR4 · 3200 MHz · 52,00 GiB verfügbar
+Mainboard       MSI B550-A PRO
+SSD             Samsung 980 PRO · 2,00 TB · NVMe · ssd
+Systemvolume    1,82 TiB / 1,09 TiB frei
+Modellspeicher  Samsung 980 PRO · Volume 1,82 TiB / 1,09 TiB frei
+GPU             NVIDIA GeForce RTX 3090 · 24,00 GiB · VRAM
+Firmware        nicht verfügbar
+Software        Commander 1.8.1
+
+02 MESSBEDINGUNGEN
+────────────────────────────────────────────────────────────────────────────
+Fälle           G60_01A (5 Min.) · G60_30B (20 Min.)
+Durchläufe      1 Erstlauf ausgeschlossen + 5 Messungen
+Auswertung      Median in Sekunden; Modelle nacheinander
+Profil          32768 Token/Slot · 1 Slot(s) · KV q8_0
+LLM-Backend     llama.cpp
+Sampling        Temperatur 0,1 · Seed 42 · maximal 1.600 Ausgabetoken
+Thinking        durch Commander nicht bestätigt
+Promptcache     Aus; gemeldete Cache-Nutzung wird als Fehler gewertet
+Dateicache      Unverändert; kein SSD-Kaltstart nachgewiesen
+Whisper-Cache   RAM
+5 / 20 Minuten bezeichnen die festen Kontaktfälle, keine Audiodauern.
+
+03 SERIELLER BETRIEB
+────────────────────────────────────────────────────────────────────────────
+GP60 – Laden bis zur vollständigen Antwort
+
+Modell                         5-Min.-Fall  20-Min.-Fall
+────────────────────────────────────────────────────────
+Qwen3.5-4B Q4_K_M                   4,80 s        7,60 s
+Qwen3.5-9B Q6_K                    10,20 s       16,80 s
+
+Median aus fünf gültigen Messungen. ASR und Rückwechsel separat.
+
+WHISPER – REFERENZAUFNAHME
+Audio           „Der Husten geht nicht weg“ · 113,16 s
+Backend         Modell/Build durch Commander nicht bestätigt
+Verfahren       13 Final-Blöcke · ohne Echtzeit-Wartepausen
+Mit Laden       19,20 s · RTF 0,170 · 5,89× Echtzeit
+LLM-Kontext     Qwen3.5-4B Q4_K_M
+
+04 PARALLELER BETRIEB
+────────────────────────────────────────────────────────────────────────────
+GP60 – Whisper und LLM gleichzeitig geladen
+
+Modell                         5-Min.-Fall  20-Min.-Fall
+────────────────────────────────────────────────────────
+Qwen3.5-4B Q4_K_M                   1,30 s        3,10 s
+Qwen3.5-9B Q6_K                     3,50 s        8,30 s
+
+Median aus fünf gültigen Messungen. ASR und Rückwechsel separat.
+
+WHISPER – REFERENZAUFNAHME
+Audio           „Der Husten geht nicht weg“ · 113,16 s
+Backend         Modell/Build durch Commander nicht bestätigt
+Verfahren       13 Final-Blöcke · ohne Echtzeit-Wartepausen
+Bereits geladen 8,40 s · RTF 0,074 · 13,47× Echtzeit
+LLM-Kontext     Qwen3.5-4B Q4_K_M
+
+05 WÄRMETEST & TEMPERATURVERLAUF
+────────────────────────────────────────────────────────────────────────────
+Modell          Qwen3.5-9B Q6_K · ein Modell für den ganzen Test
+Ablauf          Whisper und LLM gleichzeitig
+Soll-Lastphase  30:00 min · GP60 kurz/lang + Whisper wiederholt
+Wärmeteststart  16.11.2026 14:05:00 CET (UTC+01:00)
+Lastphase       30:00 min
+Nachlauf        3,00 s · außerhalb der Lastphase
+
+TEMPERATUREN – MINUTENWERTE DER LASTPHASE
+Sensor                 Start           Maximum              Ende
+CPU                  39,0 °C           72,0 °C           72,0 °C
+GPU                  33,0 °C           69,0 °C           69,0 °C
+Maximum aus Minutenmessungen; Start = Minute 0, Ende = Minute 30.
+
+TEMPERATURVERLAUF – LASTPHASE
+Minute 0 = Ausgangswert; danach jede Minute ab Wärmeteststart.
+
+Zeit ab Start                  CPU                  GPU
+Min. 00:                    39,0 °C              33,0 °C
+Min. 01:                    40,1 °C              34,2 °C
+Min. 02:                    41,2 °C              35,4 °C
+Min. 03:                    42,3 °C              36,6 °C
+Min. 04:                    43,4 °C              37,8 °C
+Min. 05:                    44,5 °C              39,0 °C
+Min. 06:                    45,6 °C              40,2 °C
+Min. 07:                    46,7 °C              41,4 °C
+Min. 08:                    47,8 °C              42,6 °C
+Min. 09:                    48,9 °C              43,8 °C
+Min. 10:                    50,0 °C              45,0 °C
+Min. 11:                    51,1 °C              46,2 °C
+Min. 12:                    52,2 °C              47,4 °C
+Min. 13:                    53,3 °C              48,6 °C
+Min. 14:                    54,4 °C              49,8 °C
+Min. 15:                    55,5 °C              51,0 °C
+Min. 16:                    56,6 °C              52,2 °C
+Min. 17:                    57,7 °C              53,4 °C
+Min. 18:                    58,8 °C              54,6 °C
+Min. 19:                    59,9 °C              55,8 °C
+Min. 20:                    61,0 °C              57,0 °C
+Min. 21:                    62,1 °C              58,2 °C
+Min. 22:                    63,2 °C              59,4 °C
+Min. 23:                    64,3 °C              60,6 °C
+Min. 24:                    65,4 °C              61,8 °C
+Min. 25:                    66,5 °C              63,0 °C
+Min. 26:                    67,6 °C              64,2 °C
+Min. 27:                    68,7 °C              65,4 °C
+Min. 28:                    69,8 °C              66,6 °C
+Min. 29:                    70,9 °C              67,8 °C
+Min. 30:                    72,0 °C              69,0 °C
+Einzelmessungen; fehlende Werte werden nicht ersetzt.
+Drosselung: nicht erfasst.
+
+NACHKÜHLUNG – NACH ABSCHLUSS ALLER AUFTRÄGE
+Start           16.11.2026 14:35:03 CET (UTC+01:00)
+Eigene Zeitachse: Minute 0 = Beginn der Nachkühlung.
+
+Noch keine Minutenwerte vorhanden.
+
+06 STATUS & FEHLENDE ANGABEN
+────────────────────────────────────────────────────────────────────────────
+Gesamtstatus    Abgeschlossen · FIKTIVES BEISPIEL
+Keine Fehler gemeldet.
+Wiederherstellung für alle beendeten Sitzungen bestätigt
+— = ausstehend, unvollständig oder nicht verfügbar; Anzahl ggf. in Klammern.
+* = Messmedian vorhanden, aber Fehler/Erstlauf beachten.
+Backend-Build, Thinking und Decoder nur soweit vom Commander bestätigt.
+Kein fachlicher Qualitätsnachweis durch diesen Laufzeitvergleich.
+
+Audio: Hörtexte Deutsch – „Der Husten geht nicht weg“
+https://www.hoertexte-deutsch.at/mp3/husten.mp3
+Lizenz laut Referenz: CC BY-NC-ND 3.0 AT
+https://creativecommons.org/licenses/by-nc-nd/3.0/at/
