@@ -354,7 +354,7 @@ def transcribe_final_block_http(url, wav_bytes, language, api_key=None, timeout=
     headers = {
         'Accept': 'application/json',
         'Content-Type': content_type,
-        'User-Agent': 'Kienzledoku-ASR/1.7.6',
+        'User-Agent': 'Kienzledoku-ASR/1.8',
     }
     if api_key:
         headers['Authorization'] = 'Bearer ' + api_key
@@ -1076,7 +1076,7 @@ async def _run_recording(args, audio):
         args._recording_stream = stream
         stream.start()
 
-    diagnostic_print(args, '\n=== kienzledoku record 1.7.6 Final-Block-ASR ===')
+    diagnostic_print(args, '\n=== kienzledoku record 1.8 Final-Block-ASR ===')
     diagnostic_print(args, 'Final-ASR:         %s' % normalize_final_asr_url(args.asr))
     diagnostic_print(args, 'Pausenschnitt:     %.2f s bestätigt' % args.pause_seconds)
     diagnostic_print(args, 'Kurze Äußerung:    Schnitt spätestens nach %.2f s Stille' % args.short_block_pause_seconds)
@@ -1244,7 +1244,7 @@ async def _run_recording(args, audio):
 
 def parse_args():
     p = argparse.ArgumentParser(
-        description='kienzledoku record 1.7.6: natürliche Pausen + residenter Final-Block-ASR + pyannote + LLM'
+        description='kienzledoku record 1.8: natürliche Pausen + residenter Final-Block-ASR + pyannote + LLM'
     )
     p.add_argument('--asr', '--final-asr', dest='asr', default='http://127.0.0.1:8179')
     p.add_argument(

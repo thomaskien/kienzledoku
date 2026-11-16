@@ -14,7 +14,7 @@ import tarfile
 import tempfile
 import zipfile
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='1.7.6'
+VERSION='1.8'
 sys.path.insert(0,str(ROOT))
 from installer.product_key_build import ProductKeyBuild
 def run(argv,**kw): subprocess.run(list(map(str,argv)),check=True,**kw)
@@ -27,6 +27,8 @@ def ps_copy(source,target):
     for p in ([target] if target.is_file() else target.rglob('*')):
         if p.suffix in ('.ps1','.psm1'): p.write_text(p.read_text(encoding='utf-8-sig'),encoding='utf-8-sig',newline='\r\n')
 def main():
+    from installer.runtime_contract import check
+    check(ROOT)
     p=argparse.ArgumentParser();p.add_argument('--tools',type=Path,required=True);p.add_argument('--makensis',default='makensis');p.add_argument('--go',default='go');p.add_argument('--product-key-file',type=Path)
     args=p.parse_args();tools=args.tools.resolve();out=ROOT/'dist';win=out/'windows';linux=out/'linux'
     artifacts=[win/f'kienzledoku-{VERSION}-windows-x64-setup.exe',win/f'kienzledoku-{VERSION}-windows-x64.zip']

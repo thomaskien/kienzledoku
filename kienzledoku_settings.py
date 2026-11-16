@@ -77,12 +77,12 @@ def run_settings(no_browser=False, window_opener=None, setup=False):
             key_note = ('Diese Version verwendet den eingebetteten KienzleDoku-Hersteller-Key für Direktbetrieb und Connect.'
                         if production_build() else 'Ohne eigenen Key wird der öffentliche Demo-Key verwendet. Connect ersetzt jeden mitgesendeten Key durch seinen eingebetteten Key.')
             data = ('''<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>kienzledoku record 1.7.6 – %s</title><style>
+<title>kienzledoku record 1.8 – %s</title><style>
 body{font:16px system-ui;margin:32px auto;padding:0 24px;max-width:760px;background:#f2f3f5;color:#172536}
 header{display:flex;gap:20px;align-items:center}.logo-slot{width:96px;height:96px;display:flex;align-items:center;justify-content:center;flex:none}.logo-slot img{width:66%%;height:66%%;object-fit:contain}h1{font-size:26px}form{background:white;padding:24px;border-radius:16px}
 label{display:block;margin:15px 0}input:not([type=checkbox]),select{display:block;width:100%%;box-sizing:border-box;padding:10px;margin-top:6px}
 button{padding:12px 16px;margin:8px 4px 0 0}p{line-height:1.5}.notice{white-space:pre-wrap}</style>
-<header><span class="logo-slot"><img src="/logo.svg" alt=""></span><div><h1>kienzledoku record 1.7.6</h1><p>%s</p></div></header>
+<header><span class="logo-slot"><img src="/logo.svg" alt=""></span><div><h1>kienzledoku record 1.8</h1><p>%s</p></div></header>
 <p>%s</p><p class="notice">%s</p><form method="post"><input type="hidden" name="csrf" value="%s">%s%s
 <p>%s
 Die Zertifikatsausnahme betrifft ausschließlich das eingetragene T2med-Ziel. Änderungen gelten für den nächsten Patientenvorgang.</p>

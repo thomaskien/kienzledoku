@@ -13,6 +13,7 @@ import wave
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
+os.environ["PYANNOTE_METRICS_ENABLED"] = "0"
 
 HOST = os.environ.get("KIENZLEDOKU_DIARIZATION_HOST", "127.0.0.1")
 PORT = int(os.environ.get("KIENZLEDOKU_DIARIZATION_PORT", "8183"))
@@ -74,6 +75,7 @@ def annotation_segments(annotation) -> list[dict]:
 
 
 def load_runtime() -> None:
+    os.environ["PYANNOTE_METRICS_ENABLED"] = "0"
     if not MODEL_DIR or not os.path.isdir(MODEL_DIR):
         raise RuntimeError("Lokales pyannote-Modellverzeichnis fehlt: %s" % MODEL_DIR)
 

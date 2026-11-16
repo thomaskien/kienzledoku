@@ -10,6 +10,7 @@ import threading
 import time
 import uuid
 
+from .benchmark import BenchmarkMixin
 from .config import LABELS
 from .errors import BackendFailure, Busy, CommanderError, Conflict, InvalidRequest, QueueFull, QueueExpired
 
@@ -28,9 +29,15 @@ class Job:
     payload_size: int = 0
     submitted_at: float = field(default_factory=time.monotonic)
     started_at: float | None = None
+    benchmark_session: str | None = None
+    benchmark_model: str | None = None
+    benchmark_mode: str | None = None
+    failure_code: str | None = None
+    model_changes: list = field(default_factory=list)
+    backend_metrics: dict = field(default_factory=dict)
 
 
-class Commander:
+class Commander(BenchmarkMixin):
     def __init__(self, settings, runtime):
         self.settings, self.runtime = settings, runtime
         self._condition = threading.Condition()
@@ -54,10 +61,14 @@ class Commander:
         self._ready_once = threading.Event()
         self._pool = ThreadPoolExecutor(max_workers=32, thread_name_prefix="commander-inference")
         self._changes = ThreadPoolExecutor(max_workers=1, thread_name_prefix="commander-models")
+        self._benchmark_init()
         self._thread = threading.Thread(target=self._loop, name="kienzledoku-commander")
         self._thread.start()
 
     def _baseline(self):
+        benchmark = self._benchmark_target()
+        if benchmark is not None:
+            return benchmark
         if (self.settings.diarization_mode is not None and self._awaiting_documentation
                 and self._loaded['diar'] and not self._uncertain):
             # The next client request follows the completed diarization result.
@@ -101,6 +112,9 @@ class Commander:
         return desired
 
     def _desired(self, job):
+        benchmark = self._benchmark_target(job)
+        if benchmark is not None:
+            return benchmark
         return self._runtime_target(self._diar_policy(self._desired_legacy(job), job.role))
 
     def _desired_legacy(self, job):
@@ -140,7 +154,9 @@ class Commander:
                 break
             del self._remembered[min(done)[1]]
 
-    def submit(self, role, payload, quality=None, request_id=None):
+    def submit(self, role, payload, quality=None, request_id=None, benchmark_session=None):
+        if benchmark_session is None and role == 'llm' and quality is not None and quality not in self.settings.allowed and not self.settings.remote_llm_url:
+            raise InvalidRequest()
         if role not in ("asr", "diar", "llm"):
             raise InvalidRequest()
         if role not in self.settings.enabled_roles:
@@ -160,6 +176,19 @@ class Commander:
         size = len(payload.get("body", b"")) + len(json.dumps({k: v for k, v in payload.items() if k != "body"}).encode())
         with self._condition:
             self._purge()
+            benchmark = None
+            if benchmark_session is not None:
+                benchmark = self._benchmark_require(benchmark_session)
+                if benchmark['state'] != 'active' or time.monotonic() >= benchmark['expires']:
+                    raise Busy()
+                if role not in ('asr', 'llm') or (role == 'llm' and (self.settings.remote_llm_url or quality != benchmark['quality'])):
+                    raise InvalidRequest()
+                if request_id in benchmark['seen'] or request_id in self._remembered:
+                    raise Conflict()
+                if len(benchmark['seen']) >= 4096:
+                    raise QueueFull()
+            elif self._benchmark is not None:
+                raise Busy()
             previous = self._remembered.get(request_id)
             if previous:
                 if previous.fingerprint != fingerprint:
@@ -171,6 +200,11 @@ class Commander:
             if len(self._pending) >= self.settings.max_pending or len(self._remembered) >= self.settings.max_remembered or held_bytes + size > self.settings.max_payload_mib * 1048576:
                 raise QueueFull()
             job = Job(request_id, role, payload, quality, quality, fingerprint)
+            if benchmark:
+                benchmark['seen'].add(request_id)
+                job.benchmark_mode = benchmark['mode']
+                job.benchmark_session = benchmark['id']
+                job.benchmark_model = benchmark['model_id'] if role == 'llm' else None
             job.payload_size = size
             self._remembered[request_id] = job
             self._pending.append(job)
@@ -228,7 +262,10 @@ class Commander:
 
     def _complete(self, job, value=None, error=None):
         job.completed_at = time.monotonic()
+        job.failure_code = getattr(error, 'code', 'backend_failure') if error else None
         job.payload = {}  # Completed cache retains result, never raw audio/transcript inputs.
+        if job.benchmark_session and isinstance(value, dict):
+            value['benchmark'] = self._benchmark_job_view(job)
         if not job.future.done():
             if error:
                 job.future.set_exception(error)
@@ -236,7 +273,7 @@ class Commander:
                 job.future.set_result(value)
 
     def _failed(self, job, error):
-        fallback = self.settings.fallback(job.quality) if job.role == "llm" and not self.settings.remote_llm_url else None
+        fallback = self.settings.fallback(job.quality) if job.role == "llm" and not self.settings.remote_llm_url and not job.benchmark_session else None
         if isinstance(error, BackendFailure) and fallback and fallback not in job.attempted:
             job.attempted.append(job.quality)
             job.quality = fallback
@@ -252,7 +289,15 @@ class Commander:
                 self._return_after_llm = True
             try:
                 value = future.result()
-                if job.role == "llm":
+                if job.benchmark_session:
+                    # Numeric backend measurements only; never retain prompt content here.
+                    for name in ('timings', 'usage'):
+                        data = value.get(name, {}) if isinstance(value, dict) else {}
+                        if isinstance(data, dict):
+                            job.backend_metrics[name] = {k: v for k, v in data.items()
+                                if isinstance(k, str) and type(v) in (int, float) and __import__('math').isfinite(v)}
+                    self._last_benchmark_job = job
+                elif job.role == "llm":
                     remote = value.pop("remote_commander", {}) if self.settings.remote_llm_url else {}
                     used = remote.get("used_quality", job.quality)
                     requested = remote.get("requested_quality", job.requested_quality)
@@ -306,27 +351,44 @@ class Commander:
                 self._ready_once.set()
             self._condition.notify_all()
 
-    def _perform_change(self, desired, force):
+    def _perform_change(self, desired, force, selected=None):
         # ASR is unblocked as soon as its own reload finishes; restoring the
         # persistent LLM may continue concurrently with already queued ASR.
         with self._condition:
             loaded = dict(self._loaded)
             llm_fault = self._llm_fault
+        def measured(role, operation, callback):
+            started = time.monotonic()
+            success = False
+            try:
+                result = callback()
+                success = True
+                return result
+            finally:
+                with self._condition:
+                    if self._benchmark:
+                        event = dict(role=role, operation=operation,
+                            phase='prepare' if selected else ('restore' if self._benchmark['state']!='active' else ('return' if self._last_benchmark_job else 'initial')), started_at=started,
+                            seconds=round(time.monotonic()-started, 6), success=success)
+                        self._benchmark['model_changes'].append(event)
+                        owner = selected or self._last_benchmark_job
+                        if owner and owner.benchmark_session == self._benchmark['id']:
+                            owner.model_changes.append(event)
         local_llm = "llm" in self.settings.enabled_roles and not self.settings.remote_llm_url
         if local_llm and (force or (loaded["llm"] and (loaded["llm"] != desired["llm"] or llm_fault))):
-            self.runtime.stop_llm()
+            measured('llm', 'unload', self.runtime.stop_llm)
             self._publish("llm", None)
             loaded["llm"] = None
         for role in ("asr", "diar"):
             if role in self.settings.enabled_roles and not desired[role] and (loaded[role] or force):
-                self._worker_change(role, "park", False)
+                measured(role, 'unload', lambda: self._worker_change(role, "park", False))
                 loaded[role] = False
         for role in ("asr", "diar"):
             if role in self.settings.enabled_roles and desired[role] and (not loaded[role] or force):
-                self._worker_change(role, "load", True)
+                measured(role, 'load', lambda: self._worker_change(role, "load", True))
                 loaded[role] = True
         if desired["llm"] and loaded["llm"] != desired["llm"]:
-            self.runtime.load_llm(desired["llm"])
+            measured('llm', 'load', lambda: self.runtime.load_llm(desired["llm"]))
             self._publish("llm", desired["llm"])
 
     def _worker_change(self, role, operation, value):
@@ -404,7 +466,7 @@ class Commander:
         self._transition = True
         self._change_target = dict(desired)
         self._phase = "preparing_model" if selected else "restoring_asr"
-        future = self._changes.submit(self._perform_change, desired, force)
+        future = self._changes.submit(self._perform_change, desired, force, selected)
         future.add_done_callback(lambda result: self._changed(desired, selected, result))
         return True
 
@@ -412,6 +474,7 @@ class Commander:
         while True:
             with self._condition:
                 self._purge()
+                self._benchmark_tick()
                 if self._closing:
                     while self._pending:
                         self._complete(self._pending.popleft(), error=CommanderError())

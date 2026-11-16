@@ -173,26 +173,14 @@ def import_models(cfg):
         save('model-import.json',dict(run_id=cfg['ModelImportId'],verify_model_files=cfg.get('VerifyModelFiles',True),files=[dict(path=e['path'],bytes=e['bytes']) for e in entries]))
 
 def install_audio():
-    env=dict(os.environ,HF_HUB_DISABLE_XET='1',PIP_DISABLE_PIP_VERSION_CHECK='1')
-    for role,cuda in [('asr','cu129'),('diarization','cu130')]:
+    from locked_dependencies import install_locked
+    env=dict(os.environ,HF_HUB_DISABLE_XET='1',PIP_DISABLE_PIP_VERSION_CHECK='1',PYANNOTE_METRICS_ENABLED='0')
+    for role, lock_role in [('asr','asr'),('diarization','diar')]:
         venv=BASE/'python'/(role+'-venv'); py=venv/'bin/python'
-        # Dependency set 1.0 is unchanged; product releases reuse this cache.
-        stamp=STATE/(role+'-packages-1.0.json')
-        if not stamp.exists():
-            if not py.exists(): run([sys.executable,'-m','venv',venv])
-            run([py,'-m','pip','install','--upgrade','pip'],env=env)
-            run([py,'-m','pip','install','--index-url','https://download.pytorch.org/whl/'+cuda,
-                 'torch==2.11.0','torchaudio==2.11.0'],env=env)
-            if role=='asr':
-                wheels=STATE/'wheels';wheels.mkdir(exist_ok=True)
-                run([py,'-m','pip','download','--no-deps','--only-binary=:all:','--dest',wheels,'whisperlivekit==0.2.24'],env=env)
-                wheel=next(wheels.glob('whisperlivekit-0.2.24-*.whl'))
-                if hashlib.sha256(wheel.read_bytes()).hexdigest()!=WHEEL_SHA: raise ValueError('WhisperLiveKit-Wheel stimmt nicht.')
-                run([py,'-m','pip','install',wheel,'faster-whisper==1.2.1','ctranslate2==4.8.1'],env=env)
-            else:
-                run([py,'-m','pip','install','pyannote.audio==4.0.7'],env=env)
-            run([py,'-c','import torch; assert torch.cuda.is_available(), "CUDA fehlt"; print(torch.cuda.get_device_name(0))'])
-            save(stamp.name,{'version':'1.0','cuda':cuda,'time':time.time()})
+        if not py.exists(): run([sys.executable,'-m','venv',venv])
+        install_locked(py, ROOT/'dependency-locks'/('linux-'+lock_role+'-py312.txt'),
+                       STATE/(role+'-dependencies.json'), run, env)
+        run([py,'-c','import torch; assert torch.cuda.is_available(), "CUDA fehlt"; print(torch.cuda.get_device_name(0))'],env=env)
     from managed_update import replace_tree
     replace_tree(ROOT/'runtime',APP,'serial_server.py')
     scripts=BASE/'scripts';scripts.mkdir(exist_ok=True)
@@ -242,6 +230,7 @@ def runtime_settings(cfg,hw):
                 load_timeout=600,backend_timeout=7200,queue_timeout=1800)
     if 'ParallelModel' in cfg:
         server['resident_quality']=catalog()[cfg['ParallelModel']]['quality'] if cfg['ParallelModel'] else ''
+    server.update(asr_model_path=str(BASE/'models/whisper'),diar_model_path=str(BASE/'models/pyannote'))
     server.update(auth_enabled=cfg.get('AuthEnabled', True), asr_on_demand=cfg.get('AsrOnDemand', False),
                   diarization_mode=cfg.get('DiarizationMode'),
                   enabled_fields=cfg.get('EnabledFields', ['anamnese','befund','therapie','prozedere']),
@@ -287,6 +276,7 @@ Environment=DIARIZATION_MAX_BYTES=268435456
 Environment=CUDA_VISIBLE_DEVICES={cfg['GpuIndex']}
 Environment=HF_HOME={BASE}/models/huggingface
 Environment=HF_HUB_OFFLINE=1
+Environment=PYANNOTE_METRICS_ENABLED=0
 Environment=HF_HUB_DISABLE_XET=1
 Environment=KIENZLEDOKU_SERIAL_BOOT=1
 Environment=KIENZLEDOKU_AUDIO_CACHE={cfg['AudioCache']}

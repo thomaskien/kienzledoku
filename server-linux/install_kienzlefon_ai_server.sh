@@ -3,6 +3,7 @@
 # Version: 2.0
 
 set -Eeuo pipefail
+export PYANNOTE_METRICS_ENABLED=0
 IFS=$'\n\t'
 umask 022
 
@@ -6094,13 +6095,15 @@ write_diarization_server() {
 
 import json
 import os
-import tempfile
+import io
+import wave
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
+os.environ['PYANNOTE_METRICS_ENABLED'] = '0'
+
 import torch
-import torchaudio
 from pyannote.audio import Pipeline
 
 HOST = os.environ.get('DIARIZATION_HOST', '0.0.0.0')
@@ -6240,16 +6243,21 @@ class Handler(BaseHTTPRequestHandler):
             if max_speakers is not None:
                 call_kwargs['max_speakers'] = max_speakers
 
-        tmp_name = None
         try:
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
-                tmp.write(body)
-                tmp_name = tmp.name
-
-            # Audio einmal in den Speicher laden. Pyannote empfiehlt diese
-            # Form für schnellere Verarbeitung und vermeidet wiederholtes
-            # Dateidecoding innerhalb der Pipeline.
-            waveform, sample_rate = torchaudio.load(tmp_name)
+            # Record sends PCM16 mono/16 kHz. Decode directly from RAM, never a file.
+            with wave.open(io.BytesIO(body), 'rb') as audio:
+                if (audio.getnchannels(), audio.getsampwidth(), audio.getframerate(),
+                        audio.getcomptype()) != (1, 2, 16000, 'NONE'):
+                    raise ValueError('PCM-WAV mono/16-bit/16-kHz erforderlich.')
+                count = audio.getnframes()
+                if not 0 < count <= 16000 * 7200:
+                    raise ValueError('Ungültige Aufnahmedauer.')
+                frames = audio.readframes(count)
+                if len(frames) != count * 2:
+                    raise ValueError('Unvollständige WAV-Aufnahme.')
+            sample_rate = 16000
+            waveform = torch.frombuffer(bytearray(frames), dtype=torch.int16)
+            waveform = waveform.to(dtype=torch.float32).div_(32768.0).unsqueeze(0)
             audio_input = {
                 'waveform': waveform,
                 'sample_rate': sample_rate,
@@ -6279,12 +6287,6 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:
             print('Diarisierungsfehler: %r' % (exc,), flush=True)
             self.send_json(500, {'error': 'diarization_failed', 'detail': str(exc)})
-        finally:
-            if tmp_name:
-                try:
-                    os.unlink(tmp_name)
-                except OSError:
-                    pass
 
 
 if __name__ == '__main__':

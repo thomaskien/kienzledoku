@@ -11,6 +11,8 @@ import socket
 import threading
 from urllib.parse import parse_qs, urlsplit, urlencode
 
+from .hardware import HardwareProbe
+from .benchmark_api import dispatch
 from .config import LABELS
 from .errors import BackendFailure, CommanderError, InvalidRequest, RecordingNotFinalized, PayloadTooLarge
 FINALIZED_HEADER = "X-Kienzledoku-Recording-Finalized"
@@ -52,6 +54,8 @@ class API(ThreadingHTTPServer):
 
     def __init__(self, address, commander):
         self.commander = commander
+        self.hardware = HardwareProbe()
+        self.hardware_slots = threading.BoundedSemaphore(2)
         self.upload_slots = threading.BoundedSemaphore(4)
         self.connection_slots = threading.BoundedSemaphore(128)
         self.token = os.environ.get(commander.settings.token_env, "") if commander.settings.auth_enabled else ""
@@ -269,6 +273,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if url.query and url.path != "/v1/diarize":
                 raise InvalidRequest()
+            handled, extension = dispatch(self, url.path, post)
+            if handled:
+                self._send(200, extension)
+                return
             if not post and url.path == "/v1/runtime/status":
                 value = self.server.commander.status()
                 if self.server.commander.settings.remote_llm_url:

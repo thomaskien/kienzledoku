@@ -1,4 +1,4 @@
-# kienzledoku 1.7.6 für Ubuntu 24.04 x86_64
+# kienzledoku 1.8 für Ubuntu 24.04 x86_64
 
 Das Archiv entpacken, ein Terminal im entpackten Ordner öffnen und ausführen:
 
@@ -43,7 +43,7 @@ vorgeladen. Der Commander läuft als systemd-Dienst. Status:
 T2med-Aktivierung: **Drittanbieter-Zugriffe verwalten → Per Produktcode aktivieren →
 Produktcode `kienzledoku` eingeben und bestätigen**. Danach erscheint
 **Dr. Thomas Kienzle - KienzleDoku** mit einem **grünen Statuspunkt**.
-Das Linux-Paket 1.7.6 enthält den endgültigen Hersteller-Key in kompilierten
+Das Linux-Paket 1.8 enthält den endgültigen Hersteller-Key in kompilierten
 Binärdateien. Für die URL den aktivierten **KienzleDoku**-Eintrag verwenden.
 Öffentliche Quellcode-Builds ohne privaten Build-Eingang verwenden weiterhin den Demo-Key. Die verlinkte GitHub-Anleitung zeigt alle Schritte mit Bildern.
 

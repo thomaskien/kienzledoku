@@ -116,7 +116,7 @@ function Install-KienzledokuMaintenance {
     $args='-NoProfile -ExecutionPolicy Bypass -STA -File "'+(Join-Path $destination 'Setup.ps1')+'" -Uninstall'
     $reg='HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\kienzledoku'
     New-Item -Force $reg|Out-Null
-    foreach($entry in @(@('DisplayName','kienzledoku'),@('DisplayVersion','1.7.6'),@('Publisher','Dr. Thomas Kienzle'),@('UninstallString','"'+$ps+'" '+$args))){Set-ItemProperty $reg -Name $entry[0] -Value $entry[1]}
+    foreach($entry in @(@('DisplayName','kienzledoku'),@('DisplayVersion','1.8'),@('Publisher','Dr. Thomas Kienzle'),@('UninstallString','"'+$ps+'" '+$args))){Set-ItemProperty $reg -Name $entry[0] -Value $entry[1]}
     $shell=New-Object -ComObject WScript.Shell
     $shortcut=$shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Programs')) 'kienzledoku deinstallieren.lnk'))
     $shortcut.TargetPath=$ps;$shortcut.Arguments=$args;$shortcut.Save()

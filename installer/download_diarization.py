@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import sys
+os.environ["PYANNOTE_METRICS_ENABLED"] = "0"
 from huggingface_hub import snapshot_download
 
 repo='pyannote/speaker-diarization-community-1'

@@ -1,0 +1,118 @@
+{
+  "inventory": {
+    "schema_version": 1,
+    "measured_at": "2026-11-16T09:55:00.162170+00:00",
+    "system": {
+      "os": "Darwin",
+      "version": "27.2.0",
+      "architecture": "arm64",
+      "execution": "native",
+      "model": "Mac16,10",
+      "source": "platform",
+      "unavailable": {}
+    },
+    "cpu": {
+      "manufacturer": "Apple",
+      "model": "Apple M4",
+      "physical_cores": 10,
+      "logical_processors": 10,
+      "architecture": "arm64",
+      "source": "sysctl",
+      "unavailable": {}
+    },
+    "memory": {
+      "installed_bytes": 34359738368,
+      "visible_bytes": 34359738368,
+      "available_bytes": null,
+      "free_plus_inactive_bytes": 10129752064,
+      "type": "unified",
+      "speed_mhz": null,
+      "unified": true,
+      "source": "sysctl/vm_stat",
+      "unavailable": {
+        "available_bytes": "no_exact_available_counter; free_plus_inactive_bytes_reported_separately",
+        "speed_mhz": "not_available_from_source"
+      }
+    },
+    "board": {
+      "manufacturer": "Apple",
+      "model": "Mac16,10",
+      "firmware": null,
+      "source": "sysctl",
+      "unavailable": {
+        "firmware": "not_available_from_source"
+      }
+    },
+    "storage": [
+      {
+        "role": "system",
+        "volume_total_bytes": 1995218165760,
+        "volume_free_bytes": 322634559488,
+        "model_path_exists": true,
+        "model_filename": null,
+        "device": "disk0",
+        "model": "APPLE SSD AP2048Z",
+        "type": "ssd",
+        "capacity_bytes": 2001111162880,
+        "source": "filesystem",
+        "unavailable": {
+          "model_filename": "not_available_from_source"
+        },
+        "interface": "Apple Fabric"
+      },
+      {
+        "role": "model:0",
+        "volume_total_bytes": 1995218165760,
+        "volume_free_bytes": 322634559488,
+        "model_path_exists": false,
+        "model_filename": "model.gguf",
+        "device": "disk0",
+        "model": "APPLE SSD AP2048Z",
+        "type": "ssd",
+        "capacity_bytes": 2001111162880,
+        "source": "filesystem",
+        "unavailable": {},
+        "interface": "Apple Fabric"
+      }
+    ],
+    "gpus": [
+      {
+        "id": "gpu:0",
+        "model": "Apple M4",
+        "memory_bytes": 34359738368,
+        "memory_kind": "unified",
+        "source": "system_profiler",
+        "unavailable": {}
+      }
+    ]
+  },
+  "temperatures": {
+    "schema_version": 1,
+    "measured_at": "2026-11-16T09:55:00.873621+00:00",
+    "execution": "darwin",
+    "sensors": [
+      {
+        "kind": "cpu",
+        "id": "cpu:unavailable",
+        "name": "CPU",
+        "value": null,
+        "unit": "celsius",
+        "source": "Darwin",
+        "measured_at": "2026-11-16T09:55:00.873608+00:00",
+        "status": "unavailable",
+        "reason": "no_supported_unprivileged_sensor"
+      },
+      {
+        "kind": "gpu",
+        "id": "gpu:unavailable",
+        "name": "GPU",
+        "value": null,
+        "unit": "celsius",
+        "source": "Darwin",
+        "measured_at": "2026-11-16T09:55:00.873619+00:00",
+        "status": "unavailable",
+        "reason": "no_supported_unprivileged_sensor"
+      }
+    ]
+  }
+}

@@ -94,7 +94,7 @@ def preserve_unselected(support,home,server,client):
 CLIENT_FILES={'kienzleconnect','kienzledoku_window','kienzledoku_record_app',
               'kienzledoku_connect_app','libkienzledoku_product.dylib','release.json',
               'assets','requirements-asr-client.txt','start_kienzledoku_asr.sh'}
-SERVER_FILES={'asr-venv','diar-venv','llama','local-ai-macos','kienzledoku_commander'}
+SERVER_FILES={'asr-venv','diar-venv','llama','local-ai-macos','kienzledoku_commander','asr-dependencies.json','diar-dependencies.json'}
 # The HTTP API imports FINALIZED_HEADER from commander_client as a shared protocol constant.
 SHARED_FILES={'runtime','venv','kienzledoku_document.py','kienzledoku_commander_client.py','prompt_documentation.txt','LICENSE','NOTICE',OWNER}
 

@@ -10,7 +10,7 @@ bearbeiten den Entwurf und übernehmen ihn anschließend bewusst in die Patiente
 
 ## Download und Installation
 
-Die gemeinsame Installer-Version **1.7.6 für Windows, macOS und Linux** ist
+Der Quellstand **1.8** enthält die Auditkorrekturen und die [Vorbereitung für Kienzlebench](docs/commander-benchmark-api.md). Die zuletzt veröffentlichte Installer-Version **1.7.6 für Windows, macOS und Linux** ist
 [als GitHub-Release verfügbar](https://github.com/thomaskien/kienzledoku/releases/tag/v1.7.6).
 Der zugehörige Quellcode ist unter demselben Tag veröffentlicht.
 
@@ -94,7 +94,7 @@ wirkt auch ohne VAD. Einstellungen werden für diesen Client gespeichert.
 
 ## T2med einrichten und verwenden
 
-Diese Anleitung gehört zum gemeinsamen Installerstand 1.7.6.
+Diese Anleitung gehört zum gemeinsamen Installerstand 1.8; die neuen Pakete werden separat freigegeben.
 Die älteren Quellcode-Installer sind separat im
 [Archiv](docs/archiv/direktbetrieb.md) beschrieben.
 

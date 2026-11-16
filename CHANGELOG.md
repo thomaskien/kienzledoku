@@ -1,5 +1,20 @@
 # Änderungsprotokoll
 
+## 1.8 — 16.11.2026
+
+- Pyannote-Telemetrie vor Import, Modellvorbereitung und Workerstart deaktiviert.
+- Linux/WSL: WAV-Diarisierung direkt im RAM, ohne temporäre Audiodatei.
+- Mehrdeutige Patientenzuordnungen werden abgelehnt. Bestätigte T2med-Speicherung
+  bleibt auch bei einem Fehler der Abschlussanzeige gegen Wiederholung gesperrt.
+- Vollständige Python-Server-Locks mit Hashprüfung, tatsächlichem Paketvergleich
+  und exportierbarem Softwareinventar; bisherige pauschale Cache-Stempel entfallen.
+- Vorbereitung für Kienzlebench: Hardware-/Modellinventar, aktuelle Temperaturen
+  auf Anfrage und authentifizierte temporäre Benchmarksteuerung mit Rückkehr zur
+  bisherigen Modellvorhaltung. Kein Temperatursampler und keine Benchmarkoberfläche.
+- Bestehende Aufnahmen, Layouts, Verbindungen und optionale Commander-Anmeldung
+  bleiben erhalten. Transportverschlüsselung folgt separat.
+
+
 ## 1.7.6 — 15.11.2026
 
 - Connect ist bei neuen Clientinstallationen auf macOS, Linux und Windows

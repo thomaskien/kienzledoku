@@ -20,6 +20,8 @@ from installer.product_key_build import ProductKeyBuild
 
 
 def stage(output, llvm, key_file=None, go='/usr/local/bin/go'):
+    from installer.runtime_contract import check
+    check(ROOT)
     native=(ROOT/'native/KienzledokuWindowLinux.c').read_text(encoding='utf-8')
     if f'"kienzledoku record {VERSION}"' not in native or f'"kienzledoku-record/{VERSION}"' not in native:
         raise ValueError('Native Linux-Versionsanzeige passt nicht zu '+VERSION)

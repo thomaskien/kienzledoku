@@ -1,6 +1,6 @@
-# kienzledoku 1.7.6 für Windows x64
+# kienzledoku 1.8 für Windows x64
 
-`kienzledoku-1.7.6-windows-x64-setup.exe` öffnen und **Client**, **Server** oder
+`kienzledoku-1.8-windows-x64-setup.exe` öffnen und **Client**, **Server** oder
 **Client und Server** wählen. Die Vorbereitung wird sofort sichtbar angezeigt;
 anschließend führt derselbe Wizard-Aufbau wie auf dem Mac durch Komponenten,
 Verbindungen, Modelle, Dokumentation und Zusammenfassung. Erst danach beginnt
@@ -40,7 +40,7 @@ ersten Audioblock warten und bleibt nach der LLM-Verarbeitung entladen.
 In T2med **Drittanbieter-Zugriffe verwalten → Per Produktcode aktivieren** öffnen,
 als Produktcode **`kienzledoku`** eingeben und bestätigen. Danach erscheint
 **Dr. Thomas Kienzle - KienzleDoku** mit einem **grünen Statuspunkt**. Der Installer zeigt diese Schritte auch als Bildanleitung. Die offizielle Ausgabe
-1.7.6 enthält den endgültigen Hersteller-Key. Für die URL den aktivierten
+1.8 enthält den endgültigen Hersteller-Key. Für die URL den aktivierten
 **KienzleDoku**-Eintrag verwenden.
 
 Die Clienteinrichtung fragt T2med, Commander und einen optionalen Commander-Token

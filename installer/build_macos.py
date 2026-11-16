@@ -27,6 +27,8 @@ def compile_native(source,target,extra=()):
 
 
 def build(arch,output,cache,product_key_file=None):
+    from installer.runtime_contract import check
+    check(ROOT)
     from installer.product_key_build import ProductKeyBuild
     context = ProductKeyBuild(product_key_file,ROOT) if product_key_file else nullcontext(None)
     with context as product:

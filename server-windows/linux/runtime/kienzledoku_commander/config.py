@@ -85,6 +85,7 @@ class Settings:
     })
     model_options: dict = field(default_factory=dict)
     explicit_models: bool = False
+    benchmark_models: dict = field(default_factory=dict)
 
     def validate(self):
         ints = ("tier", "port", "gpu_index", "diar_allocator_mib", "max_pending", "max_remembered", "max_payload_mib", "asr_parallel", "diar_parallel")
@@ -168,6 +169,18 @@ class Settings:
                 raise ValueError("Modellslots sind ungültig.")
             if "kv" in options and (not isinstance(options["kv"], str) or not options["kv"]):
                 raise ValueError("KV-Typ ist ungültig.")
+        for mid, options in self.benchmark_models.items():
+            if (not isinstance(mid, str) or not mid or len(mid) > 96 or
+                    not isinstance(options, dict) or set(options) - {'path','label','context','slots','kv','parallel_available','quantization'}):
+                raise ValueError('Ungültiger Benchmark-Modellkatalog.')
+            if not isinstance(options.get('path'), str) or not Path(options['path']).is_absolute():
+                raise ValueError('Benchmark-Modellpfad muss absolut sein.')
+            if type(options.get('context',32768)) is not int or not 1024 <= options.get('context',32768) <= 1048576:
+                raise ValueError('Ungültiger Benchmark-Kontext.')
+            if type(options.get('slots',1)) is not int or not 1 <= options.get('slots',1) <= 32:
+                raise ValueError('Ungültige Benchmark-Slotzahl.')
+            if type(options.get('parallel_available',False)) is not bool:
+                raise ValueError('Ungültige Parallelfreigabe.')
         return self
 
     @property
@@ -187,12 +200,18 @@ class Settings:
 
     def quality(self, value=None):
         q = self.default if value is None else value
+        if isinstance(q,str) and q.startswith('@') and q[1:] in self.benchmark_models:
+            return q
         if q not in self.allowed:
             raise InvalidRequest("Diese Verarbeitungsstufe ist nicht verfügbar.")
         return q
 
     def model(self, quality):
         quality = self.quality(quality)
+        if quality.startswith('@'):
+            options=self.benchmark_models[quality[1:]]
+            return Model(quality, options['path'], options.get('context',32768), options.get('slots',1),
+                         options.get('kv','q8_0'), quality[1:], options.get('label',quality[1:]))
         context, slots, kv = 32768, 1, "q8_0"
         if quality == "gruendlich":
             context, slots = ((87552, 1) if self.tier == 16 else (262144, 3))
@@ -204,6 +223,11 @@ class Settings:
 
     def runtime_quality(self, quality):
         """Stable backend identity; public request qualities remain unchanged."""
+        if quality and quality.startswith('@'):
+            for alias in self.allowed:
+                a,b=self.model(alias),self.model(quality)
+                if (a.model_id,a.path,a.context,a.slots,a.kv)==(b.model_id,b.path,b.context,b.slots,b.kv):
+                    return alias
         return quality
 
     def persistent(self, quality):
@@ -218,6 +242,7 @@ class Settings:
 
     def fallback(self, quality):
         if self.remote_llm_url: return None
+        if quality not in QUALITIES: return None
         index = QUALITIES.index(quality)
         candidate = QUALITIES[index - 1] if index else None
         return candidate if candidate in self.allowed else None
@@ -236,7 +261,7 @@ def detect_tier(index):
 
 def load_settings(path):
     with open(path, "rb") as f: data = tomllib.load(f)
-    if set(data) - {"server", "gpu", "policy", "backends", "models", "remote_llm"}:
+    if set(data) - {"server", "gpu", "policy", "backends", "models", "remote_llm", "benchmark_models"}:
         raise ValueError("Unbekannter Konfigurationsabschnitt.")
     mapping = {
         "server": {k: k for k in ("host", "port", "token_env", "auth_enabled")},
@@ -246,6 +271,9 @@ def load_settings(path):
         "remote_llm": {"url": "remote_llm_url", "token_env": "remote_llm_token_env"},
     }
     values = {}
+    if 'benchmark_models' in data:
+        if not isinstance(data['benchmark_models'],dict): raise ValueError('Ungültiger Benchmark-Modellkatalog.')
+        values['benchmark_models']=data['benchmark_models']
     for section, names in mapping.items():
         block = data.get(section, {})
         if not isinstance(block, dict) or set(block) - set(names): raise ValueError("Unbekannte Einstellung in %s." % section)

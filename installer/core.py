@@ -27,7 +27,7 @@ from kienzledoku_document import DEFAULT_DOCUMENT_FIELDS, DOCUMENT_FIELDS, DOCUM
 from kienzledoku_product_key import production_build
 from kienzledoku_config import DEFAULT_COMMANDER_URL
 
-VERSION = '1.7.6'
+VERSION = '1.8'
 GRADES = ('basis', 'gruendlich', 'sehr_gruendlich')
 GRADE_LABELS = dict(zip(GRADES, ('Basis', 'Gründlich', 'Sehr gründlich')))
 DIARIZATION_MODES = {'resident':'Immer geladen', 'with_asr':'Zusammen mit Whisper', 'serial':'Seriell'}
@@ -169,6 +169,9 @@ def validate(cfg, hw=None):
     server=cfg['mode']!='client'
     local_llm=server and cfg['server_role']!='asr' and not cfg['remote_llm_url']
     if server:
+        mac_version=platform.mac_ver()[0] if sys.platform=='darwin' else ''
+        if mac_version and tuple(map(int,mac_version.split('.')[:2])) < (14,0):
+            raise ValueError('Lokale KI-Laufzeiten benötigen macOS 14 oder neuer.')
         if not hw['server_supported']: raise ValueError('Lokaler KI-Server benötigt Apple Silicon mit mindestens 16 GB Arbeitsspeicher. Der Client kann einen anderen Commander verwenden.')
         if not isinstance(cfg['listen_host'],str) or not re.fullmatch(r'[A-Za-z0-9.:-]{1,253}',cfg['listen_host']): raise ValueError('Ungültige Serveradresse.')
         if cfg['auth_enabled'] and not cfg['server_token']:
@@ -236,7 +239,7 @@ def download(url,destination,expected,progress=lambda text:None,cancel=None):
     partial=destination.with_name(destination.name+'.part')
     progress('Download: '+destination.name)
     try:
-        with urlopen(Request(url,headers={'User-Agent':'kienzledoku-installer/1.7.6'}),timeout=60) as response, open(partial,'wb') as target:
+        with urlopen(Request(url,headers={'User-Agent':'kienzledoku-installer/1.8'}),timeout=60) as response, open(partial,'wb') as target:
             total=int(response.headers.get('Content-Length') or 0); received=0; last=0
             while True:
                 if cancel and cancel.is_set(): raise InterruptedError('Installation abgebrochen.')
@@ -299,6 +302,12 @@ def commander_toml(cfg,version_root,support):
             m=models[mid]
             data += ['', '[models.'+grade+']', 'path = '+q(support/'models'/mid/m['filename']), 'model_id = '+q(mid),
                      'label = '+q(m['label']), 'context = 32768','slots = 1','kv = "q8_0"']
+        for mid in cfg['selected_models']:
+            m=models[mid]
+            reserve=8 if cfg['diarization_mode']=='resident' else 6
+            data += ['', '[benchmark_models.'+q(mid)+']', 'path = '+q(support/'models'/mid/m['filename']),
+                     'label = '+q(m['label']), 'context = 32768', 'slots = 1', 'kv = "q8_0"',
+                     'parallel_available = '+str(memory >= m['min_ram_gib']+reserve).lower()]
     return '\n'.join(data)+'\n'
 
 
@@ -469,14 +478,16 @@ class Installer:
             if asr:
                 self.report('Whisper-Laufzeit einrichten',45)
                 self.run([python,'-m','venv',version/'asr-venv'])
-                self.run([version/'asr-venv/bin/python','-m','pip','install','mlx==0.32.0','mlx-whisper==0.4.3'])
+                from installer.locked_dependencies import install_locked
+                install_locked(version/'asr-venv/bin/python', ROOT/'installer/dependency-locks/macos-asr-py312.txt', version/'asr-dependencies.json', self.run)
                 for name,digest in WHISPER_FILES.items():
                     download('https://huggingface.co/mlx-community/whisper-large-v3-mlx/resolve/'+WHISPER_REV+'/'+name,self.support/'models/whisper-large-v3-mlx'/name,digest,self.report,self.cancel)
             if asr and cfg['diarization']:
                 self.report('Sprechertrennung einrichten',60)
                 self.run([python,'-m','venv',version/'diar-venv'])
-                self.run([version/'diar-venv/bin/python','-m','pip','install','pyannote.audio==4.0.7'])
-                env=dict(os.environ,HF_TOKEN=cfg['hf_token'],HF_HUB_DISABLE_TELEMETRY='1')
+                from installer.locked_dependencies import install_locked
+                install_locked(version/'diar-venv/bin/python', ROOT/'installer/dependency-locks/macos-diar-py312.txt', version/'diar-dependencies.json', self.run, dict(os.environ,PYANNOTE_METRICS_ENABLED='0'))
+                env=dict(os.environ,HF_TOKEN=cfg['hf_token'],HF_HUB_DISABLE_TELEMETRY='1',PYANNOTE_METRICS_ENABLED='0')
                 self.run([version/'diar-venv/bin/python',version/'installer/download_diarization.py',self.support/'models/pyannote-community-1'],env=env)
             if self.cancel.is_set(): raise InterruptedError('Installation abgebrochen.')
             self.report('Konfiguration und Programme fertigstellen',85)

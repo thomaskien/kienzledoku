@@ -3,6 +3,7 @@
 # Version 1.0.0
 
 set -Eeuo pipefail
+export PYANNOTE_METRICS_ENABLED=0
 IFS=$'\n\t'
 umask 077
 

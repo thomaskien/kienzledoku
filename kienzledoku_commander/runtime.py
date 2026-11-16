@@ -124,7 +124,7 @@ class Runtime:
         else:
             env.update(KIENZLEDOKU_PYANNOTE_MODEL=self.settings.diar_model_path,
                        KIENZLEDOKU_DIARIZATION_HOST=address.hostname, KIENZLEDOKU_DIARIZATION_PORT=str(address.port),
-                       PYTORCH_ENABLE_MPS_FALLBACK="0")
+                       PYTORCH_ENABLE_MPS_FALLBACK="0", PYANNOTE_METRICS_ENABLED="0")
         try:
             proc = subprocess.Popen(list(command), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                     stderr=subprocess.DEVNULL, start_new_session=True, env=env)
@@ -301,6 +301,14 @@ class Runtime:
         request = dict(job.payload["llm"])
         request.update(model=self.settings.runtime_quality(job.quality), stream=False, cache_prompt=False)
         value = self._http(self.settings.llm_url + "/v1/chat/completions", json.dumps(request).encode())
+        if getattr(job, 'benchmark_session', None):
+            # Explicit raw-prompt endpoint: no production prompt or JSON rewriting.
+            try:
+                if not isinstance(value['choices'][0]['message']['content'], str):
+                    raise ValueError()
+            except (KeyError, IndexError, TypeError, ValueError):
+                raise BackendFailure() from None
+            return value
         try:
             choice = value["choices"][0]
             if choice.get("finish_reason") != "stop":

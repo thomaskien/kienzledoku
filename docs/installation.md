@@ -2,8 +2,8 @@
 
 [Zur Übersicht](../README.md) · [T2med einrichten](../README.md#t2med-einrichten-und-verwenden)
 
-Diese Anleitung beschreibt die gemeinsame Installer-Ausgabe **1.7.6** für Windows,
-macOS und Linux. [Pakete und Quellcode](https://github.com/thomaskien/kienzledoku/releases/tag/v1.7.6)
+Diese Anleitung beschreibt die gemeinsame Installer-Ausgabe **1.8** für Windows,
+macOS und Linux. [Pakete und Quellcode](https://github.com/thomaskien/kienzledoku/releases)
 sind veröffentlicht. Ein Quellcode-ZIP ist kein Ersatz für die fertigen Installer
 mit eingebetteten Laufzeiten.
 

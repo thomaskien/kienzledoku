@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""kienzledoku record 1.7.6 <-> T2med FHIR client.
+"""kienzledoku record 1.8 <-> T2med FHIR client.
 
 Target: Python 3.9+ (macOS, Ubuntu 24.04 LTS) and bundled Python 3.12 (Windows).
 Platform-independent FHIR/UI core with optional compiled Connect transport.
@@ -67,7 +67,7 @@ from kienzledoku_speech import (
 )
 
 APP_NAME = "kienzledoku record"
-VERSION = "1.7.6"
+VERSION = "1.8"
 LINUX_NATIVE_WINDOW_PATH = "/usr/local/libexec/kienzledoku/kienzledoku_window_linux"
 
 # Public test/demo key from T2med's reference application (not a secret).
@@ -546,7 +546,7 @@ class T2medFhirClient(object):
         status, obj = self._request("GET", "/Patient?" + query, patient_profile=True)
         patient = normalize_patient_result(obj)
         if patient is None:
-            raise FhirError("Kein Patient für den aktuellen T2med-Kontext gefunden", status=status, body=obj)
+            raise FhirError("Keine eindeutige Patientenzuordnung für den T2med-Kontext. Übernahme gesperrt.", status=status, body=obj)
         return patient
 
     def get_encounter(self):
@@ -732,11 +732,25 @@ def normalize_patient_result(obj):
     if obj.get("resourceType") == "Patient":
         return obj
     if obj.get("resourceType") == "Bundle":
-        for entry in obj.get("entry", []) or []:
-            if isinstance(entry, dict):
-                resource = entry.get("resource")
-                if isinstance(resource, dict) and resource.get("resourceType") == "Patient":
-                    return resource
+        entries = obj.get("entry", [])
+        if not isinstance(entries, list) or not entries:
+            return None
+        total = obj.get("total")
+        if "total" in obj and (type(total) is not int or total != 1):
+            return None
+        links = obj.get("link", [])
+        if not isinstance(links, list) or any(
+                not isinstance(link, dict) or link.get("relation") == "next" for link in links):
+            return None
+        patient = None
+        for entry in entries:
+            resource = entry.get("resource") if isinstance(entry, dict) else None
+            if not isinstance(resource, dict) or resource.get("resourceType") != "Patient":
+                return None
+            if patient is not None and resource != patient:
+                return None
+            patient = resource
+        return patient
     return None
 
 
@@ -809,6 +823,7 @@ class SessionState(object):
         self.key_source = key_source
         self.csrf = secrets.token_urlsafe(24)
         self.write_uncertain = False
+        self.write_succeeded = False
         self.closing = False
         self.patient = None
         self.patient_error = ""
@@ -844,6 +859,8 @@ def start_patient_load(state):
         if state.closing or state.patient_loading:
             return
         state.patient_loading = True
+        # A stale successful lookup must never authorize a write after a failed reload.
+        state.patient = None
         state.patient_error = ""
         state.t2med_status = "checking"
         state.t2med_message = "T2med-Verbindung wird geprüft."
@@ -1818,7 +1835,7 @@ def make_handler(state):
                 state.message = ""
                 state.error = ""
                 try:
-                    if state.completed_event.is_set() or state.closing:
+                    if state.write_succeeded or state.completed_event.is_set() or state.closing:
                         raise ValueError('Dieser Vorgang wird geschlossen')
                     if action == 'speech_audio_controls':
                         try:
@@ -1902,6 +1919,11 @@ def make_handler(state):
                             state.documentation, state.output_mode, state.single_code,
                             state.active_fields,
                         )
+                        # Commit the business outcome before logging or any UI operation.
+                        # A lost local response must never make this write repeatable.
+                        state.write_uncertain = False
+                        state.write_succeeded = True
+                        state.completed_event.set()
                         safe_log(
                             "Documentation transaction OK",
                             mode=state.output_mode,
@@ -1912,15 +1934,17 @@ def make_handler(state):
                             "Dokumentation atomar in T2med übernommen (HTTP %s): %s"
                             % (status, ", ".join(labels))
                         )
-                        state.write_uncertain = False
-                        state.write_succeeded = True
                         self._send_html(close_page_html())
                         close_ui_window(state)
-                        state.completed_event.set()
                         return
                     else:
                         raise ValueError("Unbekannte Aktion")
                 except Exception as exc:
+                    if state.write_succeeded:
+                        # Persistence already succeeded. UI delivery/cleanup is best-effort;
+                        # run_session also cleans up after completed_event is set.
+                        safe_log("UI completion failed after successful write", error=type(exc).__name__)
+                        return
                     if action == "write" and isinstance(exc, FhirTransactionRejected):
                         state.write_uncertain = False
                         safe_log("Documentation transaction rejected", rollback="confirmed")
@@ -2260,7 +2284,7 @@ def main():
         print("kienzledoku record: %s" % exc, file=sys.stderr)
         if sys.platform == 'win32':
             import ctypes
-            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.7.6', 0x10)
+            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.8', 0x10)
         if not args.no_browser:
             notify_start_failure(exc)
         return 1

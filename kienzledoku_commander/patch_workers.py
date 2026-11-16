@@ -10,8 +10,14 @@ import tempfile
 
 HASHES = {
     "whisper": "bd80dddcffb1e24782508adeac17f1b91b3ef4b819a59035769985ae968f4412",
-    "diar": "b4d35c393ead5a917740a1bf71a607b2494fb83075636cd88d814dcb1a8893ac",
+    "diar": "ff27f312c591b75e049f84fb658b384d3fb66ca6e7d5bd1fe1f7c1be5646a8bc",
 }
+
+
+PATCH_REVISION = "audit-20261116"
+LEGACY_DIAR_HASH = "b4d35c393ead5a917740a1bf71a607b2494fb83075636cd88d814dcb1a8893ac"
+
+LEGACY_DIAR_HASHES = {LEGACY_DIAR_HASH, "6385124b78bb24040f4238e4e4260079ee85e176c82b0422bb7ae245edcceed7"}
 
 
 def digest(data):
@@ -20,6 +26,12 @@ def digest(data):
 
 def transform(role, raw):
     text = raw.decode("utf-8")
+    if role == "diar" and "NamedTemporaryFile" in text:
+        old, new, cleanup = "        tmp_name = None\n        try:\n            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:\n                tmp.write(body)\n                tmp_name = tmp.name\n\n            # Audio einmal in den Speicher laden. Pyannote empfiehlt diese\n            # Form für schnellere Verarbeitung und vermeidet wiederholtes\n            # Dateidecoding innerhalb der Pipeline.\n            waveform, sample_rate = torchaudio.load(tmp_name)\n", "        try:\n            # Record sends PCM16 mono/16 kHz. Decode directly from RAM, never a file.\n            with wave.open(io.BytesIO(body), 'rb') as audio:\n                if (audio.getnchannels(), audio.getsampwidth(), audio.getframerate(),\n                        audio.getcomptype()) != (1, 2, 16000, 'NONE'):\n                    raise ValueError('PCM-WAV mono/16-bit/16-kHz erforderlich.')\n                count = audio.getnframes()\n                if not 0 < count <= 16000 * 7200:\n                    raise ValueError('Ungültige Aufnahmedauer.')\n                frames = audio.readframes(count)\n                if len(frames) != count * 2:\n                    raise ValueError('Unvollständige WAV-Aufnahme.')\n            sample_rate = 16000\n            waveform = torch.frombuffer(bytearray(frames), dtype=torch.int16)\n            waveform = waveform.to(dtype=torch.float32).div_(32768.0).unsqueeze(0)\n", '        finally:\n            if tmp_name:\n                try:\n                    os.unlink(tmp_name)\n                except OSError:\n                    pass\n'
+        if text.count(old) != 1 or text.count(cleanup) != 1:
+            raise ValueError("Unbekannter temporärer Audiopfad")
+        text = text.replace(old, new).replace(cleanup, "")
+        text = text.replace("import tempfile\n", "import io\nimport wave\n")
     tree = ast.parse(text)
     if "kienzledoku_commander.worker" in text:
         raise ValueError("Hook bereits vorhanden; Manifest prüfen.")
@@ -46,7 +58,7 @@ def transform(role, raw):
             raise ValueError("Unbekannter Diarisierungsstart")
         at = mains[0].body[0].lineno - 1
         changes.append((at, at, "    commander_control = start_diar_control(globals())\n"))
-        imports = "from kienzledoku_commander.worker import start_diar_control\n"
+        imports = "import os\nos.environ['PYANNOTE_METRICS_ENABLED'] = '0'\nfrom kienzledoku_commander.worker import start_diar_control\n"
     else:
         raise ValueError("Unbekannter Worker")
     # Preserve module docstring and mandatory future-import placement.
@@ -110,35 +122,50 @@ def apply(paths, backup, expected=None, check=False):
     backup = Path(backup)
     if set(paths) != set(HASHES):
         raise ValueError("Beide Worker werden benötigt")
+    previous_manifest = None
     if (backup / "manifest.json").exists():
-        manifest = validate_manifest(backup)
-        if all(str(Path(paths[r]).resolve()) == item["path"] and digest(Path(paths[r]).read_bytes()) == item["after"] for r, item in manifest.items()):
+        previous_manifest = validate_manifest(backup)
+        for role, item in previous_manifest.items():
+            path = Path(paths[role])
+            if path.is_symlink() or str(path.resolve()) != item["path"] or digest(path.read_bytes()) not in (item["before"], item["after"]):
+                raise ValueError("Worker wurde zwischenzeitlich verändert; Update abgebrochen.")
+        if all(item.get("patch_revision") == PATCH_REVISION and digest(Path(paths[r]).read_bytes()) == item["after"]
+               for r, item in previous_manifest.items()):
             return "bereits installiert"
-    plans, manifest = {}, {}
+    plans, manifest, previous = {}, {}, {}
     for role, filename in paths.items():
         p = Path(filename)
         info = p.lstat()
         if not stat.S_ISREG(info.st_mode) or p.is_symlink():
             raise ValueError("Worker muss eine reguläre Datei sein")
-        original = p.read_bytes()
-        if digest(original) != expected[role]:
+        previous[role] = p.read_bytes()
+        original = (backup / (role + ".original")).read_bytes() if previous_manifest else previous[role]
+        allowed = {expected[role]}
+        if role == "diar":
+            allowed.update(LEGACY_DIAR_HASHES)
+        if digest(original) not in allowed:
             raise ValueError("Unbekannte SHA-256-Ausgangsdatei: " + role)
         patched = transform(role, original)
         plans[role] = (original, patched)
         manifest[role] = {"path": str(p.resolve()), "before": digest(original), "after": digest(patched),
+                          "patch_revision": PATCH_REVISION,
                           "mode": stat.S_IMODE(info.st_mode), "uid": info.st_uid, "gid": info.st_gid,
                           "atime_ns": info.st_atime_ns, "mtime_ns": info.st_mtime_ns}
     if check:
         return "beide Originaldateien geprüft"
     backup.mkdir(mode=0o700, parents=True, exist_ok=True)
+    metadata = {"mode": 0o600, "uid": os.getuid(), "gid": os.getgid()}
     for role, (original, _) in plans.items():
-        atomic_write(backup / (role + ".original"), original, {"mode": 0o600, "uid": os.getuid(), "gid": os.getgid()})
-    atomic_write(backup / "manifest.json", json.dumps(manifest, indent=2).encode(), {"mode": 0o600, "uid": os.getuid(), "gid": os.getgid()})
+        atomic_write(backup / (role + ".original"), original, metadata)
     try:
         for role, (_, patched) in plans.items():
             atomic_write(Path(manifest[role]["path"]), patched, manifest[role])
+        atomic_write(backup / "manifest.json", json.dumps(manifest, indent=2).encode(), metadata)
     except BaseException:
-        rollback(backup)
+        for role, data in previous.items():
+            atomic_write(Path(manifest[role]["path"]), data, manifest[role])
+        if previous_manifest is not None:
+            atomic_write(backup / "manifest.json", json.dumps(previous_manifest, indent=2).encode(), metadata)
         raise
     return "Hooks installiert; Worker noch nicht neu gestartet"
 

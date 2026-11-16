@@ -97,6 +97,7 @@ for role in "$ASR" "$DIAR"; do
 # kienzledoku-commander
 [Service]
 Environment=PYTHONPATH=/opt/kienzledoku-commander
+Environment=PYANNOTE_METRICS_ENABLED=0
 Environment=KIENZLEDOKU_COMMANDER_CONTROL_DIR=$CONTROL_DIR
 EOF
   if [[ "$role" == "$DIAR" && "$DIAR_USER" == root ]]; then

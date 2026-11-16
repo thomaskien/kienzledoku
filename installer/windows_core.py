@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PAYLOAD = ROOT.parent if (ROOT.parent/'server/models.json').exists() else ROOT
 SERVER = PAYLOAD/'server' if (PAYLOAD/'server').exists() else ROOT/'server-windows'
 BRIDGE = PAYLOAD/'WizardBridge.ps1' if (PAYLOAD/'WizardBridge.ps1').exists() else ROOT/'windows/WizardBridge.ps1'
-VERSION = '1.7.6'
+VERSION = '1.8'
 CATALOG = json.loads((SERVER/'models.json').read_text(encoding='utf-8-sig'))
 GRADES = dict(basis='Basis', gruendlich='Gründlich', sehr_gruendlich='Sehr gründlich')
 SECRETS = ('commander_token', 'server_token', 'remote_llm_token', 'hf_token')
