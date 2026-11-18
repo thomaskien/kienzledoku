@@ -31,7 +31,7 @@ Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; pu
 $script:SetupScript=$PSCommandPath
 if($Uninstall){& (Join-Path $PSScriptRoot 'UninstallUI.ps1');exit 0}
 $form=New-Object Windows.Forms.Form
-$form.Text='kienzledoku installieren 1.8.1';$form.ClientSize=New-Object Drawing.Size(750,300)
+$form.Text='kienzledoku installieren 1.8.2';$form.ClientSize=New-Object Drawing.Size(750,300)
 $form.StartPosition='CenterScreen';$form.BackColor=[Drawing.Color]::White;$form.AutoScaleMode='Dpi'
 $form.Font=New-Object Drawing.Font('Segoe UI',11)
 $title=New-Object Windows.Forms.Label;$title.Text='kienzledoku wird vorbereitet';$title.Font=New-Object Drawing.Font('Segoe UI',20);$title.SetBounds(32,32,680,50);$form.Controls.Add($title)

@@ -36,7 +36,7 @@ def model_request(entry,token):
     if not huggingface and not (entry.get('path')=='whisper/large-v3.pt' and url==whisper_url
                                 and len(sha)==64 and all(c in '0123456789abcdef' for c in sha)):
         raise ValueError('Unerwartete Modellquelle.')
-    headers={'User-Agent':'kienzledoku-installer/1.8.1'}
+    headers={'User-Agent':'kienzledoku-installer/1.8.2'}
     if huggingface and token:headers['Authorization']='Bearer '+token
     return urllib.request.Request(url,headers=headers)
 
@@ -77,7 +77,9 @@ def main():
     if os.geteuid()!=0 or os.environ.get('WSL_DISTRO_NAME'): raise ValueError('Nur über den nativen Ubuntu-Installer mit sudo starten.')
     cfg=json.loads(args.config.read_text());hf=args.hf_token_file.read_text().strip();token=args.token_file.read_text().strip();remote=args.remote_token_file.read_text().strip();remote_diar=args.remote_diar_token_file.read_text().strip()
     release=Path('/etc/os-release').read_text()
-    if 'ID=ubuntu' not in release or 'VERSION_ID="24.04"' not in release: raise ValueError('Ubuntu 24.04 erforderlich.')
+    sys.path.insert(0,str(args.source))
+    from kienzledoku_linux_runtime import ubuntu_version
+    ubuntu_version(release)
     source=args.source/'server-windows'
     target=Path('/opt/kienzledoku-server/installer')
     state=Path('/var/lib/kienzledoku-server');state.mkdir(parents=True,exist_ok=True)

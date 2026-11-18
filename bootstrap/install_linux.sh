@@ -166,7 +166,7 @@ def main(args):
               'Ohne passendes freigegebenes Release erfolgt keine Installation.')
         return 0
     if sys.platform != 'linux' or platform.machine().lower() not in ('x86_64', 'amd64'):
-        raise InstallError('Dieser Starter ist für Linux x86_64 (Ubuntu 24.04) vorgesehen.')
+        raise InstallError('Dieser Starter ist für Linux x86_64 (Ubuntu 24.04/26.04) vorgesehen.')
     components = None
     for index, arg in enumerate(args):
         if arg == '--components' and index + 1 < len(args):

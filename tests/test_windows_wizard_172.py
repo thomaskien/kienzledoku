@@ -117,7 +117,7 @@ class WindowsWizardTests(unittest.TestCase):
 
     def test_bootstrap_is_windows_and_preserves_no_gpu_client(self):
         b=win.bootstrap(self.hw,self.base)
-        self.assertEqual(b['platform'],'windows');self.assertEqual(b['version'],'1.8.1')
+        self.assertEqual(b['platform'],'windows');self.assertEqual(b['version'],'1.8.2')
         self.assertTrue(next(m for m in b['models'] if m['id']=='gemma12-q8')['parallel_supported'])
         (self.base/'fixture.json').write_text(json.dumps(b))
     def test_install_rejects_injected_or_incomplete_options(self):

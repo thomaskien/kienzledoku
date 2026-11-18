@@ -34,7 +34,7 @@ static bool sameOrigin(const wchar_t* value) {
     return url.rfind(origin + L"/", 0) == 0 || url == origin;
 }
 static void fail(const wchar_t* text) {
-    MessageBoxW(windowHandle, text, L"kienzledoku record 1.8.1", MB_OK | MB_ICONERROR);
+    MessageBoxW(windowHandle, text, L"kienzledoku record 1.8.2", MB_OK | MB_ICONERROR);
     DestroyWindow(windowHandle);
 }
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
@@ -137,7 +137,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE, PWSTR,int show) {
     UINT dpi=GetDpiForSystem();
     if (!dpi) dpi=96;
     int width=(std::min)(static_cast<LONG>(MulDiv(1440,dpi,96)),work.right-work.left), height=(std::min)(static_cast<LONG>(MulDiv(960,dpi,96)),work.bottom-work.top-40);
-    windowHandle=CreateWindowExW(0,wc.lpszClassName,(installerMode ? L"kienzledoku installieren 1.8.1" : L"kienzledoku record 1.8.1"),WS_OVERLAPPEDWINDOW,
+    windowHandle=CreateWindowExW(0,wc.lpszClassName,(installerMode ? L"kienzledoku installieren 1.8.2" : L"kienzledoku record 1.8.2"),WS_OVERLAPPEDWINDOW,
         work.left+(work.right-work.left-width)/2,work.top+20,width,height,nullptr,nullptr,instance,nullptr);
     if (!windowHandle) { CoUninitialize(); return 1; }
     WTSRegisterSessionNotification(windowHandle,NOTIFY_FOR_THIS_SESSION);

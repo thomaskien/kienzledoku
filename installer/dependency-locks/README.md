@@ -1,8 +1,8 @@
 # Python-Serverabhängigkeiten
 
 Die vier Locks umfassen direkte und transitive Python-Abhängigkeiten für
-Python 3.12: macOS 14+ auf Apple Silicon sowie Ubuntu 24.04 x86_64 unter Linux
-oder WSL. ASR und Sprechertrennung verwenden getrennte virtuelle Umgebungen.
+Python 3.12: macOS 14+ auf Apple Silicon sowie Ubuntu 24.04/26.04 x86_64 unter Linux sowie Ubuntu 24.04 unter WSL.
+Ubuntu 26.04 verwendet dafür eine separate Python-3.12-Laufzeit. ASR und Sprechertrennung verwenden getrennte virtuelle Umgebungen.
 
 Der Ausgangsstand wurde am 16.11.2026 aus den Paketmetadaten der vorhandenen
 Mac- und Linux-Installation gelesen, ohne Modelle zu laden oder Dienste zu

@@ -23,7 +23,8 @@ def check(root=None):
         actual = difference((base/name).read_text(), (runtime/name).read_text())
         if actual != allowed.get(name, {}).get('diff', ''):
             errors.append(name)
-    pairs = [(root/'kienzledoku_document.py', runtime.parent/'kienzledoku_document.py'),
+    pairs = [(root/'kienzledoku_linux_runtime.py', runtime.parent.parent/'kienzledoku_linux_runtime.py'),
+             (root/'kienzledoku_document.py', runtime.parent/'kienzledoku_document.py'),
              (root/'installer/locked_dependencies.py', runtime.parent.parent/'locked_dependencies.py')]
     pairs += [(p, runtime.parent.parent/'dependency-locks'/p.name) for p in (root/'installer/dependency-locks').glob('*.txt')]
     if {p.name for p in (root/'installer/dependency-locks').glob('*.txt')} != {p.name for p in (runtime.parent.parent/'dependency-locks').glob('*.txt')}:

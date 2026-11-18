@@ -2,8 +2,8 @@
 
 [Zur Übersicht](../README.md) · [T2med einrichten](../README.md#t2med-einrichten-und-verwenden)
 
-Diese Anleitung beschreibt die gemeinsame Installer-Ausgabe **1.8.1** für Windows,
-macOS und Linux. [Pakete und Quellcode](https://github.com/thomaskien/kienzledoku/releases)
+Diese Anleitung beschreibt **Linux 1.8.2** sowie die unveränderte Ausgabe
+**1.8.1 für Windows und macOS**. [Pakete und Quellcode](https://github.com/thomaskien/kienzledoku/releases)
 sind veröffentlicht. Ein Quellcode-ZIP ist kein Ersatz für die fertigen Installer
 mit eingebetteten Laufzeiten.
 
@@ -89,9 +89,9 @@ Voraussetzung ist, dass Sie der Downloadquelle vertrauen und die App unveränder
 
 ## Linux
 
-Vorgesehen für **Ubuntu 24.04 LTS x86_64**. Der lokale KI-Server benötigt eine
+Vorgesehen für **Ubuntu 24.04 oder 26.04 LTS x86_64**. Der lokale KI-Server benötigt eine
 unterstützte NVIDIA-GPU mit Compute Capability 7.5 oder neuer (z. B. GTX 1650, RTX 20) mit mindestens 4 GiB VRAM und 20 GiB RAM,
-einen funktionierenden NVIDIA-Treiber sowie Speicherplatz für die ausgewählten
+einen funktionierenden NVIDIA-Treiber ab Version 580 sowie Speicherplatz für die ausgewählten
 Modelle. Der Client benötigt eine Desktop-Sitzung und ein Mikrofon. Der
 Download-Starter benötigt `bash`, `wget` und `python3`.
 
@@ -200,3 +200,13 @@ Linux/WSL nutzt [faster-whisper Turbo](https://huggingface.co/mobiuslabsgmbh/fas
 mit `int8_float32`; Apple Silicon die [MLX-8-Bit-Variante](https://huggingface.co/mlx-community/whisper-large-v3-turbo-8bit).
 Downloads sind auf feste Revisionen und Prüfsummen festgelegt. Audio bleibt bei
 Turbo im Speicher; der bisherige VAD- und Zeitstempelvertrag bleibt erhalten.
+
+### Ubuntu 26.04 und Betriebssystem-Upgrades
+
+Linux 1.8.2 unterstützt zusätzlich Ubuntu 26.04. Client und KI-Worker erhalten
+dort eine eigene geprüfte Python-3.12-Laufzeit; das Ubuntu-System-Python wird
+nicht geändert. Auf 24.04 bleibt die bisherige Python-3.12-Einrichtung erhalten.
+Der CUDA-Build verwendet auf 26.04 Toolkit 13.4 aus der passenden NVIDIA-Paketquelle.
+Nach einem Ubuntu-Upgrade den Installer erneut starten, damit Python-Umgebungen
+und native Programme geprüft beziehungsweise neu erstellt werden. Vorhandene
+Modelle und Einstellungen werden übernommen.

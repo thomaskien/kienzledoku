@@ -15,6 +15,7 @@ import time
 import traceback
 
 from model_verification import VerificationCache
+from kienzledoku_linux_runtime import ubuntu_version, ensure_python, ensure_venv
 
 ROOT = Path(__file__).resolve().parent
 VERSION = ((ROOT if (ROOT/'VERSION').is_file() else ROOT.parent)/'VERSION').read_text().strip()
@@ -134,20 +135,26 @@ def check_memory(cfg,hw):
     if hw['ram_bytes'] < (cfg['WslRamGiB']-1)*1024**3:
         raise ValueError('Das gewählte WSL-RAM-Limit ist noch nicht wirksam. Alle WSL-Instanzen schließen und Windows neu starten; danach fortsetzen.')
 
+def cuda_bin():
+    # Keep the existing 24.04/WSL choice. 26.04 gets a supported toolkit and
+    # explicit compiler path, independent of the current /usr/local/cuda link.
+    return Path('/usr/local/cuda-13.4/bin' if ubuntu_version() == '26.04' else '/usr/local/cuda/bin')
+
 def prepare_host():
     env=dict(os.environ,DEBIAN_FRONTEND='noninteractive',PATH='/usr/lib/wsl/lib:/usr/local/cuda/bin:'+os.environ['PATH'])
     run(['apt-get','update'],env=env)
     run(['apt-get','-o','DPkg::Lock::Timeout=300','install','-y','build-essential','cmake','ninja-build','git',
          'curl','ca-certificates','python3','python3-venv','python3-pip','python3-dev','ffmpeg','sudo',
          'pkg-config','libssl-dev','libcurl4-openssl-dev','espeak-ng'],env=env)
-    if not Path('/usr/local/cuda/bin/nvcc').exists():
+    release=ubuntu_version()
+    if not (cuda_bin()/'nvcc').exists():
         keyring=STATE/'cuda-keyring.deb'
         run(['curl','--fail','--location','--retry','4','--output',keyring,
-             'https://developer.download.nvidia.com/compute/cuda/repos/'+('wsl-ubuntu' if os.environ.get('WSL_DISTRO_NAME') else 'ubuntu2404')+'/x86_64/cuda-keyring_1.1-1_all.deb'])
+             'https://developer.download.nvidia.com/compute/cuda/repos/'+('wsl-ubuntu' if os.environ.get('WSL_DISTRO_NAME') else {'24.04':'ubuntu2404','26.04':'ubuntu2604'}[release])+'/x86_64/cuda-keyring_1.1-1_all.deb'])
         run(['dpkg','-i',keyring])
         run(['apt-get','update'],env=env)
         # Toolkit only. Linux display drivers break CUDA's WSL driver bridge.
-        run(['apt-get','-o','DPkg::Lock::Timeout=300','install','-y','cuda-toolkit-13-0'],env=env)
+        run(['apt-get','-o','DPkg::Lock::Timeout=300','install','-y','cuda-toolkit-'+('13-4' if release=='26.04' else '13-0')],env=env)
     try: pwd.getpwnam(USER)
     except KeyError:
         run(['useradd','--system','--user-group','--create-home','--home-dir','/var/lib/kienzledoku-ai',
@@ -205,9 +212,10 @@ def import_models(cfg):
 def install_audio():
     from locked_dependencies import install_locked
     env=dict(os.environ,HF_HUB_DISABLE_XET='1',PIP_DISABLE_PIP_VERSION_CHECK='1',PYANNOTE_METRICS_ENABLED='0')
+    python=ensure_python(BASE/'python/cpython312')
     for role, lock_role in [('asr','asr'),('diarization','diar')]:
         venv=BASE/'python'/(role+'-venv'); py=venv/'bin/python'
-        if not py.exists(): run([sys.executable,'-m','venv',venv])
+        ensure_venv(python,venv)
         install_locked(py, ROOT/'dependency-locks'/('linux-'+lock_role+'-py312.txt'),
                        STATE/(role+'-dependencies.json'), run, env)
         run([py,'-c','import torch; assert torch.cuda.is_available(), "CUDA fehlt"; print(torch.cuda.get_device_name(0))'],env=env)
@@ -228,18 +236,20 @@ def install_audio():
 def build_llama(hw):
     source=BASE/'src/llama.cpp'; build=source/'build-kienzledoku'
     stamp=STATE/'llama-build.json'
-    identity={'revision':LLAMA_REVISION,'compute_capability':hw['compute_capability']}
+    identity={'revision':LLAMA_REVISION,'compute_capability':hw['compute_capability'],
+              'ubuntu':ubuntu_version(),'compiler':str(cuda_bin()/'nvcc')}
     if stamp.exists() and json.loads(stamp.read_text())==identity and (build/'bin/llama-server').is_file(): return
     source.parent.mkdir(parents=True,exist_ok=True)
     if not (source/'.git').exists():
         run(['git','init',source]);run(['git','-C',source,'remote','add','origin','https://github.com/ggml-org/llama.cpp.git'])
     run(['git','-C',source,'fetch','--depth','1','origin',LLAMA_REVISION]);run(['git','-C',source,'checkout','--detach','FETCH_HEAD'])
-    env=dict(os.environ,PATH='/usr/local/cuda/bin:'+os.environ['PATH'])
-    run(['cmake','-S',source,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DGGML_CUDA=ON',
+    env=dict(os.environ,PATH=str(cuda_bin())+':'+os.environ['PATH'])
+    run(['cmake','--fresh','-S',source,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DGGML_CUDA=ON',
          '-DGGML_NATIVE=OFF','-DLLAMA_OPENSSL=OFF','-DLLAMA_BUILD_UI=OFF','-DLLAMA_BUILD_NUMBER=9637',
          '-DCMAKE_CUDA_ARCHITECTURES='+hw['compute_capability'].replace('.',''),
+         '-DCMAKE_CUDA_COMPILER='+str(cuda_bin()/'nvcc'),
          '-DLLAMA_BUILD_TESTS=OFF','-DLLAMA_BUILD_EXAMPLES=OFF','-DLLAMA_BUILD_TOOLS=ON'],env=env)
-    run(['cmake','--build',build,'--target','llama-server','llama-cli','-j','2'],env=env)
+    run(['cmake','--build',build,'--target','llama-server','llama-cli','--clean-first','-j','2'],env=env)
     (BASE/'bin').mkdir(exist_ok=True)
     for name in ('llama-server','llama-cli'):
         link=BASE/'bin'/name;link.unlink(missing_ok=True);link.symlink_to(build/'bin'/name)
@@ -388,9 +398,7 @@ def main():
     args=parser.parse_args();cfg=json.loads(args.config.read_text(encoding='utf-8-sig'))
     if os.geteuid()!=0 or os.environ.get('WSL_DISTRO_NAME')!='kienzledoku-server':
         raise ValueError('Nur als root in der eigenen WSL-Instanz kienzledoku-server ausführen.')
-    release=dict(line.split('=',1) for line in Path('/etc/os-release').read_text().splitlines() if '=' in line)
-    if release.get('ID','').strip('"')!='ubuntu' or release.get('VERSION_ID','').strip('"')!='24.04':
-        raise ValueError('Ubuntu 24.04 erforderlich.')
+    ubuntu_version()
     STATE.mkdir(parents=True,exist_ok=True)
     with (STATE/'install.lock').open('w') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)

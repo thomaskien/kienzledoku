@@ -4,13 +4,13 @@
 [Setup]
 AppId={{49E665CD-61CE-426A-A64C-BE1CE11AE019}
 AppName=kienzledoku record
-AppVersion=1.8.1
+AppVersion=1.8.2
 DefaultDirName={localappdata}\Programs\kienzledoku record
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
-OutputBaseFilename=kienzledoku-record-1.8.1-windows-x64-setup
+OutputBaseFilename=kienzledoku-record-1.8.2-windows-x64-setup
 SetupIconFile=..\assets\kienzledoku-record.ico
 UninstallDisplayIcon={app}\assets\kienzledoku-record.ico
 Compression=lzma2

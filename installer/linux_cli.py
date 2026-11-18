@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Text installer for Ubuntu 24.04: client, local Commander, or both."""
+"""Text installer for Ubuntu 24.04/26.04: client, local Commander, or both."""
 import argparse
 import getpass
 import json
@@ -17,7 +17,8 @@ import kienzledoku_config as client_config
 from kienzledoku_document import DOCUMENT_LABELS
 from kienzledoku_product_key import production_build
 from installer.linux_uninstall import Uninstaller
-VERSION='1.8.1'
+from kienzledoku_linux_runtime import ubuntu_version
+VERSION='1.8.2'
 GRADES=('basis','gruendlich','sehr_gruendlich')
 GRADE_LABELS={'basis':'Basis','gruendlich':'Gründlich','sehr_gruendlich':'Sehr gründlich'}
 DIARIZATION_MODES={'resident':'Immer geladen','with_asr':'Zusammen mit Whisper','serial':'Seriell – nach Whisper, vor dem LLM'}
@@ -262,7 +263,7 @@ def self_test():
     subprocess.run(['bash','-n',str(ROOT/'linux/install_client.sh')],check=True)
     profile=(ROOT/'linux/kienzledoku.apparmor').read_text()
     assert 'userns,' in profile and 'apparmor_restrict_unprivileged_userns=0' not in profile
-    print('SELF-TEST OK — kienzledoku 1.8.1 Linux, ohne Systemänderungen')
+    print('SELF-TEST OK — kienzledoku 1.8.2 Linux, ohne Systemänderungen')
 
 def uninstall(choice,remove_models,remove_settings):
     options=Uninstaller.options(choice,remove_models,remove_settings)
@@ -278,7 +279,7 @@ def uninstall(choice,remove_models,remove_settings):
     if server:
         if os.geteuid()==0: local.execute(Uninstaller.options('server',remove_models,remove_settings))
         else: subprocess.run(['sudo',*helper],check=True)
-    print('\nKienzledoku 1.8.1 deinstalliert. Modelle: '+
+    print('\nKienzledoku 1.8.2 deinstalliert. Modelle: '+
           ('entfernt' if remove_models else 'beibehalten')+'; Einstellungen: '+
           ('entfernt.' if remove_settings else 'beibehalten.'))
 
@@ -306,7 +307,7 @@ def main():
     if args.self_test: self_test();return
     if not args.plan:
         release=Path('/etc/os-release').read_text() if Path('/etc/os-release').exists() else ''
-        if 'ID=ubuntu' not in release or 'VERSION_ID="24.04"' not in release or platform.machine()!='x86_64': raise ValueError('Ubuntu 24.04 x86_64 erforderlich.')
+        ubuntu_version(release, platform.machine())
     action='deinstallieren' if args.uninstall else ('installieren' if args.components or args.plan else ask('Aktion: installieren / deinstallieren','installieren').lower())
     if action not in ('installieren','deinstallieren'): raise ValueError('Ungültige Aktion.')
     choice=args.components or ask('Komponenten: client / server / both',previous_components())
@@ -354,7 +355,7 @@ def main():
         print(scheme+'://record?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}')
         print('\nAusführliche Anleitung: '+DOCS)
     private_write(client_config.config_dir()/'installer.json',json.dumps({'components':choice}))
-    print('\nkienzledoku 1.8.1 installiert.')
+    print('\nkienzledoku 1.8.2 installiert.')
 if __name__=='__main__':
     try: main()
     except ValueError as exc:

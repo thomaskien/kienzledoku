@@ -1,4 +1,4 @@
-"""Shared Record 1.8.1 configuration. Patient context and credentials never enter TOML."""
+"""Shared Record 1.8.2 configuration. Patient context and credentials never enter TOML."""
 import copy
 import json
 import os
@@ -139,7 +139,7 @@ def save(config, path=None):
     validate(config)
     path = Path(path or config_path())
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    lines = ['# kienzledoku record 1.8.1 — keine Zugangsdaten/Patienten in dieser Datei.']
+    lines = ['# kienzledoku record 1.8.2 — keine Zugangsdaten/Patienten in dieser Datei.']
     for section, values in config.items():
         lines.extend(['', '[' + section + ']'])
         for name, value in values.items():

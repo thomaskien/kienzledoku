@@ -46,11 +46,11 @@ class BootstrapTests(unittest.TestCase):
 
     def test_latest_linux_semver_not_windows_or_prerelease(self):
         windows=dict(tag_name='v9.0',assets=[asset('kienzledoku-9.0-windows-x64-setup.exe')])
-        chosen,_=mod.select_release([release('1.7.9'),release('1.7.10'),windows,release('1.8.1',True)])
+        chosen,_=mod.select_release([release('1.7.9'),release('1.7.10'),windows,release('1.8.2',True)])
         self.assertIn('1.7.10',chosen['name'])
 
     def test_missing_new_checksum_does_not_fall_back(self):
-        newest=release('1.8.1');newest['assets'].pop()
+        newest=release('1.8.2');newest['assets'].pop()
         with self.assertRaisesRegex(mod.InstallError,'SHA-256-Datei'):
             mod.select_release([release(),newest])
 

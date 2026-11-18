@@ -27,7 +27,7 @@ from kienzledoku_document import DEFAULT_DOCUMENT_FIELDS, DOCUMENT_FIELDS, DOCUM
 from kienzledoku_product_key import production_build
 from kienzledoku_config import DEFAULT_COMMANDER_URL
 
-VERSION = '1.8.1'
+VERSION = '1.8.2'
 from installer.options import SERVER_ROLES, ASR_MODELS, roles, local_role
 GRADES = ('basis', 'gruendlich', 'sehr_gruendlich')
 GRADE_LABELS = dict(zip(GRADES, ('Basis', 'Gründlich', 'Sehr gründlich')))
@@ -243,7 +243,7 @@ def download(url,destination,expected,progress=lambda text:None,cancel=None):
     partial=destination.with_name(destination.name+'.part')
     progress('Download: '+destination.name)
     try:
-        with urlopen(Request(url,headers={'User-Agent':'kienzledoku-installer/1.8.1'}),timeout=60) as response, open(partial,'wb') as target:
+        with urlopen(Request(url,headers={'User-Agent':'kienzledoku-installer/1.8.2'}),timeout=60) as response, open(partial,'wb') as target:
             total=int(response.headers.get('Content-Length') or 0); received=0; last=0
             while True:
                 if cancel and cancel.is_set(): raise InterruptedError('Installation abgebrochen.')

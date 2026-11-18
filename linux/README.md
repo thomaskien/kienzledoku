@@ -1,4 +1,4 @@
-# kienzledoku 1.8.1 für Ubuntu 24.04 x86_64
+# kienzledoku 1.8.2 für Ubuntu 24.04/26.04 x86_64
 
 Das Archiv entpacken, ein Terminal im entpackten Ordner öffnen und ausführen:
 
@@ -43,7 +43,7 @@ vorgeladen. Der Commander läuft als systemd-Dienst. Status:
 T2med-Aktivierung: **Drittanbieter-Zugriffe verwalten → Per Produktcode aktivieren →
 Produktcode `kienzledoku` eingeben und bestätigen**. Danach erscheint
 **Dr. Thomas Kienzle - KienzleDoku** mit einem **grünen Statuspunkt**.
-Das Linux-Paket 1.8.1 enthält den endgültigen Hersteller-Key in kompilierten
+Das Linux-Paket 1.8.2 enthält den endgültigen Hersteller-Key in kompilierten
 Binärdateien. Für die URL den aktivierten **KienzleDoku**-Eintrag verwenden.
 Öffentliche Quellcode-Builds ohne privaten Build-Eingang verwenden weiterhin den Demo-Key. Die verlinkte GitHub-Anleitung zeigt alle Schritte mit Bildern.
 
@@ -82,3 +82,17 @@ bei unsicherer Zuordnung oder Symlinks bricht der Assistent vor Änderungen ab.
 Ein vollständiger Desktop-/GPU-Installationslauf dieser Ausgabe steht aus. Ein
 vorhandener produktiver Server wird durch das Bauen des Pakets nicht verändert;
 der spätere Installer richtet seine systemd-Dienste ein.
+
+## Ubuntu 26.04
+
+Unterstützt werden Ubuntu 24.04 und 26.04 LTS auf x86_64. Auf 26.04 richtet
+der Installer eine eigene, per SHA-256 geprüfte Python-3.12-Laufzeit für Client
+und KI-Worker ein. Das System-Python bleibt unverändert. Vorhandene
+KI-Python-Umgebungen werden bei einem Wechsel des Basisinterpreters neu erstellt;
+Modelle und Einstellungen bleiben erhalten. Für den CUDA-Build wird auf 26.04
+Toolkit 13.4 aus der offiziellen ubuntu2604-Paketquelle verwendet. Ein passender
+NVIDIA-Treiber muss bereits installiert sein; das Setup installiert nur das Toolkit.
+
+Nach einem Betriebssystem-Upgrade den Installer erneut ausführen. Der Client
+wird neu gebaut, die KI-Python-Umgebungen werden geprüft und llama.cpp für das
+aktuelle Betriebssystem neu kompiliert.

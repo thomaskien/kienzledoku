@@ -1,5 +1,16 @@
 # Änderungsprotokoll
 
+## 1.8.2 — 2026-11-18 (Linux)
+
+- Ubuntu 26.04 LTS x86_64 zusätzlich zu 24.04 im gemeinsamen Textinstaller.
+- Geprüfte eigene Python-3.12-Laufzeit auf 26.04 für VAD, Whisper und
+  Sprechertrennung; Ubuntu-System-Python bleibt unverändert.
+- Passende NVIDIA-Paketquelle und CUDA Toolkit 13.4 für 26.04.
+- Python-Umgebungen nach Betriebssystemwechsel prüfen/reparieren; llama.cpp
+  bei verändertem Ubuntu-/Compilerstand neu bauen. Modelle und Konfiguration erhalten.
+- Nur Linux-Paket; Windows und macOS bleiben unverändert bei 1.8.1.
+
+
 ## 1.8.1 — 16.11.2026
 
 - Benchmarksteuerung folgt dem normalen optionalen Commander-Tokenschutz;

@@ -10,8 +10,10 @@ bearbeiten den Entwurf und übernehmen ihn anschließend bewusst in die Patiente
 
 ## Download und Installation
 
-**KienzleDoku 1.8.1 für Windows, macOS und Linux** ist
-[als GitHub-Release verfügbar](https://github.com/thomaskien/kienzledoku/releases/tag/v1.8.1).
+**KienzleDoku 1.8.2 für Linux** ist
+[als GitHub-Release verfügbar](https://github.com/thomaskien/kienzledoku/releases/tag/v1.8.2).
+Windows und macOS bleiben bei der unveränderten Version **1.8.1**.
+Linux 1.8.2 ergänzt Ubuntu 26.04 und behält die Unterstützung für 24.04 bei.
 Der zugehörige Quellcode ist unter demselben Tag veröffentlicht. Enthalten sind
 Auditkorrekturen, verteilte Sprechertrennung, Temperaturanzeigen und die
 [Vorbereitung für Kienzlebench](docs/commander-benchmark-api.md).
@@ -22,7 +24,7 @@ Auditkorrekturen, verteilte Sprechertrennung, Temperaturanzeigen und die
 | --- | --- | --- |
 | Windows x64 | [Installer 1.8.1](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.1/kienzledoku-1.8.1-windows-x64-setup.exe) · [Anleitung](docs/installation.md#windows) | [Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
 | macOS / Apple Silicon | [Installer 1.8.1](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.1/kienzledoku-1.8.1-macOS-arm64.dmg) · [Anleitung](docs/installation.md#macos) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
-| Ubuntu 24.04 / x86_64 | [Archiv 1.8.1](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.1/kienzledoku-1.8.1-linux-x86_64.tar.gz) · [Anleitung](docs/installation.md#linux) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
+| Ubuntu 24.04 / 26.04 · x86_64 | [Archiv 1.8.2](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.2/kienzledoku-1.8.2-linux-x86_64.tar.gz) · [Anleitung](docs/installation.md#linux) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
 
 [Veröffentlichte Pakete auf GitHub](https://github.com/thomaskien/kienzledoku/releases)
 · [Homepage](https://kienzledoku.de/)
@@ -97,7 +99,7 @@ wirkt auch ohne VAD. Einstellungen werden für diesen Client gespeichert.
 
 ## T2med einrichten und verwenden
 
-Diese Anleitung gehört zum gemeinsamen Installerstand **1.8.1**.
+Diese Anleitung gilt für **Linux 1.8.2** sowie **macOS und Windows 1.8.1**.
 Die älteren Quellcode-Installer sind separat im
 [Archiv](docs/archiv/direktbetrieb.md) beschrieben.
 

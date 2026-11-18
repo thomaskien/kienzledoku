@@ -63,7 +63,7 @@ usage() {
     cat <<'EOF'
 Aufruf: ./install_linux.sh [Optionen]
 
-Installiert den schlanken kienzledoku record-Client für Ubuntu 24.04 LTS.
+Installiert den schlanken kienzledoku record-Client für Ubuntu 24.04 oder 26.04 LTS.
 Die KI-Serverkomponenten werden nicht installiert.
 
 Optionen:
@@ -175,20 +175,7 @@ print('1' if production else '0')
 PY
 )"
 
-if [ ! -r /etc/os-release ]; then
-    echo "FEHLER: /etc/os-release fehlt; unterstützt wird Ubuntu 24.04 LTS." >&2
-    exit 1
-fi
-. /etc/os-release
-if [ "${ID:-}" != "ubuntu" ] || [ "${VERSION_ID:-}" != "24.04" ]; then
-    echo "FEHLER: Unterstützt wird ausschließlich Ubuntu 24.04 LTS." >&2
-    echo "Gefunden: ${PRETTY_NAME:-unbekannt}" >&2
-    exit 1
-fi
-if [ "$(uname -m)" != "x86_64" ]; then
-    echo "FEHLER: Der T2med-Linux-Client wird zunächst nur für x86_64 unterstützt." >&2
-    exit 1
-fi
+python3 "$SCRIPT_DIR/kienzledoku_linux_runtime.py" --check >/dev/null
 
 if ! command -v sudo >/dev/null 2>&1; then
     echo "FEHLER: sudo wird für die geschützte Fenster- und AppArmor-Installation benötigt." >&2
@@ -330,6 +317,7 @@ sudo install -o root -g root -m 0644 \
     "$SCRIPT_DIR/linux/kienzledoku.apparmor" "$APPARMOR_PROFILE_PATH"
 sudo apparmor_parser -r "$APPARMOR_PROFILE_PATH"
 
+PYTHON3="$("$PYTHON3" "$SCRIPT_DIR/kienzledoku_linux_runtime.py" --target "$DATA_DIR/python312")"
 PY_MM="$("$PYTHON3" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
 PY_TAG="$(printf '%s' "$PY_MM" | tr -d '.')"
 ARCH="$(uname -m)"

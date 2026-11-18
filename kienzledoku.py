@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""kienzledoku record 1.8.1 <-> T2med FHIR client.
+"""kienzledoku record 1.8.2 <-> T2med FHIR client.
 
 Target: Python 3.9+ (macOS, Ubuntu 24.04 LTS) and bundled Python 3.12 (Windows).
 Platform-independent FHIR/UI core with optional compiled Connect transport.
@@ -67,7 +67,7 @@ from kienzledoku_speech import (
 )
 
 APP_NAME = "kienzledoku record"
-VERSION = "1.8.1"
+VERSION = "1.8.2"
 LINUX_NATIVE_WINDOW_PATH = "/usr/local/libexec/kienzledoku/kienzledoku_window_linux"
 
 # Public test/demo key from T2med's reference application (not a secret).
@@ -2302,7 +2302,7 @@ def main():
         print("kienzledoku record: %s" % exc, file=sys.stderr)
         if sys.platform == 'win32':
             import ctypes
-            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.8.1', 0x10)
+            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.8.2', 0x10)
         if not args.no_browser:
             notify_start_failure(exc)
         return 1
