@@ -1,10 +1,12 @@
-# kienzledoku Serverkomponenten 1.8.1
+# kienzledoku Serverkomponenten 1.8.3
 
-Die Serverkomponenten gehören jetzt zur gemeinsamen Version **1.8.1**. Unter
-Windows das gemeinsame `kienzledoku-1.8.1-windows-x64-setup.exe` öffnen und
+Die Serverkomponenten gehören jetzt zur gemeinsamen Version **1.8.3**. Unter
+Windows das gemeinsame `kienzledoku-1.8.3-windows-x64-setup.exe` öffnen und
 Server oder Client und Server wählen. Es richtet eine eigene Ubuntu-24.04-WSL2-
 Umgebung mit Whisper large-v3, pyannote Community-1, llama.cpp und Commander ein.
 Die vorherige separate Serverausgabe hieß 1.13; sie bleibt unverändert erhalten.
+
+Bei einem Fehler zeigt der Windows-Assistent den betroffenen Schritt. Über „Fehlerdetails kopieren“ lassen sich Version und Diagnose weitergeben.
 
 1.8 ergänzt unabhängige Diarisierungsstrategien, längere Aufnahmeabschnitte und
 den gemeinsamen Uninstaller. Prompt, Felder, Modellstufen, optionaler Token-Schutz,
@@ -14,7 +16,7 @@ enthalten; öffentliche Quellen enthalten kein produktives Schlüsselmaterial.
 
 ## Start
 
-`kienzledoku-1.8.1-windows-x64-setup.exe` unter Windows 11 x64 öffnen.
+`kienzledoku-1.8.3-windows-x64-setup.exe` unter Windows 11 x64 öffnen.
 Alternativ das gleichnamige ZIP entpacken und die EXE darin starten.
 Der Assistent nutzt Windows PowerShell 5.1 und Windows Forms; Python muss auf
 Windows nicht vorinstalliert sein. Das Setup ist nicht digital signiert.

@@ -36,7 +36,7 @@ def model_request(entry,token):
     if not huggingface and not (entry.get('path')=='whisper/large-v3.pt' and url==whisper_url
                                 and len(sha)==64 and all(c in '0123456789abcdef' for c in sha)):
         raise ValueError('Unerwartete Modellquelle.')
-    headers={'User-Agent':'kienzledoku-installer/1.8.2'}
+    headers={'User-Agent':'kienzledoku-installer/1.8.3'}
     if huggingface and token:headers['Authorization']='Bearer '+token
     return urllib.request.Request(url,headers=headers)
 

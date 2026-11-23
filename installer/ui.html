@@ -308,6 +308,7 @@
         <h1 id="title-5">Bereit zur Installation</h1>
         <p class="lead">Prüfen Sie die Auswahl. Erst mit „Installieren“ werden Dateien geladen und Änderungen vorgenommen.</p>
         <div id="validation-error" class="notice error hidden" role="alert"></div>
+          <div id="validation-support" class="hidden"><details><summary>Technische Details</summary><pre class="logs" id="validation-details"></pre></details><button type="button" class="button copy-button" data-copy-target="validation-details">Fehlerdetails kopieren</button></div>
         <ul id="summary-list" class="summary-list"></ul>
         <p id="download-size" class="download-size"></p>
         <div class="notice">Passwörter und Tokens werden aus Sicherheitsgründen nicht in dieser Übersicht angezeigt.</div>
@@ -321,6 +322,7 @@
           <div class="progress-meta"><strong id="progress-message">Installation wird gestartet …</strong><span id="progress-percent">0 %</span></div>
           <pre class="logs" id="install-logs" aria-label="Installationsprotokoll"></pre>
           <div id="install-error" class="notice error hidden" role="alert"></div>
+          <div id="install-support" class="hidden"><details><summary>Technische Details</summary><pre class="logs" id="install-details"></pre></details><button type="button" class="button copy-button" data-copy-target="install-details">Fehlerdetails kopieren</button></div>
           <div class="inline-actions"><button type="button" class="button danger" id="cancel-install">Installation abbrechen</button><button type="button" class="button primary hidden" id="retry-install">Einstellungen korrigieren</button></div>
         </div>
         <div id="install-finished" class="hidden">
@@ -600,9 +602,18 @@
     return 'Voraussichtlicher Download: ' + (bytes / 1073741824).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' GB';
   }
 
+  function showInstallerError(area, message, step, details) {
+    setText('#' + area + '-error', message);
+    show('#' + area + '-error', true);
+    if (bootstrap.platform === 'windows') {
+      setText('#' + area + '-details', details || ('Windows-Installer ' + bootstrap.version + '\nSchritt: ' + step + '\nFehlermeldung: ' + message));
+      show('#' + area + '-support', true);
+    }
+  }
+
   async function validateConfig() {
     syncConfig();
-    show('#validation-error', false);
+    show('#validation-error', false); show('#validation-support', false);
     setText('#footer-status', 'Einstellungen werden geprüft …');
     try {
       const result = await api('/api/validate', { method: 'POST', body: config });
@@ -612,7 +623,7 @@
       validated = true;
       return true;
     } catch (error) {
-      setText('#validation-error', error.message); show('#validation-error', true); validated = false;
+      showInstallerError('validation', error.message, 'Einstellungen prüfen'); validated = false;
       return false;
     }
   }
@@ -622,10 +633,10 @@
     try {
       $('#next').disabled = true;
       await api('/api/install', { method: 'POST', body: config });
-      currentStep = 6; installing = true; reportBusy(true); renderStep(); show('#install-error', false); show('#retry-install', false);
+      currentStep = 6; installing = true; reportBusy(true); renderStep(); show('#install-error', false); show('#install-support', false); show('#retry-install', false);
       pollStatus();
     } catch (error) {
-      setText('#validation-error', error.message); show('#validation-error', true); $('#next').disabled = false;
+      showInstallerError('validation', error.message, 'Installation starten'); $('#next').disabled = false;
     }
   }
 
@@ -638,7 +649,7 @@
       setText('#install-logs', Array.isArray(status.logs) ? status.logs.join('\n') : '');
       if (bootstrap.platform === 'windows') { $('#cancel-install').disabled=!status.can_cancel; }
       if (status.error) {
-        installing = false; reportBusy(false); setText('#install-error', status.error); show('#install-error', true); show('#retry-install', true); show('#cancel-install', false); renderStep(); return;
+        installing = false; reportBusy(false); showInstallerError('install', status.error, 'Installation ausführen', status.details); show('#retry-install', true); show('#cancel-install', false); renderStep(); return;
       }
       if (status.done) { installing = false; reportBusy(false); finishInstall(status); return; }
       statusTimer = setTimeout(pollStatus, status.running ? 500 : 900);
@@ -659,6 +670,7 @@
     show('#server-token-finish-row', Boolean(token)); setText('#finish-server-token', token);
     const hasClient = Boolean(status.client_installed);
     show('#client-guide', hasClient);
+    if (bootstrap.separate_client && hasClient) setText('#client-guide > p', 'Die Arbeitsplatz-Einstellungen sind gespeichert. Ziehen Sie KienzleDoku.app nach Programme. Hinterlegen Sie anschließend diese Adresse in T2med.');
     const launchAddress = $('#launch-url');
     launchAddress.replaceChildren();
     (status.launch_url || '').split(/(?=[?&])/).forEach((part, index) => {
@@ -702,7 +714,8 @@
       const detected = info.client && info.server ? 'Client und Server erkannt.' : info.client ? 'Client erkannt.' : info.server ? 'Lokaler Server erkannt.' : 'Keine eindeutig zuordenbare aktive Komponente erkannt.';
       setText('#uninstall-detection', detected + (info.models ? ' Eigene Modelldaten sind vorhanden.' : ''));
       $('#uninstall-detection').classList.toggle('error', Array.isArray(info.unsafe) && info.unsafe.length > 0);
-      if (info.client && info.server) setRadio('uninstall_mode','both');
+      if (bootstrap.separate_client) setRadio('uninstall_mode','server');
+      else if (info.client && info.server) setRadio('uninstall_mode','both');
       else if (info.client) setRadio('uninstall_mode','client');
       else if (info.server) setRadio('uninstall_mode','server');
       if (Array.isArray(info.unsafe) && info.unsafe.length) setText('#uninstall-detection', 'Die Installation enthält nicht sicher zuordenbare Dateien. Diese werden nicht verändert.');
@@ -824,6 +837,20 @@
   async function initialize() {
     try {
       bootstrap = await api('/api/bootstrap'); config = clone(bootstrap.defaults);
+      if (bootstrap.separate_client) {
+        setText('#title-1','Commander einrichten');
+        setText('[data-step="1"] .lead', 'Der Installer richtet den Commander auf diesem Mac ein. Für Record und Connect ziehen Sie KienzleDoku.app aus der DMG nach Programme.');
+        $('#mode-cards input[value="client"]').closest('label').hidden = true;
+        $('#mode-cards input[value="client"]').closest('label').style.display = 'none';
+        const combined = $('#mode-cards input[value="combined"]').closest('label');
+        combined.querySelector('strong').textContent = 'Diesen Mac auch als Arbeitsplatz einrichten';
+        combined.querySelector('small').textContent = 'Client und Server. T2med und den lokalen Commander für die separate KienzleDoku.app konfigurieren.';
+        for (const input of $$('input[name="uninstall_mode"]')) {
+          if (input.value !== 'server') input.closest('label').style.display = 'none';
+        }
+        setText('#open-uninstall','Commander deinstallieren …');
+        setText('#uninstall-title','Commander deinstallieren');
+      }
       if (bootstrap.platform === 'windows') {
         // One shared wizard; adapt platform wording and Windows-specific engine options.
         const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);

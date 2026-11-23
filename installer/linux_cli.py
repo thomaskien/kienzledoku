@@ -18,7 +18,7 @@ from kienzledoku_document import DOCUMENT_LABELS
 from kienzledoku_product_key import production_build
 from installer.linux_uninstall import Uninstaller
 from kienzledoku_linux_runtime import ubuntu_version
-VERSION='1.8.2'
+VERSION='1.8.3'
 GRADES=('basis','gruendlich','sehr_gruendlich')
 GRADE_LABELS={'basis':'Basis','gruendlich':'Gründlich','sehr_gruendlich':'Sehr gründlich'}
 DIARIZATION_MODES={'resident':'Immer geladen','with_asr':'Zusammen mit Whisper','serial':'Seriell – nach Whisper, vor dem LLM'}
@@ -263,7 +263,7 @@ def self_test():
     subprocess.run(['bash','-n',str(ROOT/'linux/install_client.sh')],check=True)
     profile=(ROOT/'linux/kienzledoku.apparmor').read_text()
     assert 'userns,' in profile and 'apparmor_restrict_unprivileged_userns=0' not in profile
-    print('SELF-TEST OK — kienzledoku 1.8.2 Linux, ohne Systemänderungen')
+    print(f'SELF-TEST OK — kienzledoku {VERSION} Linux, ohne Systemänderungen')
 
 def uninstall(choice,remove_models,remove_settings):
     options=Uninstaller.options(choice,remove_models,remove_settings)
@@ -279,7 +279,7 @@ def uninstall(choice,remove_models,remove_settings):
     if server:
         if os.geteuid()==0: local.execute(Uninstaller.options('server',remove_models,remove_settings))
         else: subprocess.run(['sudo',*helper],check=True)
-    print('\nKienzledoku 1.8.2 deinstalliert. Modelle: '+
+    print(f'\nKienzledoku {VERSION} deinstalliert. Modelle: '+
           ('entfernt' if remove_models else 'beibehalten')+'; Einstellungen: '+
           ('entfernt.' if remove_settings else 'beibehalten.'))
 
@@ -355,7 +355,7 @@ def main():
         print(scheme+'://record?kontextId=${kontextId}&fhirBasisUrl=${fhirBasisUrl}&oAuthToken=${oAuthToken}')
         print('\nAusführliche Anleitung: '+DOCS)
     private_write(client_config.config_dir()/'installer.json',json.dumps({'components':choice}))
-    print('\nkienzledoku 1.8.2 installiert.')
+    print(f'\nkienzledoku {VERSION} installiert.')
 if __name__=='__main__':
     try: main()
     except ValueError as exc:

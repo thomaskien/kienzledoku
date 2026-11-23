@@ -1,5 +1,12 @@
 # Änderungsprotokoll
 
+## 1.8.3 — macOS, Windows und Linux
+
+- In den Record-Einstellungen öffnet „Testpatient öffnen“ die fiktive Akte von Toni Testpatient. Das Diktat lässt sich über den eingerichteten Commander transkribieren und dokumentieren. Die Testsitzung greift nicht auf T2med zu.
+- Linux- und Windows-Client, native Aufnahmefenster und Installer tragen den gemeinsamen Versionsstand 1.8.3. Der Windows-Installer meldet den betroffenen Installationsschritt und bietet kopierbare Fehlerdetails.
+- macOS enthält in beiden DMGs die Universal-App für Intel und Apple Silicon. Sie benötigt externes CPython 3.12 und öffnet Record und Connect. Das zweite DMG enthält zusätzlich den Commander-Installer für Apple Silicon ab macOS 14 mit mindestens 16 GB gemeinsamem Arbeitsspeicher.
+- Der Mac-Client übernimmt vorhandene Einstellungen. Über „Client deinstallieren …“ lässt sich die App in den Papierkorb verschieben. Einstellungen und gespeicherter Commander-Zugang können auf Wunsch mit entfernt werden.
+
 ## 1.8.2 — 2026-11-18 (Linux)
 
 - Ubuntu 26.04 LTS x86_64 zusätzlich zu 24.04 im gemeinsamen Textinstaller.

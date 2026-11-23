@@ -60,7 +60,7 @@ def checked_path(path):
 
 def download(target):
     print('Python 3.12 für Ubuntu 26.04 wird bereitgestellt (33 MiB).', file=sys.stderr, flush=True)
-    request = urllib.request.Request(PYTHON_URL, headers={'User-Agent': 'kienzledoku-installer/1.8.2'})
+    request = urllib.request.Request(PYTHON_URL, headers={'User-Agent': 'kienzledoku-installer/1.8.3'})
     digest = hashlib.sha256()
     count, last = 0, -1
     with urllib.request.urlopen(request, timeout=60) as source, target.open('xb') as output:

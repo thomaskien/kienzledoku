@@ -3,6 +3,7 @@ import copy
 import html
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
 import secrets
 import shutil
 import threading
@@ -35,7 +36,8 @@ def run_settings(no_browser=False, window_opener=None, setup=False):
         initial, message = config.defaults(), 'Einstellungen konnten nicht gelesen werden: %s. Angezeigt werden Standardwerte; die vorhandene Datei wird erst beim Speichern ersetzt.' % exc
     state = {'config': initial, 'message': message, 'last': time.monotonic(), 'devices': []}
     fields_to_show = [field for field in FIELDS if not setup or field[0] in ('connection', 'commander')]
-    saved = False
+    result = False
+    can_uninstall = not setup and os.environ.get('KIENZLEDOKU_UNIFIED_CLIENT') == '1'
     csrf = secrets.token_urlsafe(32)
     stopped = threading.Event()
     class Handler(SecureLocalHandler, BaseHTTPRequestHandler):
@@ -60,29 +62,32 @@ def run_settings(no_browser=False, window_opener=None, setup=False):
                     control = '<input name="%s" value="%s">' % (name, html.escape(value, quote=True))
                 fields.append('<label>%s%s</label>' % (label, control))
             heading = 'Server für die Installation einrichten' if setup else 'Einstellungen'
-            explanation = ('Bitte T2med und Commander eintragen. Alle KI-Dienste werden über den Commander angesprochen. '
+            explanation = ('Für den Praxisbetrieb T2med und Commander eintragen. Für den Testpatienten genügt die Commander-Adresse, das T2med-Feld kann auf dem Standardwert bleiben. Alle KI-Dienste werden über den Commander angesprochen. '
                            'Mit „Speichern und Installation abschließen“ werden diese Werte übernommen. '
-                           'Spätere Änderungen sind über kienzledoku record im Startmenü möglich.') if setup else ''
+                           'Spätere Änderungen sind in den Record-Einstellungen möglich.') if setup else ''
             buttons = ('<button name="action" value="save">Speichern und Installation abschließen</button>'
                        '<button name="action" value="check">KI-Dienste prüfen</button>'
                        '<button name="action" value="close">Abbrechen</button>') if setup else (
                        '<button name="action" value="save">Speichern</button>'
                        '<button name="action" value="check">KI-Dienste prüfen</button>'
+                       '<button name="action" value="test_patient" title="Verwendet die gespeicherten Einstellungen">Testpatient öffnen</button>'
                        '<button name="action" value="devices">Mikrofone anzeigen</button>'
                        '<button name="action" value="audio_test">Mikrofon 3 Sekunden testen</button>'
                        '<button name="action" value="close">Schließen</button>')
+            if can_uninstall:
+                buttons += '<p><button name="action" value="uninstall">Client deinstallieren …</button></p>'
             key_field = '<label>Commander-Zugang (leer = unverändert)<input type="password" name="commander_token" autocomplete="new-password"></label>'
             if not setup and not production_build():
                 key_field += '<label>Eigener API-Key für Direktbetrieb (leer = unverändert)<input type="password" name="direct_key" autocomplete="new-password"></label>'
             key_note = ('Diese Version verwendet den eingebetteten KienzleDoku-Hersteller-Key für Direktbetrieb und Connect.'
                         if production_build() else 'Ohne eigenen Key wird der öffentliche Demo-Key verwendet. Connect ersetzt jeden mitgesendeten Key durch seinen eingebetteten Key.')
             data = ('''<!doctype html><html lang="de"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>kienzledoku record 1.8.2 – %s</title><style>
+<title>kienzledoku record 1.8.3 – %s</title><style>
 body{font:16px system-ui;margin:32px auto;padding:0 24px;max-width:760px;background:#f2f3f5;color:#172536}
 header{display:flex;gap:20px;align-items:center}.logo-slot{width:96px;height:96px;display:flex;align-items:center;justify-content:center;flex:none}.logo-slot img{width:66%%;height:66%%;object-fit:contain}h1{font-size:26px}form{background:white;padding:24px;border-radius:16px}
 label{display:block;margin:15px 0}input:not([type=checkbox]),select{display:block;width:100%%;box-sizing:border-box;padding:10px;margin-top:6px}
 button{padding:12px 16px;margin:8px 4px 0 0}p{line-height:1.5}.notice{white-space:pre-wrap}</style>
-<header><span class="logo-slot"><img src="/logo.svg" alt=""></span><div><h1>kienzledoku record 1.8.2</h1><p>%s</p></div></header>
+<header><span class="logo-slot"><img src="/logo.svg" alt=""></span><div><h1>kienzledoku record 1.8.3</h1><p>%s</p></div></header>
 <p>%s</p><p class="notice">%s</p><form method="post"><input type="hidden" name="csrf" value="%s">%s%s
 <p>%s
 Die Zertifikatsausnahme betrifft ausschließlich das eingetragene T2med-Ziel. Änderungen gelten für den nächsten Patientenvorgang.</p>
@@ -110,7 +115,7 @@ Die Zertifikatsausnahme betrifft ausschließlich das eingetragene T2med-Ziel. Ä
             else:
                 self.page()
         def do_POST(self):
-            nonlocal saved
+            nonlocal result
             if not self.authorize():
                 return
             state['last'] = time.monotonic()
@@ -119,6 +124,18 @@ Die Zertifikatsausnahme betrifft ausschließlich das eingetragene T2med-Ziel. Ä
                 if not secrets.compare_digest(form.get('csrf', [''])[0], csrf):
                     self.send_error(403); return
                 action = form.get('action', [''])[0]
+                if action == 'uninstall' and can_uninstall:
+                    result = 'uninstall'
+                    state['message'] = 'Bitte bestätigen Sie die Auswahl im Mac-Dialog.'
+                    self.page()
+                    stopped.set()
+                    return
+                if action == 'test_patient' and not setup:
+                    result = 'test_patient'
+                    state['message'] = 'Record öffnet den fiktiven Testpatienten.'
+                    self.page()
+                    stopped.set()
+                    return
                 if action == 'close':
                     state['message'] = 'Einstellungen geschlossen. Dieses Fenster kann geschlossen werden.'
                     self.page(); stopped.set(); return
@@ -137,7 +154,7 @@ Die Zertifikatsausnahme betrifft ausschließlich das eingetragene T2med-Ziel. Ä
                         candidate['commander']['token_file'] = ''
                     config.save(candidate); state['config'] = candidate
                     state['message'] = 'Gespeichert. T2med-Aufruf: ' + ('kienzledoku://record' if candidate['connection']['mode'] == 'connect' else 'kienzledoku-record://record')
-                    saved = True
+                    result = True
                     if setup:
                         self.page()
                         stopped.set()
@@ -199,4 +216,4 @@ Die Zertifikatsausnahme betrifft ausschließlich das eingetragene T2med-Ziel. Ä
             except Exception: ui.kill(); ui.wait()
         if ui and getattr(ui, 'record_profile', None):
             shutil.rmtree(ui.record_profile, ignore_errors=True)
-    return saved
+    return result

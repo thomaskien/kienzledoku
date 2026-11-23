@@ -89,6 +89,8 @@ def handler(installer,csrf,uninstaller=None):
                         installer.start(body)
                     self.json({'started':True})
                 elif path=='/api/uninstall':
+                    if (ROOT.parent/'commander-installer').is_file() and (body.get('remove_client') or body.get('remove_server') is not True):
+                        raise ValueError('Die Client-App wird in ihren eigenen Einstellungen deinstalliert.')
                     with operation_lock:
                         if installer.snapshot()['running']: raise ValueError('Die Installation läuft bereits.')
                         uninstaller.start(body)

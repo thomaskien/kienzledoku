@@ -1,0 +1,45 @@
+KienzleDoku 1.8.3 für macOS
+
+Client einrichten
+Ziehen Sie KienzleDoku.app aus dem DMG in „Programme“. Alternativ können Sie
+die App in den Programme-Ordner Ihres Benutzerordners kopieren. Öffnen Sie
+die kopierte App. Beim ersten Start führt sie durch die Einrichtung.
+Vorhandene Arbeitsplatz-Einstellungen übernimmt sie automatisch.
+
+Externes Python
+Der Client benötigt CPython 3.12 für die Architektur Ihres Mac. Mit Homebrew:
+brew install python@3.12
+Python.org bietet einen grafischen „macOS 64-bit universal2 installer“ für
+Intel und Apple Silicon an. Die letzte .pkg-Version 3.12.10 enthält spätere
+Sicherheitskorrekturen der 3.12-Reihe nicht. Der Download ist hier verlinkt:
+https://www.python.org/downloads/release/python-31210/
+Öffnen Sie die .pkg per Doppelklick. Lassen Sie Python installiert, solange
+Sie den Client oder den Commander verwenden.
+
+Commander einrichten (DMG „Client und Server“)
+Öffnen Sie „Commander installieren.app“ im DMG. Der lokale Server benötigt
+Apple Silicon, macOS 14 oder neuer und mindestens 16 GB gemeinsamen Speicher.
+Der Assistent lädt die für die gewählten KI-Dienste benötigten Komponenten.
+Über „Diesen Mac auch als Arbeitsplatz einrichten“ können Sie T2med und
+den Commander-Zugang für die separate Client-App konfigurieren. Kopieren
+Sie KienzleDoku.app anschließend nach Programme. Die Konfiguration gilt für
+den angemeldeten Benutzer. Andere Macs erhalten die angezeigte LAN-Adresse
+und bei aktiviertem Zugriffsschutz den zugehörigen Commander-Zugang.
+Technische Einrichtungsprotokolle erscheinen bei erlaubtem Zugriff auf dem
+Schreibtisch. macOS kann die Freigabe beider Apps einzeln verlangen.
+
+Testpatient und T2med
+„Testpatient öffnen“ in den Client-Einstellungen benötigt für Diktat und
+Dokumentation einen erreichbaren Commander. Eine T2med-Akte ist dafür nicht
+erforderlich. Die T2med-Adressen beginnen im Direktbetrieb mit
+kienzledoku-record://record und im Connect-Betrieb mit kienzledoku://record.
+Wenn noch ein früherer Starter geöffnet wird, beenden Sie KienzleDoku und
+öffnen Sie die neue App bei gedrückter Wahltaste. Ab macOS 12 können Sie
+beide Aufrufarten der neuen App zuordnen.
+
+Client entfernen
+Schließen Sie laufende Aufnahmen. Öffnen Sie die Client-Einstellungen und
+wählen Sie „Client deinstallieren …“. Die App zeigt ihren Installationsort
+zur Bestätigung an. Auf Wunsch entfernt sie auch Ihre Client-Einstellungen
+und Ihren gespeicherten Commander-Zugang. Der Commander, seine Modelle und
+Python bleiben erhalten. Den Commander können Sie im Server-Installer entfernen.

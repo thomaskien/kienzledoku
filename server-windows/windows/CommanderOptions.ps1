@@ -26,7 +26,7 @@ function Show-CommanderOptions($Models, $Previous) {
         if($combo.Items.Count){$combo.SelectedIndex=0}
         $preferred=@{basis='qwen4-q4';gruendlich='gemma12-q8';sehr_gruendlich='27b-q4'}[$grade]
         if($combo.Items.Contains($preferred)){$combo.SelectedItem=$preferred}
-        if($Previous -and $Previous.PSObject.Properties['QualityModels']){
+        if($Previous -and $Previous.PSObject.Properties['QualityModels'] -and $Previous.QualityModels){
             $prop=$Previous.QualityModels.PSObject.Properties[$grade]
             if($prop -and $combo.Items.Contains([string]$prop.Value)){$combo.SelectedItem=[string]$prop.Value}
         }
@@ -64,24 +64,43 @@ function Show-CommanderOptions($Models, $Previous) {
     $reset.Add_Click({$prompt.Text=$standard})
     $ok=Button $dialog 'Übernehmen' 655 826 170
     $cancel=Button $dialog 'Abbrechen' 470 826 170;$cancel.DialogResult='Cancel'
+    $fieldErrors=New-Object Windows.Forms.ErrorProvider
+    $fieldErrors.ContainerControl=$dialog
+    $fieldErrors.BlinkStyle='NeverBlink'
+    function Select-InvalidField($Control,[string]$Message) {
+        $fieldErrors.SetError($Control,$Message)
+        $dialog.ScrollControlIntoView($Control)
+        $null=$Control.Focus()
+        [Windows.Forms.MessageBox]::Show($dialog,$Message,'Eingabe prüfen','OK','Warning') | Out-Null
+    }
     $ok.Add_Click({
-        if(-not $prompt.Text.Trim()){[Windows.Forms.MessageBox]::Show('Der Prompt darf nicht leer sein.')|Out-Null;return}
-        if(-not @($fieldControls.Keys|Where-Object{$fieldControls[$_].Checked}).Count){[Windows.Forms.MessageBox]::Show('Mindestens ein Feld auswählen.')|Out-Null;return}
-        if($remote.Text.Trim()){
-            $u=$null
-            if(-not [Uri]::TryCreate($remote.Text.Trim(),[UriKind]::Absolute,[ref]$u) -or $u.Scheme -notin @('http','https') -or $u.UserInfo -or $u.Query -or $u.Fragment -or $u.AbsolutePath -ne '/'){
-                [Windows.Forms.MessageBox]::Show('Vollständige Commander-Adresse ohne Zugangsdaten oder Pfad eingeben.')|Out-Null;return
+        try {
+            $fieldErrors.Clear()
+            if(-not ([string]$prompt.Text).Trim()){Select-InvalidField $prompt 'Der Prompt darf nicht leer sein.';return}
+            if(-not @($fieldControls.Keys|Where-Object{$fieldControls[$_].Checked}).Count){Select-InvalidField $fieldControls['anamnese'] 'Mindestens ein Dokumentationsfeld auswählen.';return}
+            if(([string]$remote.Text).Trim()){
+                $u=$null
+                if(-not [Uri]::TryCreate(([string]$remote.Text).Trim(),[UriKind]::Absolute,[ref]$u) -or $u.Scheme -notin @('http','https') -or $u.UserInfo -or $u.Query -or $u.Fragment -or $u.AbsolutePath -ne '/'){
+                    Select-InvalidField $remote 'Vollständige Commander-Adresse ohne Zugangsdaten oder Pfad eingeben.';return
+                }
             }
+            if($remoteSecret.Text -match '\s' -or $remoteSecret.Text.Length -gt 4096){Select-InvalidField $remoteSecret 'Der Token darf höchstens 4096 Zeichen und keine Leerzeichen enthalten.';return}
+            $dialog.DialogResult='OK';$dialog.Close()
+        } catch {
+            Show-WizardProblem $_ 'Commander-Einstellungen übernehmen' 'Die Commander-Einstellungen konnten nicht übernommen werden.' $dialog @($script:HfToken.Text,$remoteSecret.Text) -BeforeStart
         }
-        if($remoteSecret.Text -match '\s' -or $remoteSecret.Text.Length -gt 4096){[Windows.Forms.MessageBox]::Show('Token darf keine Leerzeichen enthalten.')|Out-Null;return}
-        $dialog.DialogResult='OK';$dialog.Close()
     })
     try{
         if($dialog.ShowDialog($script:Form) -ne 'OK'){return $null}
-        $mapping=[ordered]@{}
-        foreach($grade in @('basis','gruendlich','sehr_gruendlich')){if($gradeControls[$grade].SelectedItem){$mapping[$grade]=[string]$gradeControls[$grade].SelectedItem}}
-        [IO.Directory]::CreateDirectory($script:State)|Out-Null
-        [IO.File]::WriteAllText($remoteSecretPath,$remoteSecret.Text,(New-Object Text.UTF8Encoding($false)));Set-PrivateFile $remoteSecretPath
-        return [pscustomobject]@{RemoteLlmTokenFile=$remoteSecretPath;EnabledFields=@($fields.Keys|Where-Object{$fieldControls[$_].Checked});QualityModels=$mapping;AuthEnabled=$auth.Checked;AsrOnDemand=$cold.Checked;DiarizationMode=$diarKeys[$diarMode.SelectedIndex];RemoteLlmUrl=$remote.Text.Trim();PromptText=$prompt.Text}
-    }finally{$dialog.Dispose()}
+        try {
+            $mapping=[ordered]@{}
+            foreach($grade in @('basis','gruendlich','sehr_gruendlich')){if($gradeControls[$grade].SelectedItem){$mapping[$grade]=[string]$gradeControls[$grade].SelectedItem}}
+            [IO.Directory]::CreateDirectory($script:State)|Out-Null
+            [IO.File]::WriteAllText($remoteSecretPath,$remoteSecret.Text,(New-Object Text.UTF8Encoding($false)));Set-PrivateFile $remoteSecretPath
+            return [pscustomobject]@{RemoteLlmTokenFile=$remoteSecretPath;EnabledFields=@($fields.Keys|Where-Object{$fieldControls[$_].Checked});QualityModels=$mapping;AuthEnabled=$auth.Checked;AsrOnDemand=$cold.Checked;DiarizationMode=$diarKeys[$diarMode.SelectedIndex];RemoteLlmUrl=([string]$remote.Text).Trim();PromptText=$prompt.Text}
+        } catch {
+            Show-WizardProblem $_ 'Commander-Einstellungen übernehmen' 'Die Commander-Einstellungen konnten nicht übernommen werden.' $script:Form @($script:HfToken.Text,$remoteSecret.Text) -BeforeStart
+            return $null
+        }
+    }finally{$fieldErrors.Dispose();$dialog.Dispose()}
 }

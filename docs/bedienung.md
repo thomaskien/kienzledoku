@@ -2,8 +2,11 @@
 
 [Zur Übersicht](../README.md) · [T2med einrichten](../README.md#t2med-einrichten-und-verwenden)
 
-Diese Hinweise beschreiben den gemeinsamen Installerstand; die öffentlichen
-Pakete folgen nach Freigabe. Ältere Quellcode-Ausgaben können abweichen.
+## Probediktat ohne T2med
+
+Öffnen Sie KienzleDoku über das Anwendungsmenü oder am Mac über **Programme → KienzleDoku**. Speichern Sie in den Einstellungen die Adresse Ihres Commanders. Wählen Sie **Testpatient öffnen**, starten Sie die Aufnahme und stoppen Sie sie nach einem kurzen Diktat. Der Commander liefert Transkript und Dokumentationsentwurf für die fiktive Akte. Eine Übergabe an T2med ist in dieser Sitzung gesperrt.
+
+## Aufnahme mit einer T2med-Akte
 
 1. Patientenakte in T2med öffnen und KienzleDoku über den eingerichteten Knopf starten.
 2. **Patientennamen prüfen.** Die Mikrofonaufnahme beginnt beim Aufruf.

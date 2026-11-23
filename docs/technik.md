@@ -2,10 +2,7 @@
 
 [Zur Übersicht](../README.md) · [Installation](installation.md)
 
-Diese Seite beschreibt den aktuellen gemeinsamen Installerstand, dessen
-öffentliche Bereitstellung noch aussteht. Der bisherige Quellcode auf `main`
-kann davon abweichen. Die [archivierte README](archiv/readme-vor-2026-11-15.md)
-bewahrt den bisherigen ausführlichen Dokumentationsstand.
+Diese Seite beschreibt die Komponenten von KienzleDoku 1.8.3. Die ältere technische Beschreibung steht in der [archivierten README](archiv/readme-vor-2026-11-15.md).
 
 ## Aufgaben der Komponenten
 

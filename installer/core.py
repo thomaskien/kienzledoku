@@ -27,7 +27,8 @@ from kienzledoku_document import DEFAULT_DOCUMENT_FIELDS, DOCUMENT_FIELDS, DOCUM
 from kienzledoku_product_key import production_build
 from kienzledoku_config import DEFAULT_COMMANDER_URL
 
-VERSION = '1.8.2'
+VERSION = '1.8.3'
+SEPARATE_CLIENT = (ROOT.parent / 'commander-installer').is_file()
 from installer.options import SERVER_ROLES, ASR_MODELS, roles, local_role
 GRADES = ('basis', 'gruendlich', 'sehr_gruendlich')
 GRADE_LABELS = dict(zip(GRADES, ('Basis', 'Gründlich', 'Sehr gründlich')))
@@ -90,7 +91,7 @@ def huggingface_token(support):
 def defaults(hw=None, support=None):
     hw, support = hw or hardware(), support or support_dir()
     chosen = [m['id'] for m in CATALOG if m['default'] and hw['ram_gib'] >= m['min_ram_gib']]
-    cfg = dict(mode='combined' if hw['server_supported'] else 'client', server_role='full',
+    cfg = dict(mode='server' if SEPARATE_CLIENT else ('combined' if hw['server_supported'] else 'client'), server_role='full',
                connection_mode='connect', t2med_url='https://127.0.0.1:16567/aps/fhir/api/r4',
                t2med_insecure=False, commander_url=DEFAULT_COMMANDER_URL, commander_token='',
                network='local', listen_host='0.0.0.0', auth_enabled=False, server_token='',
@@ -118,6 +119,8 @@ def defaults(hw=None, support=None):
     prompt = support/'commander/prompt.txt'
     if prompt.is_file():
         cfg['prompt'] = prompt.read_text()
+    if SEPARATE_CLIENT and cfg['mode'] == 'client':
+        cfg['mode'] = 'server'
     cfg['hf_token'] = huggingface_token(support)
     return cfg
 
@@ -130,7 +133,7 @@ def bootstrap(hw=None, support=None):
         entry['supported'] = bool(hw['server_supported'] and hw['ram_gib'] >= model['min_ram_gib'])
         entry['reason'] = '' if entry['supported'] else 'Für lokalen Betrieb mindestens %s GB gemeinsamer Arbeitsspeicher erforderlich.' % model['min_ram_gib']
         models.append(entry)
-    return dict(version=VERSION, hardware=hw, models=models,production_key=production_build(ROOT),
+    return dict(version=VERSION, hardware=hw, models=models,separate_client=SEPARATE_CLIENT,production_key=production_build(ROOT),
                 fields=[dict(id=f,label=DOCUMENT_LABELS[f],default=f in DEFAULT_DOCUMENT_FIELDS) for f in DOCUMENT_FIELDS],
                 defaults=defaults(hw,support), default_prompt=(ROOT/'prompt_documentation.txt').read_text(), docs_url=DOCS_URL)
 
@@ -151,6 +154,8 @@ def validate(cfg, hw=None):
     if set(cfg)!=allowed: raise ValueError('Unvollständige oder unbekannte Installationseinstellungen.')
     for field,choices in [('mode',('client','server','combined')),('server_role',tuple(SERVER_ROLES)),('asr_model',ASR_MODELS),('connection_mode',('direct','connect')),('network',('local','lan')),('memory_mode',('serial','parallel')),('diarization_mode',tuple(DIARIZATION_MODES))]:
         if cfg[field] not in choices: raise ValueError('Ungültige Auswahl: '+field)
+    if SEPARATE_CLIENT and cfg['mode'] == 'client':
+        raise ValueError('Dieser Installer richtet den Commander ein. Für den Client KienzleDoku.app nach Programme ziehen.')
     for field in ('t2med_insecure','auth_enabled','asr_on_demand','diarization'):
         if type(cfg[field]) is not bool: raise ValueError('Ungültige Einstellung: '+field)
     for field in SECRET_FIELDS:
@@ -200,7 +205,7 @@ def plan(cfg,hw=None):
     server=cfg['mode']!='client'; client=cfg['mode']!='server'
     llm=server and local_role(cfg,'llm')
     lines=[]
-    if client: lines += ['kienzledoku record und Connect installieren', 'T2med: '+cfg['t2med_url']]
+    if client: lines += ['Arbeitsplatz konfigurieren · KienzleDoku.app nach Programme ziehen' if SEPARATE_CLIENT else 'kienzledoku record und Connect installieren', 'T2med: '+cfg['t2med_url']]
     if server:
         lines += ['Commander installieren: '+('nur auf diesem Mac' if cfg['network']=='local' else 'im Praxisnetz erreichbar'),
                   'Zugangstoken: '+('aktiviert' if cfg['auth_enabled'] else 'ausgeschaltet'),
@@ -243,7 +248,7 @@ def download(url,destination,expected,progress=lambda text:None,cancel=None):
     partial=destination.with_name(destination.name+'.part')
     progress('Download: '+destination.name)
     try:
-        with urlopen(Request(url,headers={'User-Agent':'kienzledoku-installer/1.8.2'}),timeout=60) as response, open(partial,'wb') as target:
+        with urlopen(Request(url,headers={'User-Agent':'kienzledoku-installer/1.8.3'}),timeout=60) as response, open(partial,'wb') as target:
             total=int(response.headers.get('Content-Length') or 0); received=0; last=0
             while True:
                 if cancel and cancel.is_set(): raise InterruptedError('Installation abgebrochen.')
@@ -314,6 +319,14 @@ def commander_toml(cfg,version_root,support):
     return '\n'.join(data)+'\n'
 
 
+def local_commander_url(host, port=8185):
+    if host == '0.0.0.0':
+        host = '127.0.0.1'
+    if host == '::':
+        host = '::1'
+    return 'http://' + ('[' + host + ']' if ':' in host else host) + ':' + str(port)
+
+
 class Installer:
     def __init__(self,support=None,hw=None):
         self.support=Path(support or support_dir()); self.hw=hw or hardware()
@@ -350,11 +363,12 @@ class Installer:
         last_reachable=time.monotonic()
         credentials=json.loads((self.support/'commander/credentials.json').read_text())
         headers={'Authorization':'Bearer '+credentials['KIENZLEDOKU_COMMANDER_TOKEN']} if data['server'].get('auth_enabled') else {}
+        endpoint = local_commander_url(data['server'].get('host','127.0.0.1'), data['server'].get('port',8185))
         announced=None
         while True:
             if self.cancel.is_set():raise InterruptedError('Installation abgebrochen.')
             try:
-                with urlopen(Request('http://127.0.0.1:8185/v1/runtime/status',headers=headers),timeout=2) as response:
+                with urlopen(Request(endpoint + '/v1/runtime/status',headers=headers),timeout=2) as response:
                     status=json.loads(response.read(65536))
                 last_reachable=time.monotonic()
                 if status.get('last_error'):
@@ -362,7 +376,7 @@ class Installer:
                 loaded=status.get('loaded',{})
                 missing=required-{role for role in required if loaded.get(role)}
                 if not missing and not status.get('transition_running'):
-                    with urlopen(Request('http://127.0.0.1:8185/health',headers=headers),timeout=2) as response:
+                    with urlopen(Request(endpoint + '/health',headers=headers),timeout=2) as response:
                         if response.status==200:return
                 names={'asr':'Whisper','diar':'Sprechertrennung','llm':'LLM'}
                 message='Commander erreichbar – Modelle werden geladen: '+', '.join(names[r] for r in ('asr','diar','llm') if r in missing)
@@ -409,8 +423,8 @@ class Installer:
         from installer.update_macos import update_guard, preserve_unselected, stop_idle_launchers
         try:
             with update_guard(self.support):
-                self._preserved_versions=preserve_unselected(self.support,Path.home(),cfg['mode']!='client',cfg['mode']!='server')
-                if cfg['mode']!='server':stop_idle_launchers(Path.home())
+                self._preserved_versions=preserve_unselected(self.support,Path.home(),cfg['mode']!='client',cfg['mode']!='server' and not SEPARATE_CLIENT)
+                if cfg['mode']!='server' and not SEPARATE_CLIENT:stop_idle_launchers(Path.home())
                 self._update_guard_held=True
                 try:self._work_locked(cfg)
                 finally:self._update_guard_held=False
@@ -429,7 +443,9 @@ class Installer:
             client_files=('kienzledoku_window','kienzleconnect','kienzledoku_record_app','kienzledoku_connect_app')
             if production_build(ROOT):
                 client_files+=('libkienzledoku_product.dylib','release.json')
-            if client:
+            if SEPARATE_CLIENT:
+                client_files = ()
+            if client and not SEPARATE_CLIENT:
                 for name in client_files:
                     if not (ROOT/name).is_file():
                         raise RuntimeError('Installationspaket unvollständig: '+name+' fehlt. Bitte einen korrigierten Installer verwenden.')
@@ -451,17 +467,24 @@ class Installer:
                 shutil.copytree(ROOT/name,version/name,ignore=shutil.ignore_patterns('__pycache__','*.pyc'))
             for name in ('LICENSE','NOTICE','prompt_documentation.txt','requirements-asr-client.txt',*client_files):
                 if (ROOT/name).is_file(): shutil.copy2(ROOT/name,version/name)
-            self.report('Eigene Python-Laufzeit bereitstellen',7)
-            packaged=ROOT.parent/'runtime/python'
-            if not packaged.is_dir():
-                archive=self.support/'downloads/python.tar.gz'; info=LOCKS['python_'+self.hw['arch']]
-                download(info['url'],archive,info['sha256'],self.report,self.cancel)
-                extract_archive(archive,version/'runtime'); python=version/'runtime/python/bin/python3.12'
+            if SEPARATE_CLIENT:
+                self.report('Externes Python 3.12 für Commander verwenden', 7)
+                if (sys.version_info[:2] != (3, 12) or platform.machine() != 'arm64'
+                        or sys.implementation.name != 'cpython' or sys.prefix != sys.base_prefix):
+                    raise RuntimeError('Für den Commander wird ein natives externes CPython 3.12 benötigt.')
+                python = Path(sys.executable)
             else:
-                shutil.copytree(packaged,version/'runtime/python',symlinks=True)
-                python=version/'runtime/python/bin/python3.12'
+                self.report('Eigene Python-Laufzeit bereitstellen',7)
+                packaged=ROOT.parent/'runtime/python'
+                if not packaged.is_dir():
+                    archive=self.support/'downloads/python.tar.gz'; info=LOCKS['python_'+self.hw['arch']]
+                    download(info['url'],archive,info['sha256'],self.report,self.cancel)
+                    extract_archive(archive,version/'runtime'); python=version/'runtime/python/bin/python3.12'
+                else:
+                    shutil.copytree(packaged,version/'runtime/python',symlinks=True)
+                    python=version/'runtime/python/bin/python3.12'
             self.run([python,'-m','venv',version/'venv']); runtime=version/'venv/bin/python'
-            if client:
+            if client and not SEPARATE_CLIENT:
                 self.report('Client-Komponenten einrichten',12)
                 wheelhouse=ROOT.parent/'wheelhouse'
                 options=['--no-index','--find-links',wheelhouse] if wheelhouse.is_dir() else []
@@ -503,7 +526,7 @@ class Installer:
             self.report('Alte Programmstände und Starter bereinigen',95)
             from installer.update_macos import complete_update
             complete_update(self.support,Path.home(),version,preserved=getattr(self,'_preserved_versions',{}),
-                            expected_roles=(('record','connect') if client else ())+ (('commander',) if server else ()))
+                            keep_legacy_client=SEPARATE_CLIENT, expected_roles=(('record','connect') if client and not SEPARATE_CLIENT else ())+ (('commander',) if server else ()))
             self.report('Installation abgeschlossen',100)
             server_host='127.0.0.1'
             if cfg['network']=='lan':
@@ -523,10 +546,11 @@ class Installer:
     def _activate(self,cfg,version,runtime,server,client):
         if not getattr(self,'_update_guard_held',False):require_closed_record(self.support)
         import kienzledoku_config as record
-        client_cfg=record.load(self.support/'config.toml')
-        client_cfg['connection'].update(mode=cfg['connection_mode'],target=cfg['t2med_url'],allow_insecure_tls=cfg['t2med_insecure'])
-        client_cfg['commander'].update(enabled=True,url='http://127.0.0.1:8185' if server else cfg['commander_url'],token_file='')
-        client_cfg['record']['diarization']=cfg['diarization']
+        if client:
+            client_cfg=record.load(self.support/'config.toml')
+            client_cfg['connection'].update(mode=cfg['connection_mode'],target=cfg['t2med_url'],allow_insecure_tls=cfg['t2med_insecure'])
+            client_cfg['commander'].update(enabled=True,url=local_commander_url(cfg['listen_host'] if cfg['network']=='lan' else '127.0.0.1') if server else cfg['commander_url'],token_file='')
+            client_cfg['record']['diarization']=cfg['diarization']
         commander=self.support/'commander'; commander.mkdir(exist_ok=True,mode=0o700)
         credentials_path=commander/'credentials.json'
         credentials=json.loads(credentials_path.read_text()) if credentials_path.exists() else {}
@@ -543,7 +567,7 @@ class Installer:
         if not cfg['remote_llm_url']: credentials.pop('KIENZLEDOKU_REMOTE_LLM_TOKEN',None)
         # Build apps before publishing new settings.
         pending=[]
-        if client:
+        if client and not SEPARATE_CLIENT:
             for mode in ('record','connect'):
                 pending.append(self._app(version,runtime,mode))
         candidate=version/'commander-candidate.toml'

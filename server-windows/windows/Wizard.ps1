@@ -9,6 +9,7 @@ trap {
 }
 Import-Module (Join-Path $PSScriptRoot 'Core.psm1') -Force
 if($ResultFile){Write-Json $ResultFile @{completed=$false};Set-PrivateFile $ResultFile}
+. (Join-Path $PSScriptRoot 'WizardError.ps1')
 . (Join-Path $PSScriptRoot 'CommanderOptions.ps1')
 $script:CommanderOptions=$null
 $script:InstallerVersion=Get-InstallerVersion
@@ -37,6 +38,9 @@ $script:Form.MinimumSize=New-Object Drawing.Size(936,787)
 $script:Form.StartPosition='CenterScreen'
 $script:Form.Font=New-Object Drawing.Font('Segoe UI',10)
 $script:Form.BackColor=[Drawing.Color]::White
+$script:InputErrors=New-Object Windows.Forms.ErrorProvider
+$script:InputErrors.ContainerControl=$script:Form
+$script:InputErrors.BlinkStyle='NeverBlink'
 $script:Form.AutoScaleMode=[Windows.Forms.AutoScaleMode]::Dpi
 $header=New-Object Windows.Forms.Panel;$header.Dock='Top';$header.Height=100;$header.BackColor=[Drawing.Color]::FromArgb(22,49,70)
 $script:Form.Controls.Add($header)
@@ -119,7 +123,7 @@ $script:HfToken=TextBox $p '' 24 ($y+116) 860
 $script:HfToken.UseSystemPasswordChar=$true
 if($env:HF_TOKEN){$script:HfToken.Text=$env:HF_TOKEN}
 elseif(Test-Path (Join-Path $env:USERPROFILE '.cache/huggingface/token')){$script:HfToken.Text=([string](Get-Content (Join-Path $env:USERPROFILE '.cache/huggingface/token') -Raw)).Trim()}
-if($script:Previous -and $script:Previous.TokenFile -and (Test-Path -LiteralPath $script:Previous.TokenFile)){$script:HfToken.Text=(Get-Content -LiteralPath $script:Previous.TokenFile -Raw).Trim()}
+if($script:Previous -and $script:Previous.TokenFile -and (Test-Path -LiteralPath $script:Previous.TokenFile)){$script:HfToken.Text=([string](Get-Content -LiteralPath $script:Previous.TokenFile -Raw)).Trim()}
 $null=Label $p 'Der Zugriff wird geprüft. Die Bedingungen für pyannote Community-1 müssen im HF-Konto akzeptiert sein.' 24 ($y+157) 850 40
 $link=New-Object Windows.Forms.LinkLabel;$link.Text='pyannote-Modellseite öffnen';$link.Location=New-Object Drawing.Point(24,($y+202));$link.Size=New-Object Drawing.Size(400,26);$p.Controls.Add($link)
 $link.Add_LinkClicked({Start-Process 'https://huggingface.co/pyannote/speaker-diarization-community-1'})
@@ -211,7 +215,7 @@ function Update-ParallelModels([string]$Preferred='__keep__') {
     $index=[Array]::IndexOf($script:ParallelIds,$Preferred)
     $script:Parallel.SelectedIndex=[math]::Max(0,$index)
 }
-function Source-Roots { @($script:Cache.Text.Trim())+@($script:Sources.Lines | ForEach-Object {$_.Trim()} | Where-Object {$_}) }
+function Source-Roots { @(([string]$script:Cache.Text).Trim())+@($script:Sources.Lines | ForEach-Object {([string]$_).Trim()} | Where-Object {$_}) }
 function Refresh-Inventory([switch]$IncludeNetwork) {
     $script:Inventory.Items.Clear()
     try{
@@ -238,27 +242,31 @@ function Update-Reserve {
     $script:Reserve.ForeColor=[Drawing.Color]::DarkGreen;if($remaining -lt 4){$script:Reserve.ForeColor=[Drawing.Color]::Firebrick}
 }
 function Build-Config {
-    $models=@(Selected-Models);if(-not $models.Count){throw 'Mindestens ein Modell auswählen.'}
-    if(-not $script:HfToken.Text.Trim()){throw 'Hugging-Face-Token eingeben.'}
-    $cache=[IO.Path]::GetFullPath($script:Cache.Text.Trim())
-    if(-not [IO.Path]::IsPathRooted($cache)){throw 'Absolutes Modellverzeichnis erforderlich.'}
+    $models=@(Selected-Models);if(-not $models.Count){Stop-WizardInput 'Mindestens ein Modell auswählen.' 1 $script:ModelChecks[$script:ModelOrder[0]]}
+    if(-not ([string]$script:HfToken.Text).Trim()){Stop-WizardInput 'Hugging-Face-Token eingeben.' 1 $script:HfToken}
+    $cache=([string]$script:Cache.Text).Trim()
+    if(-not $cache -or -not [IO.Path]::IsPathRooted($cache)){Stop-WizardInput 'Bitte einen vollständigen Pfad für das Modellarchiv eingeben.' 0 $script:Cache}
+    try{$cache=[IO.Path]::GetFullPath($cache)}catch{Stop-WizardInput 'Bitte den Pfad für das Modellarchiv prüfen.' 0 $script:Cache}
+    $installPath=([string]$script:InstallPath.Text).Trim()
+    if(-not $installPath -or -not [IO.Path]::IsPathRooted($installPath)){Stop-WizardInput 'Bitte einen vollständigen Installationspfad eingeben.' 2 $script:InstallPath}
+    try{$installPath=[IO.Path]::GetFullPath($installPath)}catch{Stop-WizardInput 'Bitte den Installationspfad prüfen.' 2 $script:InstallPath}
     $values=@(16,24,28,32);$gpuIndex=0
-    $network='local';$address='';if($script:Lan.Checked){$network='lan';if(-not $script:Address.SelectedItem){throw 'Netzwerk-IP auswählen.'};$address=($script:Address.SelectedItem -split ' — ')[0]}
+    $network='local';$address='';if($script:Lan.Checked){$network='lan';if(-not $script:Address.SelectedItem){Stop-WizardInput 'Netzwerk-IP auswählen.' 3 $script:Address};$address=($script:Address.SelectedItem -split ' — ')[0]}
     $audio='ram';if($script:DiskCache.Checked){$audio='disk'}
     $cfg=[ordered]@{Version=$script:InstallerVersion;Models=$models;DefaultModel=[string]$script:Default.SelectedItem;
         WslRamGiB=$values[$script:Ram.SelectedIndex];Mode='selected';ParallelModel=(Selected-ParallelModel);AudioCache=$audio;
         GpuIndex=$gpuIndex;Profiles=@{};CacheDirectory=$cache;Sources=@(Source-Roots | Select-Object -Skip 1);
-        InstallDirectory=[IO.Path]::GetFullPath($script:InstallPath.Text.Trim());StateDirectory=$script:State;
+        InstallDirectory=$installPath;StateDirectory=$script:State;
         TokenFile=(Join-Path $script:State 'hf.token');NetworkMode=$network;NetworkAddress=$address;NetworkRemove=$false;
         Autostart=$script:Autostart.Checked;StartAfterInstall=$script:StartAfter.Checked;Verify=$script:Verify.Checked;
         VerifyModelFiles=$script:VerifyFiles.Checked;CleanupModelStaging=$script:CleanupStages.Checked;
         ForceModelVerification=($script:VerifyFiles.Checked -and $script:RecheckModels.Checked)}
     if($script:InstallRadio.Checked){
         if(-not $script:Hardware -or $script:Hardware.Build -lt 22000 -or $script:Hardware.Architecture -ne 'AMD64'){throw 'Windows 11 x64 mit funktionsfähigem NVIDIA-Treiber erforderlich.'}
-        if($script:Gpu.SelectedIndex -lt 0){throw 'NVIDIA-GPU fehlt. Windows-Treiber installieren; Downloadmodus bleibt verfügbar.'}
+        if($script:Gpu.SelectedIndex -lt 0){Stop-WizardInput 'NVIDIA-GPU fehlt. Windows-Treiber installieren; Downloadmodus bleibt verfügbar.' 2 $script:Gpu}
         $g=$script:Hardware.Gpus[$script:Gpu.SelectedIndex];$cfg.GpuIndex=$g.Index
-        if(($script:Hardware.RamBytes/1GB)-$cfg.WslRamGiB -lt 3.5){throw 'Etwa 4 GiB Reserve für Windows erforderlich. Kleinere WSL-Stufe auswählen.'}
-        if(Test-NetworkPath $cfg.InstallDirectory){throw 'Aktive WSL-Umgebung auf einem lokalen Laufwerk installieren. Netzlaufwerke sind als Modellquelle erlaubt.'}
+        if(($script:Hardware.RamBytes/1GB)-$cfg.WslRamGiB -lt 3.5){Stop-WizardInput 'Etwa 4 GiB Reserve für Windows erforderlich. Kleinere WSL-Stufe auswählen.' 2 $script:Ram}
+        if(Test-NetworkPath $cfg.InstallDirectory){Stop-WizardInput 'Aktive WSL-Umgebung auf einem lokalen Laufwerk installieren. Netzlaufwerke sind als Modellquelle erlaubt.' 2 $script:InstallPath}
         $cfg.Profiles=Get-ProfilePlan $script:Catalog $models $cfg.DefaultModel $cfg.Mode $g.VramMiB $cfg.WslRamGiB $audio $cfg.ParallelModel
     }
     if($script:CommanderOptions){foreach($property in $script:CommanderOptions.PSObject.Properties){$cfg[$property.Name]=$property.Value}}
@@ -273,26 +281,46 @@ function Show-Page([int]$Index){
     $script:Step.Text=$labels[$Index]
 }
 $script:Next.Add_Click({
-    try{
-        switch($script:Page){
-            0{Refresh-Inventory;Show-Page 1}
-            1{if(-not @(Selected-Models).Count){throw 'Mindestens ein Modell auswählen.'};if($script:DownloadRadio.Checked){$script:Cfg=Build-Config;Prepare-Summary;Show-Page 4}else{Update-Reserve;Show-Page 2}}
-            2{if($script:Gpu.SelectedIndex -lt 0){throw 'NVIDIA-Treiber/GPU fehlt.'};Show-Page 3}
-            3{$saved=$script:CommanderOptions;if(-not $saved){$saved=$script:Previous};$chosen=Show-CommanderOptions @(Selected-Models) $saved;if($null -ne $chosen){$script:CommanderOptions=$chosen;$script:Cfg=Build-Config;Prepare-Summary;Show-Page 4}}
-            4{Start-Operation}
+    $step='Eingaben prüfen'
+    $heading='Die Eingaben konnten nicht geprüft werden.'
+    $beforeStart=$script:Page -lt 4
+    try {
+        $script:InputErrors.Clear()
+        switch($script:Page) {
+            0 { Refresh-Inventory; Show-Page 1 }
+            1 {
+                if(-not @(Selected-Models).Count){Stop-WizardInput 'Mindestens ein Modell auswählen.' 1 $script:ModelChecks[$script:ModelOrder[0]]}
+                if($script:DownloadRadio.Checked){$script:Cfg=Build-Config; Prepare-Summary; Show-Page 4}
+                else{Update-Reserve; Show-Page 2}
+            }
+            2 {
+                if($script:Gpu.SelectedIndex -lt 0){Stop-WizardInput 'NVIDIA-Treiber/GPU fehlt.' 2 $script:Gpu}
+                Show-Page 3
+            }
+            3 {
+                $step='Commander-Einstellungen öffnen'
+                $heading='Die Commander-Einstellungen konnten nicht geöffnet werden.'
+                $saved=$script:CommanderOptions
+                if(-not $saved){$saved=$script:Previous}
+                $chosen=Show-CommanderOptions @(Selected-Models) $saved
+                if($null -eq $chosen){return}
+                $script:CommanderOptions=$chosen
+                $step='Installationskonfiguration zusammenstellen'
+                $heading='Die Installationskonfiguration konnte nicht erstellt werden.'
+                $script:Cfg=Build-Config
+                $step='Zusammenfassung anzeigen'
+                $heading='Die Zusammenfassung konnte nicht angezeigt werden.'
+                Prepare-Summary
+                Show-Page 4
+            }
+            4 {
+                $step='Installation oder Download starten'
+                $heading='Beim Start des gewählten Vorgangs ist ein Fehler aufgetreten.'
+                Start-Operation
+            }
         }
-    }catch{
-        $failure=$_;$message=$failure.Exception.Message
-        # Failures before the engine starts (including private-file permissions)
-        # must also leave a useful log, without recording the visible HF token.
-        try {
-            [IO.Directory]::CreateDirectory($script:State)|Out-Null
-            $detail='[{0}] Installer {1}: {2}; Fehlerkennung: {3}; Aufrufstelle: {4}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'),$script:InstallerVersion,$message,$failure.FullyQualifiedErrorId,$failure.ScriptStackTrace
-            $secret=$script:HfToken.Text.Trim()
-            if($secret){$detail=$detail.Replace($secret,'[Token ausgelassen]');$message=$message.Replace($secret,'[Token ausgelassen]')}
-            Add-Content -LiteralPath (Join-Path $script:State 'installation.log') -Value $detail -Encoding UTF8
-        }catch{}
-        [Windows.Forms.MessageBox]::Show($message,'Bitte prüfen','OK','Warning')|Out-Null
+    } catch {
+        Show-WizardProblem $_ $step $heading $script:Form @($script:HfToken.Text) -BeforeStart:$beforeStart
     }
 })
 $script:Back.Add_Click({$next=$script:Page-1;if($script:Page -eq 4 -and $script:DownloadRadio.Checked){$next=1};Show-Page $next})
@@ -325,7 +353,7 @@ function Start-Operation {
     [IO.Directory]::CreateDirectory($script:State)|Out-Null
     $config=Join-Path $script:State 'pending-install.json'
     Write-Json $config $script:Cfg;Set-PrivateFile $config
-    [IO.File]::WriteAllText($script:Cfg.TokenFile,$script:HfToken.Text.Trim(),(New-Object Text.UTF8Encoding($false)));Set-PrivateFile $script:Cfg.TokenFile
+    [IO.File]::WriteAllText($script:Cfg.TokenFile,([string]$script:HfToken.Text).Trim(),(New-Object Text.UTF8Encoding($false)));Set-PrivateFile $script:Cfg.TokenFile
     Remove-Item -LiteralPath (Join-Path $script:State 'progress.json') -Force -ErrorAction SilentlyContinue
     $operation='Install';if($script:DownloadRadio.Checked){$operation='Download'}
     $arguments='-NoProfile -ExecutionPolicy Bypass -File "{0}" -Action {1} -ConfigPath "{2}"' -f (Join-Path $PSScriptRoot 'Engine.ps1'),$operation,$config
@@ -356,7 +384,7 @@ $script:Timer.Add_Tick({
             $script:Cancel.Text='Schließen';$script:Cancel.Enabled=$true;$progress=$null
             if(Test-Path -LiteralPath $path){try{$progress=Read-Json $path}catch{}}
             $exitCode=Get-FinishedProcessExitCode $script:Process
-            $result=Get-OperationResult $progress $exitCode $script:StderrPath $script:StdoutPath $script:HfToken.Text.Trim()
+            $result=Get-OperationResult $progress $exitCode $script:StderrPath $script:StdoutPath ([string]$script:HfToken.Text).Trim()
             $success=$result.Success;$message=$result.Message
             if(-not $success){
                 try{Add-Content -LiteralPath $log -Encoding UTF8 -Value ('[{0}] {1}' -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'),$message)}catch{}
@@ -405,5 +433,5 @@ if($script:Previous){
 Update-ParallelModels $preferred
 Update-Reserve;Refresh-Inventory;Show-Page 0
 $null=$script:Form.ShowDialog()
-$script:Timer.Dispose();$script:Form.Dispose()
+$script:Timer.Dispose();$script:InputErrors.Dispose();$script:Form.Dispose()
 $script:WizardMutex.ReleaseMutex();$script:WizardMutex.Dispose()

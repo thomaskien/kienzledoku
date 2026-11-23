@@ -1,11 +1,13 @@
-# kienzledoku 1.8.1 für Windows x64
+# kienzledoku 1.8.3 für Windows x64
 
-`kienzledoku-1.8.1-windows-x64-setup.exe` öffnen und **Client**, **Server** oder
+`kienzledoku-1.8.3-windows-x64-setup.exe` öffnen und **Client**, **Server** oder
 **Client und Server** wählen. Die Vorbereitung wird sofort sichtbar angezeigt;
 anschließend führt derselbe Wizard-Aufbau wie auf dem Mac durch Komponenten,
 Verbindungen, Modelle, Dokumentation und Zusammenfassung. Erst danach beginnt
 die Installation mit laufender Statusanzeige. Ein erforderlicher Windows-Neustart unterbricht den Ablauf;
 danach dieselbe EXE erneut starten. Vorhandene Modellarchive werden wiederverwendet.
+
+Für ein Probediktat in den Record-Einstellungen **Testpatient öffnen** wählen. Aufnahme, Transkription und Dokumentation verwenden den eingerichteten Commander und benötigen keine T2med-Verbindung.
 
 Client: Windows 10/11 x64, Mikrofon, Microsoft Edge WebView2 und Microsoft Visual C++
 v14 Redistributable **x64** für die lokale Sprachaktivitätserkennung. Python, PortAudio,
@@ -19,6 +21,8 @@ Ein erforderlicher Neustart wird ausdrücklich angezeigt. Die Python-Abhängigke
 werden beim Build einschließlich Windows-spezifischer Anforderungen geprüft.
 Server: Windows 11 x64, WSL2, NVIDIA mit Compute Capability 7.5 oder neuer, mindestens 4 GiB VRAM,
 ausreichend RAM und Speicherplatz. Die KI-Modelle werden nur nach Auswahl geladen.
+
+Bei einem Fehler zeigt der Windows-Assistent den betroffenen Schritt. Über „Fehlerdetails kopieren“ lassen sich Version und Diagnose weitergeben.
 
 Der Assistent verwendet das mit Windows gelieferte Windows PowerShell 5.1 und
 WebView2 für die gemeinsame Oberfläche. Windows Forms zeigt die Vorbereitung

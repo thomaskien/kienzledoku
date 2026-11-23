@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""kienzledoku record 1.8.2 <-> T2med FHIR client.
+"""kienzledoku record 1.8.3 <-> T2med FHIR client.
 
 Target: Python 3.9+ (macOS, Ubuntu 24.04 LTS) and bundled Python 3.12 (Windows).
 Platform-independent FHIR/UI core with optional compiled Connect transport.
@@ -67,7 +67,7 @@ from kienzledoku_speech import (
 )
 
 APP_NAME = "kienzledoku record"
-VERSION = "1.8.2"
+VERSION = "1.8.3"
 LINUX_NATIVE_WINDOW_PATH = "/usr/local/libexec/kienzledoku/kienzledoku_window_linux"
 
 # Public test/demo key from T2med's reference application (not a secret).
@@ -817,7 +817,8 @@ def encounter_summary(encounter):
 
 
 class SessionState(object):
-    def __init__(self, link_data, client, key_source):
+    def __init__(self, link_data, client, key_source, test_patient=False):
+        self.test_patient = test_patient
         self.link_data = link_data
         self.client = client
         self.key_source = key_source
@@ -1128,6 +1129,8 @@ def page_html(state):
             ) % (' disabled' if not profiles else '', ''.join(options))
 
     status_notices = []
+    if state.test_patient:
+        status_notices.append('<div class="notice" role="status"><strong>Testpatient</strong> · Diktat und Zusammenfassung ausprobieren. Der Entwurf wird beim Schließen verworfen.</div>')
     if state.error:
         status_notices.append(
             '<div class="notice err"><strong>Fehler:</strong> %s</div>'
@@ -1240,6 +1243,29 @@ def page_html(state):
         single_selected = (
             " selected" if state.output_mode == OUTPUT_MODE_SINGLE else ""
         )
+        document_editor = '<div class="documentation-grid">%s</div>' % documentation_fields
+        if not state.test_patient:
+            document_editor = """
+              <form method="post" action="/action">
+                <input type="hidden" name="csrf" value="{csrf}">
+                <input type="hidden" name="do" value="write">
+                <div class="documentation-grid">{documentation_fields}</div>
+                <details class="output-options">
+                  <summary>T2med-Ausgabe konfigurieren</summary>
+                  <div class="mode-grid">
+                    <div><label for="output_mode">Ausgabeform</label><select id="output_mode" name="output_mode">
+                      <option value="structured"{structured_selected}>Strukturierte Einträge</option>
+                      <option value="single"{single_selected}>Ein gemeinsamer Freitext-Eintrag</option>
+                    </select></div>
+                    <div><label for="single_code">Kürzel des Einzelblocks</label><input id="single_code" name="single_code" maxlength="20" value="{single_code}" list="single-code-options" autocomplete="off">
+                    <datalist id="single-code-options"><option value="A"><option value="KI"><option value="AI"></datalist></div>
+                  </div>
+                </details>
+                <div class="button-row"><span class="small">Die Übernahme schreibt direkt in T2med.</span>
+                  <button type="submit">In T2med übernehmen</button></div>
+              </form>""".format(csrf=html.escape(state.csrf), documentation_fields=documentation_fields,
+                            structured_selected=structured_selected, single_selected=single_selected,
+                            single_code=html.escape(state.single_code))
         workspace = """
         <section class="workspace">
           <div class="work-grid">
@@ -1261,24 +1287,7 @@ def page_html(state):
             </div>
             <div class="panel">
               <div class="panel-head"><h2>LLM-Dokumentation</h2><span class="small">{quality_result}</span></div>
-              <form method="post" action="/action">
-                <input type="hidden" name="csrf" value="{csrf}">
-                <input type="hidden" name="do" value="write">
-                <div class="documentation-grid">{documentation_fields}</div>
-                <details class="output-options">
-                  <summary>T2med-Ausgabe konfigurieren</summary>
-                  <div class="mode-grid">
-                    <div><label for="output_mode">Ausgabeform</label><select id="output_mode" name="output_mode">
-                      <option value="structured"{structured_selected}>Strukturierte Einträge</option>
-                      <option value="single"{single_selected}>Ein gemeinsamer Freitext-Eintrag</option>
-                    </select></div>
-                    <div><label for="single_code">Kürzel des Einzelblocks</label><input id="single_code" name="single_code" maxlength="20" value="{single_code}" list="single-code-options" autocomplete="off">
-                    <datalist id="single-code-options"><option value="A"><option value="KI"><option value="AI"></datalist></div>
-                  </div>
-                </details>
-                <div class="button-row"><span class="small">Die Übernahme schreibt direkt in T2med.</span>
-                  <button type="submit">In T2med übernehmen</button></div>
-              </form>
+              {document_editor}
             </div>
           </div>
         </section>
@@ -1291,10 +1300,7 @@ def page_html(state):
             quality_result=html.escape(quality_result),
             continue_label=continue_label,
             regenerate_disabled=regenerate_disabled,
-            documentation_fields=documentation_fields,
-            structured_selected=structured_selected,
-            single_selected=single_selected,
-            single_code=html.escape(state.single_code),
+            document_editor=document_editor,
         )
 
     audio_controls = """
@@ -1581,11 +1587,12 @@ def page_html(state):
         'patient-birth': data.patient_birth || '—',
         'patient-id': patient.id || '—',
         'patient-gender': patient.gender || '—',
-      }})) document.getElementById(id).textContent = value;
+      }})) {{ const element = document.getElementById(id); if (element) element.textContent = value; }}
       const patientError = document.getElementById('patient-error');
       patientError.textContent = data.patient_error || '';
       patientError.hidden = !data.patient_error;
-      document.getElementById('t2med-server').title = data.t2med_message || '';
+      const badge = document.getElementById('t2med-server');
+      if (badge) badge.title = data.t2med_message || '';
     }} catch (_error) {{}}
   }}
   window.setInterval(updateStatus, 500);
@@ -1595,7 +1602,7 @@ def page_html(state):
         css=CSS + (WINDOWS_STATUS_CSS if WINDOWS_STATUS_LAYOUT else ''),
         status_layout_script=WINDOWS_STATUS_JS if WINDOWS_STATUS_LAYOUT else '',
         status_layout_update='fitStatusHeader();' if WINDOWS_STATUS_LAYOUT else '',
-        t2med_badge=t2med_badge,
+        t2med_badge='' if state.test_patient else t2med_badge,
         asr_badge=asr_badge,
         diarization_badge=diarization_badge,
         llm_badge=llm_badge,
@@ -1604,7 +1611,7 @@ def page_html(state):
         status_notices=status_notices,
         workspace=workspace,
         audio_controls=audio_controls,
-        technical=technical,
+        technical='' if state.test_patient else technical,
         csrf=html.escape(state.csrf),
         csrf_json=json.dumps(state.csrf),
         temperature_badges=''.join('<span class="server-badge gpu-temperature" title="%s">GPU %s °C</span>' %
@@ -1855,6 +1862,9 @@ def make_handler(state):
                 try:
                     if state.write_succeeded or state.completed_event.is_set() or state.closing:
                         raise ValueError('Dieser Vorgang wird geschlossen')
+                    if state.test_patient and action in ('write', 'write_resolved', 'patient', 'encounter'):
+                        self._send_html("Der Testpatient hat keine T2med-Akte.", 403)
+                        return
                     if action == 'speech_audio_controls':
                         try:
                             raw = form.get('vad_enabled') or []
@@ -2022,7 +2032,32 @@ def run_session(deep_link, no_browser=False):
         from kienzledoku_product_key import production_build
         key_source = ('In Connect eingebetteter KienzleDoku-Hersteller-Key' if production_build()
                       else 'In Connect eingebetteter Key (Demo-Build)')
-    state = SessionState(link, client, key_source)
+    try:
+        run_record_window(SessionState(link, client, key_source), cfg, no_browser)
+    finally:
+        client.close()
+        unregister_window()
+
+
+def run_test_patient(no_browser=False):
+    patient = {"resourceType": "Patient", "id": "testpatient",
+               "name": [{"family": "Testpatient", "given": ["Toni"]}], "birthDate": "1980-01-01"}
+    try:
+        acquire_record_session()
+    except ActiveSessionError as active:
+        show_patient_conflict(active, patient_summary(patient), no_browser=no_browser)
+        return
+    try:
+        state = SessionState({}, None, "", test_patient=True)
+        state.patient = patient
+        state.t2med_status = "disabled"
+        state.t2med_message = "Die Testsitzung verwendet keine T2med-Akte."
+        run_record_window(state, record_config.load(), no_browser)
+    finally:
+        unregister_window()
+
+
+def run_record_window(state, cfg, no_browser):
     state.output_mode = cfg['record']['output_mode']
     state.single_code = cfg['record']['single_code']
     def accept_speech_document(document):
@@ -2041,10 +2076,12 @@ def run_session(deep_link, no_browser=False):
     if state.speech.commander:
         try:
             state.speech.load_documentation_settings()
-        except Exception:
-            client.close()
-            unregister_window()
-            raise
+        except Exception as exc:
+            if not state.test_patient:
+                raise
+            state.error = "Commander-Einstellungen konnten nicht geladen werden. Bitte Commander-Zugang prüfen und den Testpatienten erneut öffnen."
+            state.speech.config_error = state.error
+            safe_log("Testpatient Commander unavailable", error=type(exc).__name__)
     state.active_fields = tuple(state.speech.active_fields)
     state.documentation = empty_documentation(state.active_fields)
     safe_log(
@@ -2079,21 +2116,20 @@ def run_session(deep_link, no_browser=False):
             state.ui_process, window_kind = open_ui_window(
                 url, os.path.dirname(os.path.abspath(__file__))
             )
-            register_window(link, state.ui_process)
+            register_window(state.link_data, state.ui_process)
             safe_log("UI window open requested", window=window_kind, ui_port=port)
         except Exception as exc:
             safe_log("UI window open failed", error=type(exc).__name__, ui_port=port)
             state.closing = True
             state.speech.cancel()
-            client.close()
             server.shutdown(); server.server_close()
-            unregister_window()
             raise
     else:
         safe_log("Browser suppressed", ui_port=port)
-        print(url)
+        print(url, flush=True)
 
-    start_initial_work(state)
+    if not state.test_patient:
+        start_initial_work(state)
 
     # The open window owns the RAM-only work. There is deliberately no timeout.
     try:
@@ -2109,11 +2145,9 @@ def run_session(deep_link, no_browser=False):
         if state.speech is not None:
             state.closing = True
             state.speech.cancel()
-        client.close()
         close_ui_window(state)
         server.shutdown()
         server.server_close()
-        unregister_window()
         profile = getattr(state.ui_process, 'record_profile', None)
         if profile:
             shutil.rmtree(profile, ignore_errors=True)
@@ -2279,6 +2313,16 @@ def main():
         from kienzledoku_update import Lease
         with Lease(record_config.config_dir() / 'update.lock'):
             saved = run_settings(no_browser=args.no_browser, window_opener=open_ui_window, setup=args.setup)
+        if args.settings and saved == 'uninstall':
+            return 68  # Native launcher confirms removal after releasing the settings lease.
+        if saved == 'test_patient':
+            try:
+                run_test_patient(no_browser=args.no_browser)
+            except Exception as exc:
+                safe_log("Testpatient start failed", error=type(exc).__name__)
+                if not args.no_browser:
+                    notify_start_failure(exc)
+                return 1
         return 1 if args.setup and not saved else 0
     deep_link = args.deep_link
     if args.deep_link_stdin:
@@ -2302,7 +2346,7 @@ def main():
         print("kienzledoku record: %s" % exc, file=sys.stderr)
         if sys.platform == 'win32':
             import ctypes
-            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.8.2', 0x10)
+            ctypes.windll.user32.MessageBoxW(None, str(exc), 'kienzledoku record 1.8.3', 0x10)
         if not args.no_browser:
             notify_start_failure(exc)
         return 1

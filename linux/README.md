@@ -1,4 +1,4 @@
-# kienzledoku 1.8.2 für Ubuntu 24.04/26.04 x86_64
+# kienzledoku 1.8.3 für Ubuntu 24.04/26.04 x86_64
 
 Das Archiv entpacken, ein Terminal im entpackten Ordner öffnen und ausführen:
 
@@ -11,6 +11,10 @@ starten. Nur der Server-Helfer fordert dann bei Bedarf Administratorrechte über
 sudo an. Ein Root-Start ist ausschließlich für **server** erlaubt; dort wird
 kein weiteres sudo verwendet. Client und Server können auf demselben Rechner
 laufen.
+
+Für ein Probediktat Record im Anwendungsmenü starten und in den Einstellungen
+**Testpatient öffnen** wählen. Mit der gespeicherten Commander-Adresse lassen sich
+Aufnahme, Transkription und Dokumentation ohne T2med ausprobieren.
 
 Serverauswahl als normaler Benutzer (sudo wird nur für den geschützten
 Server-Schritt aufgerufen):
@@ -43,7 +47,7 @@ vorgeladen. Der Commander läuft als systemd-Dienst. Status:
 T2med-Aktivierung: **Drittanbieter-Zugriffe verwalten → Per Produktcode aktivieren →
 Produktcode `kienzledoku` eingeben und bestätigen**. Danach erscheint
 **Dr. Thomas Kienzle - KienzleDoku** mit einem **grünen Statuspunkt**.
-Das Linux-Paket 1.8.2 enthält den endgültigen Hersteller-Key in kompilierten
+Das Linux-Paket 1.8.3 enthält den endgültigen Hersteller-Key in kompilierten
 Binärdateien. Für die URL den aktivierten **KienzleDoku**-Eintrag verwenden.
 Öffentliche Quellcode-Builds ohne privaten Build-Eingang verwenden weiterhin den Demo-Key. Die verlinkte GitHub-Anleitung zeigt alle Schritte mit Bildern.
 

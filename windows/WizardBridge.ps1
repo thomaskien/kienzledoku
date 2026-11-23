@@ -7,7 +7,10 @@ if(!(Test-Path $serverRoot)){$serverRoot=Join-Path (Split-Path $root -Parent) 's
 Import-Module (Join-Path $serverRoot 'windows/Core.psm1') -Force
 Import-Module (Join-Path $root 'WizardConfig.psm1') -Force
 . (Join-Path $root 'SetupUninstall.ps1')
+. (Join-Path $serverRoot 'windows/WizardError.ps1')
+$script:installStep='Vorhandene Installation prüfen'
 function Report([string]$Message,[int]$Percent,$Extra=@{}){
+    $script:installStep=$Message
     $status=@{message=$Message;progress=$Percent}
     foreach($key in $Extra.Keys){$status[$key]=$Extra[$key]}
     Write-Json $ProgressPath $status
@@ -75,7 +78,9 @@ try {
         $hw=Get-Hardware
         if($hw.Build -lt 22000 -or $hw.Architecture -ne 'AMD64'){throw 'Lokaler Server benötigt Windows 11 x64.'}
         if(($hw.RamBytes/1GB)-$ui.wsl_ram_gib -lt 3.5){throw 'Mindestens 4 GB RAM für Windows freihalten.'}
+        $script:installStep='Commander- und Servereinstellungen übernehmen'
         $cfg=New-WizardServerConfig $ui $previous $hw $state (Get-InstallerVersion) (Get-Catalog $serverRoot)
+        $script:installStep='Servereinstellungen speichern'
         [IO.Directory]::CreateDirectory($state)|Out-Null
         Save-Secret $cfg.TokenFile $ui.hf_token
         Save-Secret $cfg.RemoteLlmTokenFile $ui.remote_llm_token
@@ -106,8 +111,15 @@ try {
     }
     Write-Json $ResultPath $outcome;Set-PrivateFile $ResultPath
 } catch {
-    $message=$_.Exception.Message
-    if($ui){foreach($name in @('hf_token','server_token','remote_llm_token','remote_diar_token','commander_token')){if($ui.PSObject.Properties[$name] -and $ui.$name){$message=$message.Replace($ui.$name,'[Token ausgelassen]')}}}
-    if($ResultPath){Write-Json $ResultPath @{done=$false;error=$message}}
+    $failure=$_
+    if($ResultPath){
+        $secrets=@(if($ui){foreach($name in @('hf_token','server_token','remote_llm_token','remote_diar_token','commander_token','prompt')){if($ui.PSObject.Properties[$name]){$ui.$name}}})
+        $report=New-WizardDiagnostic $failure $script:installStep (Get-InstallerVersion) $secrets
+        $message=$report.Message
+        if($failure.FullyQualifiedErrorId -like 'InvokeMethodOnNull*'){
+            $message="Beim Schritt »$script:installStep« fehlt ein erwarteter Wert. Bitte die Fehlerdetails kopieren."
+        }
+        Write-Json $ResultPath @{done=$false;error=$message;details=$report.Details}
+    }
     exit 1
 } finally {if($held){$mutex.ReleaseMutex()};if($mutex){$mutex.Dispose()}}

@@ -14,7 +14,7 @@ import tarfile
 import tempfile
 import zipfile
 ROOT=Path(__file__).resolve().parents[1]
-VERSION='1.8.2'
+VERSION='1.8.3'
 sys.path.insert(0,str(ROOT))
 from installer.product_key_build import ProductKeyBuild
 def run(argv,**kw): subprocess.run(list(map(str,argv)),check=True,**kw)

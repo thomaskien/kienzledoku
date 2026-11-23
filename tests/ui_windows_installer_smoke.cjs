@@ -62,6 +62,14 @@ assert.equal(fixture.status,0,fixture.stderr);const bootstrap=JSON.parse(fixture
  await page.locator('#next').click();
  assert.equal(sent.mode,'combined');assert.equal(sent.parallel_model,'gemma12-q8');assert.equal(sent.default_model,'gemma12-q8');assert.equal(sent.wsl_ram_gib,28);assert.equal(sent.diarization_mode,'with_asr');assert.equal(sent.quality_models.sehr_gruendlich,'27b-q4');assert.equal(sent.prompt,'Äußere Befunde: Übelkeit, Größe – vollständig dokumentieren.');assert(sent.fields.includes('ekg'));
  fail=true;await page.locator('#next').click();await page.locator('#retry-install').waitFor({state:'visible'});assert.match(await page.locator('#install-error').textContent(),/Update-Konflikt/);
+ const diagnosticCopy=page.locator('[data-copy-target="install-details"]');
+ assert(await diagnosticCopy.isVisible());
+ const details=await page.locator('#install-details').textContent();
+ assert(details.includes(bootstrap.version) && details.includes('Synthetischer Update-Konflikt'));
+ assert(!details.includes(bootstrap.defaults.hf_token || 'hf_synthetic'));
+ await page.context().grantPermissions(['clipboard-read','clipboard-write'], {origin:'http://127.0.0.1:18772'});
+ await diagnosticCopy.click();
+ assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),details);
  await page.locator('#retry-install').click();assert.equal(await page.locator('#prompt').inputValue(),'Äußere Befunde: Übelkeit, Größe – vollständig dokumentieren.');
  fail=false;await page.locator('#next').click();await page.locator('#install-finished').waitFor({state:'visible'});
  assert.deepEqual(errors,[]);console.log('PASS Windows shared wizard: client, combined, model grades, tokens, progress, failure/retry, copy/close');

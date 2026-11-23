@@ -105,7 +105,7 @@ activate(GtkApplication *application, gpointer user_data)
 {
     KienzledokuWindowData *data = user_data;
     GtkWidget *window = gtk_application_window_new(application);
-    gtk_window_set_title(GTK_WINDOW(window), "kienzledoku record 1.8.2");
+    gtk_window_set_title(GTK_WINDOW(window), "kienzledoku record 1.8.3");
     gtk_window_set_default_size(GTK_WINDOW(window), 1280, 850);
     gtk_window_set_icon_name(GTK_WINDOW(window), "kienzledoku-record");
     gtk_widget_set_size_request(window, 1100, 600);
@@ -121,7 +121,7 @@ activate(GtkApplication *application, gpointer user_data)
     WebKitSettings *settings =
         webkit_web_view_get_settings(WEBKIT_WEB_VIEW(web_view));
     webkit_settings_set_user_agent(
-        settings, "kienzledoku-record/1.8.2");
+        settings, "kienzledoku-record/1.8.3");
     webkit_settings_set_enable_developer_extras(settings, FALSE);
 
     g_signal_connect(

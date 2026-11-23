@@ -2,16 +2,9 @@
 
 [Zur Übersicht](../README.md) · [T2med einrichten](../README.md#t2med-einrichten-und-verwenden)
 
-Diese Anleitung beschreibt **Linux 1.8.2** sowie die unveränderte Ausgabe
-**1.8.1 für Windows und macOS**. [Pakete und Quellcode](https://github.com/thomaskien/kienzledoku/releases)
-sind veröffentlicht. Ein Quellcode-ZIP ist kein Ersatz für die fertigen Installer
-mit eingebetteten Laufzeiten.
+KienzleDoku 1.8.3 umfasst den **Client** für die Aufnahme am Arbeitsplatz und den **Commander** für die KI-Verarbeitung. Mehrere Arbeitsplätze können denselben Commander im Praxisnetz verwenden. Für die Übergabe an eine echte Akte richten Sie T2med ein. Für ein Probediktat genügt **Testpatient öffnen** in den Record-Einstellungen.
 
-[Veröffentlichte Installer auf GitHub](https://github.com/thomaskien/kienzledoku/releases)
-
-Wählen Sie **Client**, **Server** oder **beides**. Für den Client werden Mikrofon,
-T2med-Verbindung und die Adresse des Commanders benötigt. Ein vorhandener
-KI-Server kann von mehreren Arbeitsplätzen im Praxisnetz verwendet werden.
+[Installationspakete für alle Plattformen](https://github.com/thomaskien/kienzledoku/releases/tag/v1.8.3) · [SHA-256-Prüfsummen](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.3/SHA256SUMS)
 
 ## Hugging-Face-Token einrichten
 
@@ -56,36 +49,41 @@ freier Speicherplatz richten sich nach den gewählten Modellen.
 
 ## macOS
 
-Der grafische Installer ist für **Apple Silicon** vorgesehen. Der lokale
-KI-Server benötigt mindestens 16 GB gemeinsamen Arbeitsspeicher; größere Modelle
-brauchen mehr. Die Python-Laufzeit ist enthalten. Homebrew oder
-Entwicklungswerkzeuge werden für dieses Paket nicht benötigt.
+| Was soll dieser Mac tun? | Paket und Voraussetzungen |
+| --- | --- |
+| Gespräche aufnehmen und einen vorhandenen Commander verwenden | [Universal-Client](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.3/KienzleDoku-1.8.3-macOS-Universal-nur-Client.dmg) für Intel und Apple Silicon. Sie benötigen ein Mikrofon und die Adresse Ihres Commanders. |
+| Die KI-Modelle lokal ausführen | [Client und Commander](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.3/KienzleDoku-1.8.3-macOS-Apple-Silicon-mit-Serverkomponente.dmg) für Apple Silicon, macOS 14 oder neuer und mindestens 16 GB gemeinsamen Arbeitsspeicher. Größere Modelle benötigen mehr Speicher. Die Client-App ist ebenfalls enthalten. |
 
-1. Die macOS-arm64-DMG aus den [Releases](https://github.com/thomaskien/kienzledoku/releases) laden und öffnen.
-2. **kienzledoku Installation** starten und Client, Server oder beides wählen.
-3. Verbindungen, Modelle und Dokumentationsfelder prüfen und die Zusammenfassung bestätigen.
-4. Bei Clientinstallation die angezeigte Adresse in [T2med einrichten](../README.md#t2med-einrichten-und-verwenden).
+### Python 3.12 installieren
 
-Das Paket ist **lokal signiert, aber noch nicht von Apple notarisiert**.
-„Lokal signiert“ bedeutet **keine Bindung an einen bestimmten Rechner**:
-KienzleDoku lässt sich auch auf einem anderen kompatiblen Mac mit Apple Silicon
-installieren. Der ältere Intel-Clientweg aus dem Quellcode ist im
-[Archiv](archiv/direktbetrieb.md) eingeordnet; das ARM-Paket ist kein Intel-Installer.
+Beide Pakete verwenden ein **extern installiertes CPython 3.12** für den Prozessor des Mac. Lassen Sie Python installiert, solange Sie KienzleDoku verwenden.
+
+- **Mit Homebrew** installieren Sie die gepflegte 3.12-Reihe im Terminal mit `brew install python@3.12`. Eine vorhandene Homebrew-Installation dieser Version aktualisieren Sie mit `brew upgrade python@3.12`. [Homebrew-Formel](https://formulae.brew.sh/formula/python@3.12)
+- **Mit grafischem Installer** wählen Sie bei Python.org **macOS 64-bit universal2 installer** und öffnen die geladene `.pkg` per Doppelklick. Dieser Installer ist Version 3.12.10. Spätere Sicherheitskorrekturen der 3.12-Reihe sind darin nicht enthalten. [Python.org-Download](https://www.python.org/downloads/release/python-31210/)
+
+### Arbeitsplatz einrichten
+
+1. Öffnen Sie das passende DMG und ziehen Sie **KienzleDoku.app** nach **Programme**. Alternativ können Sie den Programme-Ordner Ihres Benutzers verwenden.
+2. Starten Sie die kopierte App. Beim ersten Start tragen Sie die Commander-Adresse und gegebenenfalls den Commander-Zugang ein. Für den Praxisbetrieb geben Sie auch die T2med-Verbindung an. Vorhandene Arbeitsplatz-Einstellungen übernimmt die App.
+3. Speichern Sie die Einrichtung. Öffnen Sie die App ohne Patientenaufruf, um zu den Einstellungen zu gelangen. Wählen Sie **Testpatient öffnen**, starten Sie ein kurzes Diktat und erlauben Sie bei der ersten Aufnahme den Mikrofonzugriff. Nach dem Stoppen erscheinen Transkript und Dokumentationsentwurf. In der Testsitzung sind T2med-Aktionen gesperrt.
+4. Für echte Akten hinterlegen Sie den zur Betriebsart passenden Aufruf in T2med. **KienzleDoku.app** verarbeitet sowohl Record- als auch Connect-Aufrufe. Öffnet sich noch ein alter Starter, beenden Sie die App und starten Sie sie bei gedrückter **Wahltaste (⌥)**. Ab macOS 12 können Sie **Zuordnen** wählen. [T2med einrichten](../README.md#t2med-einrichten-und-verwenden)
+
+### Commander auf Apple Silicon einrichten
+
+1. Öffnen Sie das DMG **Client und Commander**. Starten Sie darin **Commander installieren.app**.
+2. Wählen Sie Dienste und Modelle für diesen Mac. Für geschützte Modelle halten Sie den Hugging-Face-Lesezugang bereit. Soll der Commander weitere Arbeitsplätze bedienen, wählen Sie die Freigabe fürs Praxisnetz. [Hugging-Face-Zugang einrichten](#hugging-face-token-einrichten)
+3. Soll dieser Mac auch aufnehmen, aktivieren Sie **Diesen Mac auch als Arbeitsplatz einrichten**. Der Assistent speichert die Verbindung für den angemeldeten Benutzer. Kopieren Sie **KienzleDoku.app** nach **Programme** und öffnen Sie sie dort.
+4. Tragen Sie auf weiteren Arbeitsplätzen die angezeigte LAN-Adresse und bei aktiviertem Zugriffsschutz den zugehörigen Commander-Zugang ein.
 
 ### Wenn macOS den ersten Start blockiert
 
-Wird der Start wegen fehlender Notarisierung oder eines nicht bestätigten
-Entwicklers blockiert, lässt sich die App normalerweise einzeln freigeben.
-Voraussetzung ist, dass Sie der Downloadquelle vertrauen und die App unverändert ist.
+Die Apps sind lokal signiert. Eine Apple-Notarisierung liegt für diese Ausgabe nicht vor. Haben Sie die App aus diesem Release geladen und ihre Prüfsumme bestätigt, versuchen Sie, die betreffende App zu öffnen. Bei einer Warnung zum nicht verifizierten Entwickler können Sie sie unter **Systemeinstellungen → Datenschutz & Sicherheit → Dennoch öffnen** einzeln freigeben. Für Client und Commander kann macOS jeweils eine eigene Bestätigung verlangen. Bei erlaubtem Schreibtischzugriff liegen technische Einrichtungsprotokolle auf dem Schreibtisch. [Apple-Anleitung zur App-Freigabe](https://support.apple.com/de-de/102445)
 
-1. **kienzledoku Installation** einmal zu öffnen versuchen.
-2. **Systemeinstellungen → Datenschutz & Sicherheit** öffnen und nach unten scrollen.
-3. Bei der Meldung zur App **Dennoch öffnen** wählen.
-4. Im folgenden Dialog den Start mit **Öffnen** bestätigen.
+### Mac aktualisieren oder deinstallieren
 
-[Apple-Anleitung: Sicher Apps auf dem Mac öffnen](https://support.apple.com/de-de/102445).
+Schließen Sie laufende Aufnahmen und beenden Sie die Client-App. Kopieren Sie beim Update die neue **KienzleDoku.app** nach **Programme** und ersetzen Sie die bisherige App. Öffnen Sie zum Aktualisieren des lokalen Servers **Commander installieren.app** aus dem Server-DMG.
 
-[Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc)
+Zum Entfernen des Clients wählen Sie in seinen Einstellungen **Client deinstallieren …**. Prüfen Sie den angezeigten Installationsort und bestätigen Sie das Verschieben in den Papierkorb. Sie können dabei zusätzlich Client-Einstellungen und den gespeicherten Commander-Zugang entfernen. Die Deinstallation des lokalen Commanders und die Auswahl seiner Modelldaten erfolgen im Commander-Installer.
 
 ## Linux
 
@@ -163,14 +161,9 @@ Vorgaben übernommen; Tokenwerte nicht in Screenshots oder Protokollen weitergeb
 
 ## Aktualisieren und deinstallieren
 
-Vor einem Update offene Aufnahmefenster regulär abschließen. Den freigegebenen
-Installer erneut starten und die gewünschten Komponenten wählen. Vorhandene
-Einstellungen und Modelle sollen erhalten bleiben; die Zusammenfassung vor dem
-Start kontrollieren. Die praktische Prüfung auf dem Zielsystem gehört zur Abnahme.
+Schließen Sie vor einem Update die laufende Aufnahme. Für macOS gilt die [Anleitung für Update und Deinstallation](#mac-aktualisieren-oder-deinstallieren). Unter Windows und Linux starten Sie den neuen Installer und wählen die gewünschten Komponenten. Prüfen Sie die übernommenen Einstellungen und Modelle in der Zusammenfassung.
 
-Über den Deinstallationsbereich des Assistenten lassen sich Client, Server oder
-beide Komponenten gezielt entfernen. Modelle und technische Einstellungen werden
-nur nach gesonderter Auswahl entfernt. Beim Linux-Installer im entpackten Paket:
+Der Windows-Assistent bietet die Deinstallation für Client, Server oder beide Komponenten an. Unter Linux starten Sie die Deinstallation im entpackten Paket, beispielsweise für den Server:
 
 ```bash
 ./install_linux.sh --uninstall --components server
@@ -203,7 +196,7 @@ Turbo im Speicher; der bisherige VAD- und Zeitstempelvertrag bleibt erhalten.
 
 ### Ubuntu 26.04 und Betriebssystem-Upgrades
 
-Linux 1.8.2 unterstützt zusätzlich Ubuntu 26.04. Client und KI-Worker erhalten
+Seit Version 1.8.2 unterstützt KienzleDoku auch Ubuntu 26.04. Client und KI-Worker erhalten
 dort eine eigene geprüfte Python-3.12-Laufzeit; das Ubuntu-System-Python wird
 nicht geändert. Auf 24.04 bleibt die bisherige Python-3.12-Einrichtung erhalten.
 Der CUDA-Build verwendet auf 26.04 Toolkit 13.4 aus der passenden NVIDIA-Paketquelle.

@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PAYLOAD = ROOT.parent if (ROOT.parent/'server/models.json').exists() else ROOT
 SERVER = PAYLOAD/'server' if (PAYLOAD/'server').exists() else ROOT/'server-windows'
 BRIDGE = PAYLOAD/'WizardBridge.ps1' if (PAYLOAD/'WizardBridge.ps1').exists() else ROOT/'windows/WizardBridge.ps1'
-VERSION = '1.8.2'
+VERSION = '1.8.3'
 from installer.options import SERVER_ROLES, ASR_MODELS, local_role
 CATALOG = json.loads((SERVER/'models.json').read_text(encoding='utf-8-sig'))
 GRADES = dict(basis='Basis', gruendlich='Gründlich', sehr_gruendlich='Sehr gründlich')
@@ -269,7 +269,10 @@ class Installer:
                 outcome=read_json(result,{})
                 if p.returncode or not outcome.get('done'):
                     message=outcome.get('error') or ('Installationshelfer unerwartet beendet (Exitcode %s). '%p.returncode)+(directory/'stderr.log').read_text(encoding='utf-8-sig',errors='replace')[-3000:]
-                    raise ValueError(redact(message))
+                    self.update(error=redact(message), details=redact(outcome.get('details') or
+                                f'Windows-Installer {VERSION}\nSchritt: {action}\nInstallationshelfer beendet (Exitcode {p.returncode}).'),
+                                running=False, done=False)
+                    return
                 self.update(outcome.get('message','Installation abgeschlossen'),**{k:v for k,v in outcome.items() if k!='message'},running=False,progress=100)
                 self._hw=None
         except Exception as exc:

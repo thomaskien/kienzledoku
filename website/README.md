@@ -23,12 +23,7 @@ für diese Verwendung bereitgestellt; sie werden ohne Bildbearbeitung übernomme
 
 ## Downloadstand
 
-Stand 15.11.2026: keine gemeinsamen Installer als GitHub-Releases veröffentlicht.
-Die Downloadkarten verweisen auf die Release-Übersicht und nennen diesen Status.
-Bei Freigabe der gemeinsamen Pakete die Karten auf die geprüften Assets setzen
-und den Verfügbarkeitshinweis in README, Installationsanleitung und Homepage
-zusammen aktualisieren. In diesem Auftrag werden keine Programmversionen gebaut
-oder hochgeladen.
+Die Downloadkarten für Version 1.8.3 verweisen direkt auf den Windows-Installer, das Linux-Archiv und beide macOS-DMGs. Die Mac-Anleitung erklärt die Auswahl zwischen dem Universal-Client und dem Paket mit lokalem Commander.
 
 `bootstrap/install_linux.sh` wird als `/install_linux.sh` veröffentlicht. Es liest
 öffentliche stabile Releases, wählt das neueste Linux-Paket nach Versionsnummer,

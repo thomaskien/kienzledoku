@@ -10,28 +10,20 @@ bearbeiten den Entwurf und übernehmen ihn anschließend bewusst in die Patiente
 
 ## Download und Installation
 
-**KienzleDoku 1.8.2 für Linux** ist
-[als GitHub-Release verfügbar](https://github.com/thomaskien/kienzledoku/releases/tag/v1.8.2).
-Windows und macOS bleiben bei der unveränderten Version **1.8.1**.
-Linux 1.8.2 ergänzt Ubuntu 26.04 und behält die Unterstützung für 24.04 bei.
-Der zugehörige Quellcode ist unter demselben Tag veröffentlicht. Enthalten sind
-Auditkorrekturen, verteilte Sprechertrennung, Temperaturanzeigen und die
-[Vorbereitung für Kienzlebench](docs/commander-benchmark-api.md).
+**KienzleDoku 1.8.3** ist für macOS, Windows und Ubuntu verfügbar. Wählen Sie das Paket für Ihren Arbeitsplatz oder KI-Server.
 
-**Vor der Serverinstallation:** [Hugging-Face-Token einrichten](docs/installation.md#hugging-face-token-einrichten) – Konto, Modellfreigabe, Lesetoken und Eingabe im Installer.
-
-| Betriebssystem | Download und Anleitung | Installationsvideo |
+| System und Einsatz | Download | Anleitung |
 | --- | --- | --- |
-| Windows x64 | [Installer 1.8.1](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.1/kienzledoku-1.8.1-windows-x64-setup.exe) · [Anleitung](docs/installation.md#windows) | [Unter Windows installieren](https://www.youtube.com/watch?v=RlPRxwvj6ks) |
-| macOS / Apple Silicon | [Installer 1.8.1](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.1/kienzledoku-1.8.1-macOS-arm64.dmg) · [Anleitung](docs/installation.md#macos) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
-| Ubuntu 24.04 / 26.04 · x86_64 | [Archiv 1.8.2](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.2/kienzledoku-1.8.2-linux-x86_64.tar.gz) · [Anleitung](docs/installation.md#linux) | [Unter Mac und Linux installieren](https://www.youtube.com/watch?v=_Mn_QjbPdmc) |
+| Mac mit Intel oder Apple Silicon · Arbeitsplatz an einem vorhandenen Commander | [Universal-Client (DMG)](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.3/KienzleDoku-1.8.3-macOS-Universal-nur-Client.dmg) | [Mac einrichten](docs/installation.md#macos) |
+| Mac mit Apple Silicon · eigener KI-Server, optional auch Arbeitsplatz | [Client und Commander (DMG)](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.3/KienzleDoku-1.8.3-macOS-Apple-Silicon-mit-Serverkomponente.dmg) | [Commander auf dem Mac einrichten](docs/installation.md#commander-auf-apple-silicon-einrichten) |
+| Windows x64 · Client oder Server | [Setup (EXE)](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.3/kienzledoku-1.8.3-windows-x64-setup.exe) · [dasselbe Setup als ZIP](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.3/kienzledoku-1.8.3-windows-x64.zip) | [Windows installieren](docs/installation.md#windows) |
+| Ubuntu 24.04 oder 26.04 LTS x86_64 · Client oder Server | [Installationsarchiv](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.3/kienzledoku-1.8.3-linux-x86_64.tar.gz) | [Linux installieren](docs/installation.md#linux) |
 
-[Veröffentlichte Pakete auf GitHub](https://github.com/thomaskien/kienzledoku/releases)
-· [Homepage](https://kienzledoku.de/)
+**Am Mac zuerst CPython 3.12 installieren.** Beide DMGs enthalten dieselbe `KienzleDoku.app` für Record und Connect. Ziehen Sie sie nach **Programme**. Das Server-DMG enthält zusätzlich **Commander installieren.app** für Apple Silicon ab macOS 14 mit mindestens 16 GB gemeinsamem Arbeitsspeicher.
 
-Die Installer bieten **Client, Server oder beides**. Der Client braucht ein
-Mikrofon sowie Zugang zu T2med und zum Commander. Für den KI-Server ist passende
-Hardware erforderlich; er kann auf einem anderen Rechner im Praxisnetz laufen.
+Für ein Probediktat wählen Sie in den Record-Einstellungen **Testpatient öffnen**. Ein Mikrofon und ein erreichbarer Commander genügen für Aufnahme, Transkription und Dokumentation. Die fiktive Sitzung greift nicht auf T2med zu.
+
+[Release 1.8.3](https://github.com/thomaskien/kienzledoku/releases/tag/v1.8.3) · [SHA-256-Prüfsummen](https://github.com/thomaskien/kienzledoku/releases/download/v1.8.3/SHA256SUMS) · [Hugging-Face-Zugang für die Sprechertrennung](docs/installation.md#hugging-face-token-einrichten)
 
 Der Linux-Kurzaufruf für einen Server lautet:
 
@@ -99,7 +91,7 @@ wirkt auch ohne VAD. Einstellungen werden für diesen Client gespeichert.
 
 ## T2med einrichten und verwenden
 
-Diese Anleitung gilt für **Linux 1.8.2** sowie **macOS und Windows 1.8.1**.
+Die folgenden Schritte richten den Zugriff auf echte T2med-Akten ein.
 Die älteren Quellcode-Installer sind separat im
 [Archiv](docs/archiv/direktbetrieb.md) beschrieben.
 

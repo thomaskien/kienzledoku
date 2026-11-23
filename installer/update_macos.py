@@ -223,7 +223,7 @@ def unregister_old_app(app,runner=subprocess.run):
     raise RuntimeError('Alte App-Registrierung konnte nicht entfernt werden (lsregister, Exit '+str(result.returncode)+'). Neue Programme sind bereits aktiviert; Bereinigung nicht abgeschlossen.')
 
 
-def complete_update(support,home,version,reader=processes,remove=shutil.rmtree,runner=subprocess.run,preserved=None,expected_roles=()):
+def complete_update(support,home,version,reader=processes,remove=shutil.rmtree,runner=subprocess.run,preserved=None,expected_roles=(),keep_legacy_client=False):
     support=checked_directory(support);versions=checked_directory(support/'versions');version=checked_directory(version)
     if version.parent!=versions or not owned_version(version):raise ValueError('Neue Installation ist nicht eindeutig zugeordnet.')
     preserved=preserved or {}
@@ -241,7 +241,7 @@ def complete_update(support,home,version,reader=processes,remove=shutil.rmtree,r
            for root in retained}
     for path in obsolete:
         if not owned_version(path):raise ValueError('Unbekannter Eintrag im Versionsverzeichnis; keine automatische Löschfreigabe.')
-    legacy=legacy_code(support)
+    legacy=[] if keep_legacy_client else legacy_code(support)
     hotfix=support/'hotfix-backups'
     if hotfix.exists():checked_directory(hotfix)
     rows=reader()

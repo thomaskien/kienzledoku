@@ -123,10 +123,19 @@ class Uninstaller:
         if not isinstance(arguments, list) or len(arguments) < 4 or not all(isinstance(item, str) for item in arguments):
             raise ValueError("Der Commander-Autostart kann nicht sicher Kienzledoku zugeordnet werden.")
         runtime, service, config, credentials = map(Path, arguments[:4])
-        # venv/bin/python legitimately points to the bundled interpreter. Allow
-        # that link only when its resolved target stays inside our versions.
+        # The separate Commander installer links its private venv to an external
+        # interpreter. Only the owned service and its exact venv path are removed.
+        from installer.update_macos import owned_version
+        version = service.parent.parent
+        external_venv = (
+            version.parent == self.versions and runtime == version/'venv/bin/python'
+            and service == version/'installer/service_main.py' and service.is_file()
+            and not _has_symlink(runtime.parent, self.versions)
+            and not _has_symlink(version/'venv/pyvenv.cfg', self.versions)
+            and (version/'venv/pyvenv.cfg').is_file() and owned_version(version)
+        )
         if (not _inside(runtime, self.versions) or not runtime.is_file()
-                or not _inside(runtime.resolve(), self.versions.resolve())
+                or not (_inside(runtime.resolve(), self.versions.resolve()) or external_venv)
                 or _has_symlink(service, self.versions)
                 or _has_symlink(config, self.support) or _has_symlink(credentials, self.support)
                 or service.name != "service_main.py"
